@@ -1,0 +1,68 @@
+'use client';
+
+import { Users, TrendingUp, TrendingDown, Trophy } from 'lucide-react';
+import { Stats } from '@/types';
+
+interface StatCardProps {
+  title: string;
+  value: string | number;
+  icon: React.ComponentType<{ className?: string }>;
+  gradient: string;
+  onClick?: () => void;
+}
+
+function StatCard({ title, value, icon: Icon, gradient, onClick }: StatCardProps) {
+  return (
+    <div 
+      className={`bg-white dark:bg-slate-800 rounded-xl shadow-md hover:shadow-lg transition-shadow p-6 border border-slate-200 dark:border-slate-700 ${onClick ? 'cursor-pointer' : ''}`}
+      onClick={onClick}
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-slate-600 dark:text-slate-400 text-sm font-medium mb-1">
+            {title}
+          </p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white">
+            {value}
+          </p>
+        </div>
+        <div className={`p-3 rounded-lg ${gradient}`}>
+          <Icon className="w-6 h-6 text-white" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function StatsCards({ stats, onPromotedClick }: { stats: Stats; onPromotedClick?: () => void }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <StatCard
+        title="Total Registered Drivers"
+        value={stats.totalDrivers}
+        icon={Users}
+        gradient="bg-gradient-to-br from-primary-500 to-primary-600"
+      />
+      <StatCard
+        title="Drivers Promoted"
+        value={stats.driversPromoted}
+        icon={TrendingUp}
+        gradient="bg-gradient-to-br from-emerald-500 to-emerald-600"
+        onClick={onPromotedClick}
+      />
+      <StatCard
+        title="Drivers Demoted"
+        value={stats.driversDemoted}
+        icon={TrendingDown}
+        gradient="bg-gradient-to-br from-red-500 to-red-600"
+      />
+      <StatCard
+        title="Active Divisions"
+        value={stats.activeDivisions}
+        icon={Trophy}
+        gradient="bg-gradient-to-br from-amber-500 to-amber-600"
+      />
+    </div>
+  );
+}
+
