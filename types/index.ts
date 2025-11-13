@@ -80,3 +80,22 @@ export interface Stats {
   activeDivisions: number;
 }
 
+export interface Round {
+  id: string;
+  roundNumber: number;
+  name: string;
+  date: string;
+  location: string;
+  address: string;
+  status: 'upcoming' | 'completed' | 'cancelled';
+}
+
+export interface Season {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  numberOfRounds: number;
+  rounds: Round[];
+}
+
