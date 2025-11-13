@@ -100,7 +100,7 @@ export default function Sidebar() {
             className="flex items-center justify-center flex-1"
           >
             <img
-              src="/vhkc-logo.png"
+              src="vhkc-logo.png"
               alt="VHKC Staff Portal"
               width={isCollapsed ? 40 : 120}
               height={isCollapsed ? 40 : 40}
