@@ -52,8 +52,12 @@ export interface RaceDivisionResult {
 
 export interface DriverRaceResult {
   driverId: string;
+  driverAlias?: string;
   driverName: string;
+  kartNumber?: string;
   position: number;
+  gridPosition?: number;
+  overallPosition?: number;
   fastestLap: string;
   points: number;
 }
