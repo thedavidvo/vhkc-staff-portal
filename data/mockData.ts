@@ -1,4 +1,4 @@
-import { Driver, Race, Stats, Team, Promotion, Division } from '@/types';
+import { Driver, Race, Stats, Team, Promotion, Division, Season } from '@/types';
 
 export const mockStats: Stats = {
   totalDrivers: 127,
@@ -348,4 +348,79 @@ export const mockLocations: string[] = [
   'Speedway Park',
   'Thunder Track',
   'Velocity Circuit',
+];
+
+export const mockSeasons: Season[] = [
+  {
+    id: 'season-1',
+    name: '2024 Winter',
+    startDate: '2024-01-15',
+    endDate: '2024-02-15',
+    numberOfRounds: 3,
+    rounds: [
+      {
+        id: 'round-1',
+        roundNumber: 1,
+        name: 'Winter Championship - Round 1',
+        date: '2024-01-20',
+        location: 'Speedway Park',
+        address: '123 Racing Blvd, City, State 12345',
+        status: 'completed',
+      },
+      {
+        id: 'round-2',
+        roundNumber: 2,
+        name: 'Winter Championship - Round 2',
+        date: '2024-01-27',
+        location: 'Speedway Park',
+        address: '123 Racing Blvd, City, State 12345',
+        status: 'upcoming',
+      },
+      {
+        id: 'round-3',
+        roundNumber: 3,
+        name: 'Winter Championship - Round 3',
+        date: '2024-02-10',
+        location: 'Thunder Track',
+        address: '456 Raceway Ave, City, State 12345',
+        status: 'completed',
+      },
+    ],
+  },
+  {
+    id: 'season-2',
+    name: '2024 Spring',
+    startDate: '2024-02-15',
+    endDate: '2024-03-15',
+    numberOfRounds: 3,
+    rounds: [
+      {
+        id: 'round-4',
+        roundNumber: 1,
+        name: 'Spring Qualifier - Round 1',
+        date: '2024-02-17',
+        location: 'Velocity Circuit',
+        address: '789 Speedway Rd, City, State 12345',
+        status: 'completed',
+      },
+      {
+        id: 'round-5',
+        roundNumber: 2,
+        name: 'Spring Qualifier - Round 2',
+        date: '2024-02-24',
+        location: 'Speedway Park',
+        address: '123 Racing Blvd, City, State 12345',
+        status: 'completed',
+      },
+      {
+        id: 'round-6',
+        roundNumber: 3,
+        name: 'Spring Championship - Round 1',
+        date: '2024-03-02',
+        location: 'Thunder Track',
+        address: '456 Raceway Ave, City, State 12345',
+        status: 'upcoming',
+      },
+    ],
+  },
 ];
