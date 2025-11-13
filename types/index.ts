@@ -1,9 +1,13 @@
 export type Division = 'Division 1' | 'Division 2' | 'Division 3' | 'Division 4';
-export type DriverStatus = 'ACTIVE' | 'INACTIVE';
+export type DriverStatus = 'ACTIVE' | 'INACTIVE' | 'BANNED';
 
 export interface Driver {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  homeTrack?: string;
   division: Division;
   email: string;
   teamName?: string;
@@ -19,7 +23,11 @@ export interface Driver {
 export interface RaceResult {
   raceId: string;
   raceName: string;
+  trackName: string;
+  season: string;
+  round: number;
   position: number;
+  qualificationTime?: string;
   fastestLap: string;
   points: number;
   date: string;
