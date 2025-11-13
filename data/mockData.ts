@@ -170,10 +170,119 @@ export const mockRaces: Race[] = [
   },
   {
     id: '3',
-    name: 'Spring Qualifier',
+    name: 'Winter Championship - Round 3',
+    season: '2024 Winter',
+    round: 3,
+    date: '2024-02-10',
+    location: 'Thunder Track',
+    address: '456 Raceway Ave, City, State 12345',
+    status: 'completed',
+    results: [
+      {
+        division: 'Division 1',
+        results: [
+          { driverId: '2', driverName: 'Sarah Chen', position: 1, fastestLap: '1:17.89', points: 25 },
+          { driverId: '1', driverName: 'Alex Thompson', position: 2, fastestLap: '1:18.15', points: 18 },
+          { driverId: '9', driverName: 'Liam Anderson', position: 3, fastestLap: '1:18.92', points: 15 },
+          { driverId: '6', driverName: 'Olivia Brown', position: 4, fastestLap: '1:19.45', points: 12 },
+        ],
+      },
+      {
+        division: 'Division 2',
+        results: [
+          { driverId: '7', driverName: 'Noah Davis', position: 1, fastestLap: '1:21.33', points: 25 },
+          { driverId: '3', driverName: 'Marcus Johnson', position: 2, fastestLap: '1:21.78', points: 18 },
+          { driverId: '10', driverName: 'Isabella Taylor', position: 3, fastestLap: '1:23.12', points: 15 },
+          { driverId: '4', driverName: 'Emma Wilson', position: 4, fastestLap: '1:23.89', points: 12 },
+        ],
+      },
+      {
+        division: 'Division 3',
+        results: [
+          { driverId: '5', driverName: 'James Rodriguez', position: 1, fastestLap: '1:27.45', points: 25 },
+          { driverId: '8', driverName: 'Sophia Martinez', position: 2, fastestLap: '1:28.12', points: 18 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '4',
+    name: 'Spring Qualifier - Round 1',
     season: '2024 Spring',
     round: 1,
-    date: '2024-02-03',
+    date: '2024-02-17',
+    location: 'Velocity Circuit',
+    address: '789 Speedway Rd, City, State 12345',
+    status: 'completed',
+    results: [
+      {
+        division: 'Division 1',
+        results: [
+          { driverId: '1', driverName: 'Alex Thompson', position: 1, fastestLap: '1:16.78', points: 25 },
+          { driverId: '9', driverName: 'Liam Anderson', position: 2, fastestLap: '1:17.23', points: 18 },
+          { driverId: '2', driverName: 'Sarah Chen', position: 3, fastestLap: '1:17.56', points: 15 },
+          { driverId: '6', driverName: 'Olivia Brown', position: 4, fastestLap: '1:18.12', points: 12 },
+        ],
+      },
+      {
+        division: 'Division 2',
+        results: [
+          { driverId: '3', driverName: 'Marcus Johnson', position: 1, fastestLap: '1:20.89', points: 25 },
+          { driverId: '7', driverName: 'Noah Davis', position: 2, fastestLap: '1:21.34', points: 18 },
+          { driverId: '4', driverName: 'Emma Wilson', position: 3, fastestLap: '1:22.67', points: 15 },
+          { driverId: '10', driverName: 'Isabella Taylor', position: 4, fastestLap: '1:23.45', points: 12 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '5',
+    name: 'Spring Qualifier - Round 2',
+    season: '2024 Spring',
+    round: 2,
+    date: '2024-02-24',
+    location: 'Speedway Park',
+    address: '123 Racing Blvd, City, State 12345',
+    status: 'completed',
+    results: [
+      {
+        division: 'Division 1',
+        results: [
+          { driverId: '9', driverName: 'Liam Anderson', position: 1, fastestLap: '1:17.12', points: 25 },
+          { driverId: '1', driverName: 'Alex Thompson', position: 2, fastestLap: '1:17.45', points: 18 },
+          { driverId: '2', driverName: 'Sarah Chen', position: 3, fastestLap: '1:17.89', points: 15 },
+        ],
+      },
+      {
+        division: 'Division 2',
+        results: [
+          { driverId: '7', driverName: 'Noah Davis', position: 1, fastestLap: '1:20.56', points: 25 },
+          { driverId: '3', driverName: 'Marcus Johnson', position: 2, fastestLap: '1:21.12', points: 18 },
+          { driverId: '10', driverName: 'Isabella Taylor', position: 3, fastestLap: '1:22.34', points: 15 },
+        ],
+      },
+      {
+        division: 'Division 3',
+        results: [
+          { driverId: '5', driverName: 'James Rodriguez', position: 1, fastestLap: '1:26.78', points: 25 },
+          { driverId: '8', driverName: 'Sophia Martinez', position: 2, fastestLap: '1:27.45', points: 18 },
+        ],
+      },
+      {
+        division: 'Division 4',
+        results: [
+          { driverId: '11', driverName: 'Michael Scott', position: 1, fastestLap: '1:32.12', points: 25 },
+          { driverId: '12', driverName: 'Jennifer Lee', position: 2, fastestLap: '1:33.45', points: 18 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '6',
+    name: 'Spring Championship - Round 1',
+    season: '2024 Spring',
+    round: 3,
+    date: '2024-03-02',
     location: 'Thunder Track',
     address: '456 Raceway Ave, City, State 12345',
     status: 'upcoming',
@@ -215,6 +324,23 @@ export const mockPromotions: Promotion[] = [
     fromDivision: 'Division 3',
     toDivision: 'Division 2',
     date: '2024-01-16',
+  },
+];
+
+export const mockDemotions: Promotion[] = [
+  {
+    driverId: '6',
+    driverName: 'Olivia Brown',
+    fromDivision: 'Division 1',
+    toDivision: 'Division 2',
+    date: '2024-01-17',
+  },
+  {
+    driverId: '4',
+    driverName: 'Emma Wilson',
+    fromDivision: 'Division 2',
+    toDivision: 'Division 3',
+    date: '2024-01-17',
   },
 ];
 
