@@ -29,7 +29,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Drivers', href: '/drivers', icon: Users },
   { name: 'Races', href: '/races', icon: Flag },
   { name: 'Divisions', href: '/divisions', icon: Trophy },
@@ -96,7 +96,7 @@ export default function Sidebar() {
       >
         <div className="p-4 flex items-center justify-between border-b border-slate-700">
           <Link
-            href="/"
+            href="/dashboard"
             onClick={handleLinkClick}
             className="flex items-center justify-center flex-1"
           >

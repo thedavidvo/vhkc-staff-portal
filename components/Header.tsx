@@ -1,12 +1,16 @@
 'use client';
 
-import { Search, User, Moon, Sun } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Search, User, Moon, Sun, LogOut } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function Header({ title, hideSearch }: { title?: string; hideSearch?: boolean }) {
+  const router = useRouter();
   const [darkMode, setDarkMode] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -29,6 +33,28 @@ export default function Header({ title, hideSearch }: { title?: string; hideSear
       }
     }
   }, []);
+
+  // Close profile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+
+    if (isProfileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isProfileMenuOpen]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('isAuthenticated');
+    router.push('/');
+  };
 
   const toggleDarkMode = () => {
     const newDarkMode = !darkMode;
@@ -79,8 +105,30 @@ export default function Header({ title, hideSearch }: { title?: string; hideSear
             )}
           </button>
 
-          <div className="p-2 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 transition-all cursor-pointer shadow-md">
-            <User className="w-5 h-5 text-white" />
+          <div className="relative" ref={profileMenuRef}>
+            <button
+              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+              className="p-2 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 transition-all cursor-pointer shadow-md"
+              aria-label="Profile menu"
+            >
+              <User className="w-5 h-5 text-white" />
+            </button>
+
+            {isProfileMenuOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden z-50">
+                <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">Profile</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">User Account</p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
