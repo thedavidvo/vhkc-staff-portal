@@ -5,8 +5,22 @@ import { SidebarProvider } from '@/components/SidebarContext';
 import { SeasonProvider } from '@/components/SeasonContext';
 
 export const metadata: Metadata = {
-  title: 'VHKC Staff Portal',
+  title: 'VHKC | Staff Portal',
   description: 'Staff portal for managing go kart drivers, races, and performance data',
+  icons: {
+    icon: {
+      url: '/vhkc-logo.png',
+      type: 'image/png',
+    },
+    shortcut: {
+      url: '/vhkc-logo.png',
+      type: 'image/png',
+    },
+    apple: {
+      url: '/vhkc-logo.png',
+      type: 'image/png',
+    },
+  },
 };
 
 export default function RootLayout({
