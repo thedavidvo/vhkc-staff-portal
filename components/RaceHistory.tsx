@@ -12,16 +12,17 @@ export default function RaceHistory({ races }: RaceHistoryProps) {
   const [selectedRace, setSelectedRace] = useState<Race | null>(null);
   const [selectedDivision, setSelectedDivision] = useState<Division>('Division 1');
 
-  const completedRaces = races.filter((r) => r.status === 'completed').sort(
+  // Show all races sorted by date (most recent first)
+  const sortedRaces = [...races].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
   // Set default race to most recent if available
   useEffect(() => {
-    if (!selectedRace && completedRaces.length > 0) {
-      setSelectedRace(completedRaces[0]);
+    if (!selectedRace && sortedRaces.length > 0) {
+      setSelectedRace(sortedRaces[0]);
     }
-  }, [selectedRace, completedRaces]);
+  }, [selectedRace, sortedRaces]);
 
   // Get available divisions from selected race
   const availableDivisions = selectedRace?.results
@@ -54,13 +55,13 @@ export default function RaceHistory({ races }: RaceHistoryProps) {
             </h3>
           </div>
           <div className="overflow-y-auto max-h-[600px]">
-            {completedRaces.length === 0 ? (
+            {sortedRaces.length === 0 ? (
               <div className="p-8 text-center text-slate-500 dark:text-slate-400">
-                No completed races available.
+                No races available.
               </div>
             ) : (
               <div className="divide-y divide-slate-200 dark:divide-slate-700">
-                {completedRaces.map((race) => (
+                {sortedRaces.map((race) => (
                   <div
                     key={race.id}
                     onClick={() => {
@@ -75,13 +76,24 @@ export default function RaceHistory({ races }: RaceHistoryProps) {
                     }}
                     className={`p-4 cursor-pointer transition-colors ${
                       selectedRace?.id === race.id
-                        ? 'bg-primary-50 dark:bg-primary-900/20 border-l-4 border-primary'
+                        ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500'
                         : 'hover:bg-slate-50 dark:hover:bg-slate-700'
                     }`}
                   >
-                    <h4 className="font-semibold text-slate-900 dark:text-white mb-2">
-                      {race.name}
-                    </h4>
+                    <div className="flex items-start justify-between mb-2">
+                      <h4 className="font-semibold text-slate-900 dark:text-white">
+                        {race.name}
+                      </h4>
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        race.status === 'completed' 
+                          ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+                          : race.status === 'upcoming'
+                          ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+                          : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
+                      }`}>
+                        {race.status}
+                      </span>
+                    </div>
                     <div className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
@@ -188,9 +200,17 @@ export default function RaceHistory({ races }: RaceHistoryProps) {
                     </div>
                   </div>
                 ))
-              ) : (
+              ) : selectedRace?.status === 'completed' ? (
                 <div className="p-8 text-center text-slate-500 dark:text-slate-400">
                   No results available for {selectedDivision} in this race.
+                </div>
+              ) : (
+                <div className="p-8 text-center text-slate-500 dark:text-slate-400">
+                  {selectedRace?.status === 'upcoming' 
+                    ? 'This race is upcoming. Results will be available after completion.'
+                    : selectedRace?.status === 'cancelled'
+                    ? 'This race has been cancelled.'
+                    : 'No results available for this race.'}
                 </div>
               )}
             </div>

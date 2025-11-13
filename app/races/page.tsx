@@ -5,7 +5,7 @@ import Header from '@/components/Header';
 import { useSeason } from '@/components/SeasonContext';
 import { mockRaces } from '@/data/mockData';
 import { Race, Division, DriverRaceResult } from '@/types';
-import { Plus, Save } from 'lucide-react';
+import { Plus, Save, Trash2 } from 'lucide-react';
 
 export default function RacesPage() {
   const { selectedSeason } = useSeason();
@@ -76,6 +76,17 @@ export default function RacesPage() {
   const handleTypeModalCancel = () => {
     setNewTypeName('');
     setIsTypeModalOpen(false);
+  };
+
+  const handleDeleteType = (typeName: string) => {
+    if (!confirm(`Are you sure you want to delete the race name "${typeName}"?`)) {
+      return;
+    }
+    setTypes(types.filter((t) => t !== typeName));
+    if (selectedType === typeName) {
+      setSelectedType(null);
+      setDriverResults([]);
+    }
   };
 
   const handleUpdateDriverResult = (index: number, field: keyof DriverRaceResult, value: string | number, forceAddRow = false) => {
@@ -240,11 +251,9 @@ export default function RacesPage() {
                         }`}
                       >
                         <div className="font-medium">{division}</div>
-                        {hasResults && (
-                          <div className="text-sm mt-0.5 opacity-75">
-                            {selectedEvent.results?.find((r) => r.division === division)?.results.length || 0} drivers
-                          </div>
-                        )}
+                        <div className="text-sm mt-0.5 opacity-75">
+                          {selectedEvent.results?.find((r) => r.division === division)?.results.length || 0} drivers
+                        </div>
                       </button>
                     );
                   })}
@@ -274,19 +283,33 @@ export default function RacesPage() {
                 <div className="space-y-1">
                   {types.length > 0 ? (
                     types.map((type) => (
-                      <button
+                      <div
                         key={type}
-                        onClick={() => {
-                          setSelectedType(type);
-                        }}
-                        className={`w-full text-left p-2 rounded-lg transition-colors text-sm ${
+                        className={`group flex items-center justify-between p-2 rounded-lg transition-colors text-sm ${
                           selectedType === type
                             ? 'bg-primary-500 text-white'
                             : 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600'
                         }`}
                       >
-                        <div className="font-medium">{type}</div>
-                      </button>
+                        <button
+                          onClick={() => {
+                            setSelectedType(type);
+                          }}
+                          className="flex-1 text-left font-medium"
+                        >
+                          {type}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteType(type);
+                          }}
+                          className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="Delete race name"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     ))
                   ) : (
                     <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-sm">
@@ -434,33 +457,33 @@ function SpreadsheetTable({
   }
 
   return (
-    <div className="p-4">
+      <div className="p-4">
       <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
         Race Results - {division}{type ? ` - ${type}` : ''}
       </h3>
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead className="bg-slate-50 dark:bg-slate-900 sticky top-0">
+        <table className="w-full border-collapse border border-slate-300 dark:border-slate-600">
+          <thead className="bg-slate-100 dark:bg-slate-900 sticky top-0">
             <tr>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase border border-slate-200 dark:border-slate-700">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
                 Driver Alias
               </th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase border border-slate-200 dark:border-slate-700">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
                 Driver Name
               </th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase border border-slate-200 dark:border-slate-700">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
                 Kart Number
               </th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase border border-slate-200 dark:border-slate-700">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
                 Grid Position
               </th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase border border-slate-200 dark:border-slate-700">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
                 Overall Position
               </th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase border border-slate-200 dark:border-slate-700">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
                 Best Time
               </th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase border border-slate-200 dark:border-slate-700">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
                 Positions Gained/Lost
               </th>
             </tr>
@@ -471,7 +494,7 @@ function SpreadsheetTable({
                 key={result.driverId}
                 className="hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
               >
-                <td className="px-3 py-1 border border-slate-200 dark:border-slate-700">
+                <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                   <input
                     type="text"
                     value={result.driverAlias || ''}
@@ -536,11 +559,11 @@ function SpreadsheetTable({
                     }}
                     data-row={index}
                     data-field="driverAlias"
-                    className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white focus:bg-slate-100 dark:focus:bg-slate-600"
+                    className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:ring-1 focus:ring-blue-500"
                     placeholder="Alias"
                   />
                 </td>
-                <td className="px-3 py-1 border border-slate-200 dark:border-slate-700">
+                <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                   <input
                     type="text"
                     value={result.driverName || ''}
@@ -583,11 +606,11 @@ function SpreadsheetTable({
                     }}
                     data-row={index}
                     data-field="driverName"
-                    className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white focus:bg-slate-100 dark:focus:bg-slate-600"
+                    className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:ring-1 focus:ring-blue-500"
                     placeholder="Name"
                   />
                 </td>
-                <td className="px-3 py-1 border border-slate-200 dark:border-slate-700">
+                <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                   <input
                     type="text"
                     value={result.kartNumber || ''}
@@ -630,11 +653,11 @@ function SpreadsheetTable({
                     }}
                     data-row={index}
                     data-field="kartNumber"
-                    className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white focus:bg-slate-100 dark:focus:bg-slate-600"
+                    className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:ring-1 focus:ring-blue-500"
                     placeholder="Kart #"
                   />
                 </td>
-                <td className="px-3 py-1 border border-slate-200 dark:border-slate-700">
+                <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                   <input
                     type="number"
                     value={result.gridPosition || ''}
@@ -677,11 +700,11 @@ function SpreadsheetTable({
                     }}
                     data-row={index}
                     data-field="gridPosition"
-                    className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white focus:bg-slate-100 dark:focus:bg-slate-600"
+                    className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:ring-1 focus:ring-blue-500"
                     placeholder="Grid"
                   />
                 </td>
-                <td className="px-3 py-1 border border-slate-200 dark:border-slate-700">
+                <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                   <input
                     type="number"
                     value={result.overallPosition || ''}
@@ -724,11 +747,11 @@ function SpreadsheetTable({
                     }}
                     data-row={index}
                     data-field="overallPosition"
-                    className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white focus:bg-slate-100 dark:focus:bg-slate-600"
+                    className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:ring-1 focus:ring-blue-500"
                     placeholder="Overall"
                   />
                 </td>
-                <td className="px-3 py-1 border border-slate-200 dark:border-slate-700">
+                <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                   <input
                     type="text"
                     value={result.fastestLap || ''}
@@ -766,11 +789,11 @@ function SpreadsheetTable({
                     }}
                     data-row={index}
                     data-field="fastestLap"
-                    className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm font-mono text-slate-900 dark:text-white focus:bg-slate-100 dark:focus:bg-slate-600"
-                    placeholder="1:18.32"
+                    className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm font-mono text-slate-900 dark:text-white focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:ring-1 focus:ring-blue-500"
+                    placeholder="60.131"
                   />
                 </td>
-                <td className="px-3 py-1 border border-slate-200 dark:border-slate-700">
+                <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                   <div className="px-2 py-1 text-sm font-semibold text-slate-900 dark:text-white">
                     {result.gridPosition && result.overallPosition
                       ? (() => {
