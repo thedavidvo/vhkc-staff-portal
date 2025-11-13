@@ -35,6 +35,32 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify build output
+        run: |
+          if [ ! -d "out" ]; then
+            echo "Error: out directory not found!"
+            exit 1
+          fi
+          if [ ! -f "out/index.html" ]; then
+            echo "Error: index.html not found in out directory!"
+            exit 1
+          fi
+          echo "Build output contents:"
+          ls -la out/ | head -20
+          echo "Checking for images:"
+          if [ -f "out/vhkc-logo.png" ]; then
+            echo "✓ vhkc-logo.png found in out directory"
+          else
+            echo "✗ WARNING: vhkc-logo.png NOT found in out directory"
+            echo "Public directory contents:"
+            ls -la public/ || echo "Public directory not found"
+          fi
+          if [ -f "out/README.md" ]; then
+            echo "Warning: README.md found in out directory, removing it"
+            rm out/README.md
+          fi
+          echo "Build verification complete. Found index.html and other build files."
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 

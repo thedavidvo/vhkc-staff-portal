@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useSidebar } from './SidebarContext';
 import {
@@ -100,13 +99,12 @@ export default function Sidebar() {
             onClick={handleLinkClick}
             className="flex items-center justify-center flex-1"
           >
-            <Image
+            <img
               src="/vhkc-logo.png"
               alt="VHKC Staff Portal"
               width={isCollapsed ? 40 : 120}
               height={isCollapsed ? 40 : 40}
               className="object-contain"
-              priority
             />
           </Link>
           <button
