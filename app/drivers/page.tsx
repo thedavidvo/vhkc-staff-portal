@@ -112,6 +112,7 @@ export default function DriversPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [divisionFilter, setDivisionFilter] = useState<Division | 'all'>('all');
   const [teamFilter, setTeamFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<DriverStatus | 'all'>('all');
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Driver>>({});
@@ -130,9 +131,10 @@ export default function DriversPage() {
         driver.email.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesDivision = divisionFilter === 'all' || driver.division === divisionFilter;
       const matchesTeam = teamFilter === 'all' || driver.teamName === teamFilter;
-      return matchesSearch && matchesDivision && matchesTeam;
+      const matchesStatus = statusFilter === 'all' || driver.status === statusFilter;
+      return matchesSearch && matchesDivision && matchesTeam && matchesStatus;
     });
-  }, [drivers, searchQuery, divisionFilter, teamFilter]);
+  }, [drivers, searchQuery, divisionFilter, teamFilter, statusFilter]);
 
   const selectedDriverRaceHistory = useMemo(() => {
     if (!selectedDriver) return [];
@@ -253,19 +255,29 @@ export default function DriversPage() {
                   </option>
                 ))}
               </select>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as DriverStatus | 'all')}
+                className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="all">All Status</option>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+                <option value="BANNED">Banned</option>
+              </select>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Drivers List */}
             <div className="lg:col-span-1">
-              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[calc(100vh-200px)]">
                 <div className="p-4 border-b border-slate-200 dark:border-slate-700">
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
                     All Drivers ({filteredDrivers.length})
                   </h2>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto flex-1 overflow-y-auto">
                   <table className="w-full">
                     <thead className="bg-slate-50 dark:bg-slate-900">
                       <tr>
@@ -618,51 +630,40 @@ export default function DriversPage() {
                       No race history available
                     </p>
                   ) : (
-                    <div className="space-y-4 max-h-[600px] overflow-y-auto">
+                    <div className="space-y-2 max-h-[600px] overflow-y-auto">
                       {selectedDriverRaceHistory.map((race, index) => (
                         <div
                           key={`${race.raceId}-${index}`}
-                          className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                          className="border border-slate-200 dark:border-slate-700 rounded-lg p-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                         >
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <MapPin className="w-4 h-4 text-slate-400" />
-                                <h3 className="font-semibold text-slate-900 dark:text-white">
-                                  {race.trackName}
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                                  {race.raceName}
                                 </h3>
+                                {race.position === 1 && (
+                                  <Trophy className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                                )}
                               </div>
-                              <p className="text-sm text-slate-600 dark:text-slate-400">
-                                {race.raceName}
+                              <p className="text-xs text-slate-600 dark:text-slate-400 truncate">
+                                {race.trackName} • {race.season} R{race.round}
                               </p>
                             </div>
-                            <div className="flex items-center gap-1">
-                              {race.position === 1 && (
-                                <Trophy className="w-5 h-5 text-amber-500" />
-                              )}
-                              <span className="text-lg font-bold text-slate-900 dark:text-white">
-                                {race.position}
+                            <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                              <span className="text-sm font-bold text-slate-900 dark:text-white">
+                                P{race.position}
+                              </span>
+                              <span className="text-xs text-slate-600 dark:text-slate-400">
+                                {race.points}pts
                               </span>
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
-                              <Calendar className="w-3 h-3" />
-                              <span>{race.season}</span>
-                            </div>
-                            <div className="text-slate-600 dark:text-slate-400">
-                              Round {race.round}
-                            </div>
+                          <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-500">
+                            <span>Fastest: {race.fastestLap}</span>
                             {race.qualificationTime && (
-                              <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
-                                <Clock className="w-3 h-3" />
-                                <span>Qual: {race.qualificationTime}</span>
-                              </div>
+                              <span>Qual: {race.qualificationTime}</span>
                             )}
-                            <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
-                              <Clock className="w-3 h-3" />
-                              <span>Fastest: {race.fastestLap}</span>
-                            </div>
                           </div>
                         </div>
                       ))}
@@ -671,6 +672,7 @@ export default function DriversPage() {
                 </div>
               ) : (
                 <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-8 text-center">
+                  <User className="w-12 h-12 text-slate-400 mx-auto mb-4" />
                   <p className="text-slate-500 dark:text-slate-400">
                     Select a driver to view race history
                   </p>

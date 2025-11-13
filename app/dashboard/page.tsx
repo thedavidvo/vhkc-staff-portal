@@ -9,7 +9,8 @@ import PromotionsModal from '@/components/PromotionsModal';
 import DemotionsModal from '@/components/DemotionsModal';
 import { useSeason } from '@/components/SeasonContext';
 import { mockDrivers, mockRaces, mockPromotions, mockDemotions } from '@/data/mockData';
-import { Calendar, MapPin, Flag } from 'lucide-react';
+import { Calendar, MapPin, Flag, Trophy, Medal, Award } from 'lucide-react';
+import { Division } from '@/types';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -77,6 +78,38 @@ export default function Dashboard() {
 
   // Check if there are no upcoming races
   const hasNoUpcomingRaces = !nextUpcomingRace;
+
+  // Get top 3 drivers for each division (except New)
+  const topDriversByDivision = useMemo(() => {
+    if (!isSeasonEnded) return null;
+
+    const divisions: Division[] = ['Division 1', 'Division 2', 'Division 3', 'Division 4'];
+    const result: Record<Division, typeof mockDrivers> = {
+      'Division 1': [],
+      'Division 2': [],
+      'Division 3': [],
+      'Division 4': [],
+      'New': [],
+    };
+
+    divisions.forEach((division) => {
+      const driversInDivision = mockDrivers
+        .filter((d) => d.division === division && d.status === 'ACTIVE')
+        .sort((a, b) => b.pointsTotal - a.pointsTotal)
+        .slice(0, 3); // Get top 3
+      
+      result[division] = driversInDivision;
+    });
+
+    return result;
+  }, [isSeasonEnded]);
+
+  const getRankIcon = (rank: number) => {
+    if (rank === 1) return <Trophy className="w-5 h-5 text-amber-500" />;
+    if (rank === 2) return <Medal className="w-5 h-5 text-slate-400" />;
+    if (rank === 3) return <Award className="w-5 h-5 text-amber-600" />;
+    return null;
+  };
 
   const handlePromotionConfirm = (driverId: string) => {
     // In a real app, this would make an API call to confirm the promotion
@@ -177,9 +210,68 @@ export default function Dashboard() {
             onDivisionsClick={() => router.push('/divisions')}
           />
 
+          {/* Top 3 by Division - Only show when season has ended */}
+          {isSeasonEnded && topDriversByDivision && (
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">
+                Season Champions
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {(['Division 1', 'Division 2', 'Division 3', 'Division 4'] as Division[]).map((division) => {
+                  const topDrivers = topDriversByDivision[division];
+                  if (topDrivers.length === 0) return null;
+
+                  return (
+                    <div
+                      key={division}
+                      className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-4"
+                    >
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3">
+                        {division}
+                      </h3>
+                      <div className="space-y-3">
+                        {topDrivers.map((driver, index) => {
+                          const rank = index + 1;
+                          return (
+                            <div
+                              key={driver.id}
+                              className="flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-900 rounded-lg"
+                            >
+                              <div className="flex-shrink-0">
+                                {getRankIcon(rank)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                                  {driver.name}
+                                </div>
+                                {driver.teamName && (
+                                  <div className="text-xs text-slate-600 dark:text-slate-400 truncate">
+                                    {driver.teamName}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <div className="text-sm font-bold text-slate-900 dark:text-white">
+                                  {driver.pointsTotal.toLocaleString()}
+                                </div>
+                                <div className="text-xs text-slate-500 dark:text-slate-500">
+                                  pts
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="mb-4">
             <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">
-              Race History
+              Season Races
             </h2>
             <RaceHistory races={filteredRaces} />
           </div>
