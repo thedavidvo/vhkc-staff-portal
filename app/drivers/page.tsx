@@ -2,9 +2,10 @@
 
 import { useState, useMemo } from 'react';
 import Header from '@/components/Header';
+import AddDriverModal from '@/components/AddDriverModal';
 import { mockDrivers, mockRaces } from '@/data/mockData';
 import { Driver, Division, DriverStatus, RaceResult } from '@/types';
-import { Edit, Trash2, X, Save, User, Clock, Trophy, MapPin, Calendar } from 'lucide-react';
+import { Edit, Trash2, X, Save, User, Clock, Trophy, MapPin, Calendar, Plus } from 'lucide-react';
 
 // Helper function to get division color
 const getDivisionColor = (division: Division) => {
@@ -17,6 +18,8 @@ const getDivisionColor = (division: Division) => {
       return 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200';
     case 'Division 4':
       return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
+    case 'New':
+      return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
     default:
       return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
   }
@@ -70,6 +73,11 @@ const calculateAge = (dateOfBirth: string | undefined): number | null => {
   return age;
 };
 
+// Helper function to format status with normal casing
+const formatStatus = (status: string): string => {
+  return status.charAt(0) + status.slice(1).toLowerCase();
+};
+
 // Helper function to get race history for a driver
 const getDriverRaceHistory = (driverId: string): RaceResult[] => {
   const history: RaceResult[] = [];
@@ -108,6 +116,7 @@ export default function DriversPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Driver>>({});
   const [dateOfBirth, setDateOfBirth] = useState<{ day: number; month: number; year: number }>({ day: 0, month: 0, year: 0 });
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const teams = useMemo(() => {
     const teamSet = new Set(drivers.map((d) => d.teamName).filter(Boolean));
@@ -162,14 +171,51 @@ export default function DriversPage() {
     }
   };
 
+  const handleAddDriver = (driverData: {
+    firstName?: string;
+    lastName?: string;
+    name: string;
+    email: string;
+    division: Division;
+    dateOfBirth?: string;
+    homeTrack?: string;
+    status: DriverStatus;
+  }) => {
+    const newDriver: Driver = {
+      id: `driver-${Date.now()}`,
+      name: driverData.name,
+      firstName: driverData.firstName,
+      lastName: driverData.lastName,
+      email: driverData.email,
+      division: driverData.division,
+      dateOfBirth: driverData.dateOfBirth,
+      homeTrack: driverData.homeTrack,
+      status: driverData.status,
+      lastRacePosition: 0,
+      fastestLap: '0:00.00',
+      pointsTotal: 0,
+      lastUpdated: new Date().toISOString().split('T')[0],
+    };
+    setDrivers([...drivers, newDriver]);
+  };
+
   return (
     <>
       <Header title="Drivers" hideSearch />
       <div className="p-4 md:p-6">
         <div className="max-w-[95%] mx-auto">
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-6">
-            Drivers Management
-          </h1>
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
+              Drivers Management
+            </h1>
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-md"
+            >
+              <Plus className="w-5 h-5" />
+              Add Driver
+            </button>
+          </div>
 
           {/* Filters */}
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-4 mb-6">
@@ -193,6 +239,7 @@ export default function DriversPage() {
                 <option value="Division 2">Division 2</option>
                 <option value="Division 3">Division 3</option>
                 <option value="Division 4">Division 4</option>
+                <option value="New">New</option>
               </select>
               <select
                 value={teamFilter}
@@ -467,7 +514,7 @@ export default function DriversPage() {
                                   : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
                               }`}
                             >
-                              {status}
+                              {formatStatus(status)}
                             </button>
                           ))}
                         </div>
@@ -633,6 +680,12 @@ export default function DriversPage() {
           </div>
         </div>
       </div>
+
+      <AddDriverModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAdd={handleAddDriver}
+      />
     </>
   );
 }

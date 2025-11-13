@@ -9,7 +9,7 @@ import { Trophy, Medal, Award } from 'lucide-react';
 export default function StandingsPage() {
   const [selectedDivision, setSelectedDivision] = useState<Division>('Division 1');
 
-  const divisions: Division[] = ['Division 1', 'Division 2', 'Division 3', 'Division 4'];
+  const divisions: Division[] = ['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'];
 
   const standings = useMemo(() => {
     const driversInDivision = mockDrivers
