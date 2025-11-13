@@ -3,7 +3,7 @@ import Header from '@/components/Header';
 export default function ComparePage() {
   return (
     <>
-      <Header title="Compare" />
+      <Header hideSearch />
       <div className="p-6">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-6">

@@ -31,7 +31,7 @@ export default function StandingsPage() {
 
   return (
     <>
-      <Header title="Standings" />
+      <Header hideSearch />
       <div className="p-4 md:p-6">
         <div className="max-w-[95%] mx-auto">
           <div className="mb-6">

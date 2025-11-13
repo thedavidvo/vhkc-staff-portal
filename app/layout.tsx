@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import LayoutWrapper from '@/components/LayoutWrapper';
+import { SidebarProvider } from '@/components/SidebarContext';
 
 export const metadata: Metadata = {
   title: 'VHKC Staff Portal',
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
-        <LayoutWrapper>{children}</LayoutWrapper>
+        <SidebarProvider>
+          <LayoutWrapper>{children}</LayoutWrapper>
+        </SidebarProvider>
       </body>
     </html>
   );
