@@ -66,6 +66,7 @@ export interface Team {
   id: string;
   name: string;
   driverIds: string[];
+  division?: Division;
   createdAt: string;
 }
 
