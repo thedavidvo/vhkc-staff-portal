@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSidebar } from './SidebarContext';
+import SeasonSelector from './SeasonSelector';
 import {
   LayoutDashboard,
   Users,
@@ -28,13 +29,13 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  { name: 'Season', href: '/season', icon: Calendar },
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Drivers', href: '/drivers', icon: Users },
   { name: 'Races', href: '/races', icon: Flag },
   { name: 'Divisions', href: '/divisions', icon: Trophy },
   { name: 'Standings', href: '/standings', icon: BarChart3 },
   { name: 'Teams', href: '/teams', icon: UsersRound },
-  { name: 'Season', href: '/season', icon: Calendar },
   { name: 'Compare', href: '/compare', icon: GitCompare },
   { name: 'Audit', href: '/audit', icon: ShieldCheck },
   { name: 'Reports', href: '/reports', icon: FileText },
@@ -119,6 +120,13 @@ export default function Sidebar() {
             )}
           </button>
         </div>
+
+        {/* Season Selector */}
+        {(!isCollapsed || (mounted && isMobile)) && (
+          <div className="px-4 py-4 border-b border-slate-700">
+            <SeasonSelector />
+          </div>
+        )}
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {navItems.map((item) => {

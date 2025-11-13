@@ -1,22 +1,46 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Header from '@/components/Header';
-
+import { useSeason } from '@/components/SeasonContext';
 import { mockRaces } from '@/data/mockData';
-
 import { Race, Division, DriverRaceResult } from '@/types';
 import { Plus, Save } from 'lucide-react';
 
 export default function RacesPage() {
-  const [races] = useState(mockRaces);
-  const [selectedEvent, setSelectedEvent] = useState<Race | null>(races[0] || null);
-  const [selectedDivision, setSelectedDivision] = useState<Division | null>(races[0] ? 'Division 1' : null);
+  const { selectedSeason } = useSeason();
+  const [allRaces] = useState(mockRaces);
+  
+  // Filter races by selected season
+  const races = useMemo(() => {
+    if (!selectedSeason) {
+      return allRaces;
+    }
+    return allRaces.filter((race) => race.season === selectedSeason.name);
+  }, [allRaces, selectedSeason]);
+
+  const [selectedEvent, setSelectedEvent] = useState<Race | null>(null);
+  const [selectedDivision, setSelectedDivision] = useState<Division | null>(null);
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [types, setTypes] = useState<string[]>([]);
   const [driverResults, setDriverResults] = useState<DriverRaceResult[]>([]);
   const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
+
+  // Update selected event when races change
+  useEffect(() => {
+    if (races.length > 0 && !selectedEvent) {
+      setSelectedEvent(races[0]);
+      setSelectedDivision('Division 1');
+    } else if (races.length === 0) {
+      setSelectedEvent(null);
+      setSelectedDivision(null);
+    } else if (selectedEvent && !races.find((r) => r.id === selectedEvent.id)) {
+      // If current selected event is not in filtered races, select first one
+      setSelectedEvent(races[0]);
+      setSelectedDivision('Division 1');
+    }
+  }, [races, selectedEvent]);
 
   // Load division results when division is set
   useEffect(() => {
@@ -142,7 +166,7 @@ export default function RacesPage() {
           {/* Panel 1: Event */}
           <div className="col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="p-2 border-b border-slate-200 dark:border-slate-700">
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white">Event</h2>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">Event</h2>
             </div>
             <div className="overflow-y-auto max-h-[calc(100vh-200px)]">
               <div className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -162,13 +186,13 @@ export default function RacesPage() {
                         : 'hover:bg-slate-50 dark:hover:bg-slate-700'
                     }`}
                   >
-                    <h3 className="font-semibold text-slate-900 dark:text-white text-xs">
+                    <h3 className="font-semibold text-slate-900 dark:text-white text-sm">
                       {race.name}
                     </h3>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
                       {race.season} • R{race.round}
                     </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">
+                    <p className="text-sm text-slate-500 dark:text-slate-500 mt-0.5">
                       {new Date(race.date).toLocaleDateString()}
                     </p>
                   </div>
@@ -180,7 +204,7 @@ export default function RacesPage() {
           {/* Panel 2: Division */}
           <div className="col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="p-2 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white">Division</h2>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">Division</h2>
               {selectedEvent && (
                 <button
                   onClick={handleAddDivision}
@@ -207,7 +231,7 @@ export default function RacesPage() {
                           // Reset types when division changes
                           setTypes([]);
                         }}
-                        className={`w-full text-left p-2 rounded-lg transition-colors text-xs ${
+                        className={`w-full text-left p-2 rounded-lg transition-colors text-sm ${
                           selectedDivision === division
                             ? 'bg-primary-500 text-white'
                             : hasResults
@@ -217,7 +241,7 @@ export default function RacesPage() {
                       >
                         <div className="font-medium">{division}</div>
                         {hasResults && (
-                          <div className="text-xs mt-0.5 opacity-75">
+                          <div className="text-sm mt-0.5 opacity-75">
                             {selectedEvent.results?.find((r) => r.division === division)?.results.length || 0} drivers
                           </div>
                         )}
@@ -226,7 +250,7 @@ export default function RacesPage() {
                   })}
                 </div>
               ) : (
-                <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-xs">
+                <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-sm">
                   Select an event to view races
                 </div>
               )}
@@ -236,7 +260,7 @@ export default function RacesPage() {
           {/* Panel 3: Race Name */}
           <div className="col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="p-2 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white">Race Name</h2>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">Race Name</h2>
               <button
                 onClick={handleAddType}
                 className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all shadow-md text-xs font-medium"
@@ -255,7 +279,7 @@ export default function RacesPage() {
                         onClick={() => {
                           setSelectedType(type);
                         }}
-                        className={`w-full text-left p-2 rounded-lg transition-colors text-xs ${
+                        className={`w-full text-left p-2 rounded-lg transition-colors text-sm ${
                           selectedType === type
                             ? 'bg-primary-500 text-white'
                             : 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600'
@@ -265,13 +289,13 @@ export default function RacesPage() {
                       </button>
                     ))
                   ) : (
-                    <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-xs">
+                    <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-sm">
                       No race names created. Click Add to create one.
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-xs">
+                <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-sm">
                   Select an event and division to create race names
                 </div>
               )}

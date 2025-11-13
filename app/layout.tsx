@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import LayoutWrapper from '@/components/LayoutWrapper';
 import { SidebarProvider } from '@/components/SidebarContext';
+import { SeasonProvider } from '@/components/SeasonContext';
 
 export const metadata: Metadata = {
   title: 'VHKC Staff Portal',
@@ -17,7 +18,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
         <SidebarProvider>
-          <LayoutWrapper>{children}</LayoutWrapper>
+          <SeasonProvider>
+            <LayoutWrapper>{children}</LayoutWrapper>
+          </SeasonProvider>
         </SidebarProvider>
       </body>
     </html>
