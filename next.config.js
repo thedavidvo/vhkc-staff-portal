@@ -2,6 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  output: 'export',
+  images: {
+    unoptimized: true,
+  },
+  // If deploying to a subdirectory, uncomment and set your repo name:
+  // basePath: '/vhkc-staff-portal',
+  // trailingSlash: true,
   webpack: (config, { isServer }) => {
     // Fix for case sensitivity issues on Windows
     if (!isServer) {
@@ -13,14 +20,6 @@ const nextConfig = {
     // Ensure case-sensitive module resolution
     config.resolve.cacheWithContext = false;
     return config;
-  },
-  async rewrites() {
-    return [
-      {
-        source: '/com.chrome.devtools.json',
-        destination: '/api/devtools',
-      },
-    ];
   },
 }
 
