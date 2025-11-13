@@ -14,7 +14,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   }
   
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen overflow-x-hidden">
       <Sidebar />
       <main className={`flex-1 transition-all duration-300 w-full ${
         isCollapsed ? 'md:ml-20' : 'md:ml-64'

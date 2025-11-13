@@ -75,7 +75,7 @@ export default function RaceHistory({ races }: RaceHistoryProps) {
                     }}
                     className={`p-4 cursor-pointer transition-colors ${
                       selectedRace?.id === race.id
-                        ? 'bg-primary-50 dark:bg-primary-900/20 border-l-4 border-primary'
+                        ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500'
                         : 'hover:bg-slate-50 dark:hover:bg-slate-700'
                     }`}
                   >

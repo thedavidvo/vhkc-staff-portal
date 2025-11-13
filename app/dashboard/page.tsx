@@ -39,6 +39,18 @@ export default function Dashboard() {
     return mockRaces.filter((race) => race.season === selectedSeason.name);
   }, [selectedSeason]);
 
+  // Check if season has ended
+  const isSeasonEnded = useMemo(() => {
+    if (!selectedSeason || !selectedSeason.endDate) {
+      return false;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endDate = new Date(selectedSeason.endDate);
+    endDate.setHours(0, 0, 0, 0);
+    return endDate < today;
+  }, [selectedSeason]);
+
   // Find next upcoming race
   const nextUpcomingRace = useMemo(() => {
     const today = new Date();
@@ -56,25 +68,15 @@ export default function Dashboard() {
       })
       .filter((race) => {
         // Show upcoming races that are today or in the future
-        // For demo purposes, also show all upcoming races if none are in the future
         return race.raceDate >= today;
       })
       .sort((a, b) => a.raceDate.getTime() - b.raceDate.getTime());
     
-    // If no future races found, show the first upcoming race regardless of date (for demo)
-    if (upcomingRaces.length === 0) {
-      const allUpcoming = filteredRaces
-        .filter((race) => race.status === 'upcoming')
-        .map((race) => ({
-          ...race,
-          raceDate: new Date(race.date),
-        }))
-        .sort((a, b) => a.raceDate.getTime() - b.raceDate.getTime());
-      return allUpcoming.length > 0 ? allUpcoming[0] : null;
-    }
-    
     return upcomingRaces.length > 0 ? upcomingRaces[0] : null;
   }, [filteredRaces]);
+
+  // Check if there are no upcoming races
+  const hasNoUpcomingRaces = !nextUpcomingRace;
 
   const handlePromotionConfirm = (driverId: string) => {
     // In a real app, this would make an API call to confirm the promotion
@@ -107,8 +109,8 @@ export default function Dashboard() {
             </h1>
           </div>
 
-          {/* Next Upcoming Race */}
-          {nextUpcomingRace && (
+          {/* Next Upcoming Race / Status Message */}
+          {nextUpcomingRace ? (
             <div className="mb-6 bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl shadow-lg border border-primary-400 overflow-hidden">
               <div className="p-6 text-white">
                 <div className="flex items-center gap-3 mb-4">
@@ -149,7 +151,23 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-          )}
+          ) : hasNoUpcomingRaces ? (
+            <div className="mb-6 bg-slate-200 dark:bg-slate-700 rounded-xl shadow-lg border border-slate-300 dark:border-slate-600 overflow-hidden">
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <Flag className="w-6 h-6 text-slate-600 dark:text-slate-400" />
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                    {isSeasonEnded ? 'The Season Has Ended' : 'No Upcoming Races'}
+                  </h2>
+                </div>
+                <p className="text-slate-600 dark:text-slate-400">
+                  {isSeasonEnded
+                    ? `${selectedSeason?.name || 'Season'} ended on ${selectedSeason?.endDate ? new Date(selectedSeason.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : ''}.`
+                    : 'There are no upcoming races scheduled at this time.'}
+                </p>
+              </div>
+            </div>
+          ) : null}
 
           <StatsCards 
             stats={stats} 
