@@ -12,6 +12,9 @@ import {
   FileText,
   UsersRound,
   BarChart3,
+  GitCompare,
+  ShieldCheck,
+  Calendar,
   ChevronLeft,
   ChevronRight,
   Menu,
@@ -31,6 +34,9 @@ const navItems: NavItem[] = [
   { name: 'Divisions', href: '/divisions', icon: Trophy },
   { name: 'Standings', href: '/standings', icon: BarChart3 },
   { name: 'Teams', href: '/teams', icon: UsersRound },
+  { name: 'Season', href: '/season', icon: Calendar },
+  { name: 'Compare', href: '/compare', icon: GitCompare },
+  { name: 'Audit', href: '/audit', icon: ShieldCheck },
   { name: 'Reports', href: '/reports', icon: FileText },
 ];
 
