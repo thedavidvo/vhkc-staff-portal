@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -10,6 +11,7 @@ import {
   Trophy,
   FileText,
   UsersRound,
+  BarChart3,
   ChevronLeft,
   ChevronRight,
   Menu,
@@ -27,6 +29,7 @@ const navItems: NavItem[] = [
   { name: 'Drivers', href: '/drivers', icon: Users },
   { name: 'Races', href: '/races', icon: Flag },
   { name: 'Divisions', href: '/divisions', icon: Trophy },
+  { name: 'Standings', href: '/standings', icon: BarChart3 },
   { name: 'Teams', href: '/teams', icon: UsersRound },
   { name: 'Reports', href: '/reports', icon: FileText },
 ];
@@ -85,12 +88,23 @@ export default function Sidebar() {
         } flex flex-col h-screen fixed left-0 top-0 z-40 shadow-xl`}
       >
         <div className="p-4 flex items-center justify-between border-b border-slate-700">
-          {!isCollapsed && (
-            <h1 className="text-xl font-bold text-white">VHKC Staff Portal</h1>
-          )}
+          <Link
+            href="/"
+            onClick={handleLinkClick}
+            className="flex items-center justify-center flex-1"
+          >
+            <Image
+              src="/vhkc-logo.png"
+              alt="VHKC Staff Portal"
+              width={isCollapsed ? 40 : 120}
+              height={isCollapsed ? 40 : 40}
+              className="object-contain"
+              priority
+            />
+          </Link>
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-2 rounded-lg hover:bg-slate-700 transition-colors hidden md:block"
+            className="p-2 rounded-lg hover:bg-slate-700 transition-colors hidden md:block ml-2"
             aria-label="Toggle sidebar"
           >
             {isCollapsed ? (
