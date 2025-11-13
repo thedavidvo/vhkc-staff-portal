@@ -201,7 +201,7 @@ export default function DriversPage() {
 
   return (
     <>
-      <Header title="Drivers" hideSearch />
+      <Header hideSearch />
       <div className="p-4 md:p-6">
         <div className="max-w-[95%] mx-auto">
           <div className="flex items-center justify-between mb-6">

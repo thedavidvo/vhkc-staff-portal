@@ -204,7 +204,7 @@ export default function DivisionsPage() {
             </div>
 
             {/* Driver Search Results - Middle */}
-            <div className="lg:col-span-5">
+            <div className="lg:col-span-7">
               <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
                 <div className="p-4 border-b border-slate-200 dark:border-slate-700">
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
@@ -270,7 +270,7 @@ export default function DivisionsPage() {
             </div>
 
             {/* Confirm Division Change - Right Side */}
-            <div className="lg:col-span-5">
+            <div className="lg:col-span-3">
               <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6">
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
                   Confirm Division Changes
