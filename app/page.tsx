@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { LogIn, Mail, Lock } from 'lucide-react';
 
 export default function LoginPage() {
@@ -38,13 +37,12 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="flex justify-center mb-8">
           <div className="relative w-32 h-32">
-            <Image
+            <img
               src="/vhkc-logo.png"
               alt="VHKC Staff Portal"
               width={128}
               height={128}
               className="object-contain"
-              priority
             />
           </div>
         </div>
