@@ -209,10 +209,10 @@ export default function TeamsPage() {
   return (
     <>
       <Header hideSearch />
-      <div className="p-4 md:p-6 px-2">
-        <div className="max-w-[98vw] mx-auto">
+      <div className="py-4 md:py-6">
+        <div className="max-w-[95%] mx-auto px-4 md:px-6">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
               Teams Management
             </h1>
             <button
@@ -278,8 +278,10 @@ export default function TeamsPage() {
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-1 gap-y-6 -mx-2 justify-items-center">
+        <div className="max-w-[95%] mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-1 gap-y-6 justify-items-center">
             {filteredTeams.map((team) => {
               const teamDrivers = getTeamDrivers(team);
               const availableDrivers = getAvailableDrivers(team);

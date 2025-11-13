@@ -1,18 +1,40 @@
 'use client';
 
 import Header from '@/components/Header';
-import AddSeasonModal from '@/components/AddSeasonModal';
 import EditSeasonModal from '@/components/EditSeasonModal';
+import AddSeasonModal from '@/components/AddSeasonModal';
 import { useState, useMemo } from 'react';
-import { Season } from '@/types';
-import { mockSeasons, mockLocations } from '@/data/mockData';
-import { Plus, Edit2, Trash2, Calendar } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useSeason } from '@/components/SeasonContext';
+import { mockLocations } from '@/data/mockData';
+import { Edit2, Trash2, Calendar, Plus } from 'lucide-react';
 
 export default function SeasonPage() {
-  const [seasons, setSeasons] = useState<Season[]>(mockSeasons);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const router = useRouter();
+  const { seasons, selectedSeason, setSelectedSeason, updateSeason, deleteSeason, addSeason } = useSeason();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedSeason, setSelectedSeason] = useState<Season | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingSeason, setEditingSeason] = useState<typeof seasons[0] | null>(null);
+
+  const handleUpdateSeason = (updatedSeason: typeof seasons[0]) => {
+    updateSeason(updatedSeason);
+  };
+
+  const handleDeleteSeason = (seasonId: string) => {
+    if (!confirm('Are you sure you want to delete this season? This action cannot be undone.')) {
+      return;
+    }
+    deleteSeason(seasonId);
+  };
+
+  const handleEditSeason = (season: typeof seasons[0]) => {
+    setEditingSeason(season);
+    setIsEditModalOpen(true);
+  };
+
+  const handleCardClick = (season: typeof seasons[0]) => {
+    setSelectedSeason(season);
+  };
 
   const handleAddSeason = (seasonData: {
     name: string;
@@ -20,7 +42,7 @@ export default function SeasonPage() {
     endDate: string;
     numberOfRounds: number;
   }) => {
-    const newSeason: Season = {
+    const newSeason = {
       id: `season-${Date.now()}`,
       name: seasonData.name,
       startDate: seasonData.startDate,
@@ -28,23 +50,10 @@ export default function SeasonPage() {
       numberOfRounds: seasonData.numberOfRounds,
       rounds: [],
     };
-    setSeasons([...seasons, newSeason]);
-  };
-
-  const handleUpdateSeason = (updatedSeason: Season) => {
-    setSeasons(seasons.map((s) => (s.id === updatedSeason.id ? updatedSeason : s)));
-  };
-
-  const handleDeleteSeason = (seasonId: string) => {
-    if (!confirm('Are you sure you want to delete this season? This action cannot be undone.')) {
-      return;
-    }
-    setSeasons(seasons.filter((s) => s.id !== seasonId));
-  };
-
-  const handleEditSeason = (season: Season) => {
-    setSelectedSeason(season);
-    setIsEditModalOpen(true);
+    addSeason(newSeason);
+    setIsAddModalOpen(false);
+    // Reset dashboard when a new season is added
+    router.push('/dashboard');
   };
 
   const formatDate = (dateString: string) => {
@@ -56,12 +65,19 @@ export default function SeasonPage() {
     });
   };
 
-  // Group seasons by year
+  // Filter rounds based on selected season
+  const displayedRounds = useMemo(() => {
+    if (!selectedSeason) {
+      return [];
+    }
+    return selectedSeason.rounds.sort((a, b) => a.roundNumber - b.roundNumber);
+  }, [selectedSeason]);
+
+  // Group all seasons by year for display
   const seasonsByYear = useMemo(() => {
-    const grouped: { [year: string]: Season[] } = {};
+    const grouped: { [year: string]: typeof seasons } = {};
     
     seasons.forEach((season) => {
-      // Use startDate year if available, otherwise use "TBD" or current year
       let year: string;
       if (season.startDate) {
         year = new Date(season.startDate).getFullYear().toString();
@@ -75,7 +91,6 @@ export default function SeasonPage() {
       grouped[year].push(season);
     });
 
-    // Sort years in descending order (newest first), with "TBD" at the end
     const sortedYears = Object.keys(grouped).sort((a, b) => {
       if (a === 'TBD') return 1;
       if (b === 'TBD') return -1;
@@ -99,10 +114,10 @@ export default function SeasonPage() {
             </h1>
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-md"
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all shadow-md font-medium"
             >
               <Plus className="w-5 h-5" />
-              Add Season
+              Add New Season
             </button>
           </div>
 
@@ -113,31 +128,82 @@ export default function SeasonPage() {
                 No seasons yet
               </h3>
               <p className="text-slate-500 dark:text-slate-400 mb-6">
-                Get started by creating your first season
+                Get started by creating your first season using the dropdown in the sidebar
               </p>
-              <button
-                onClick={() => setIsAddModalOpen(true)}
-                className="px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-md"
-              >
-                Add Season
-              </button>
             </div>
           ) : (
-            <div className="space-y-8">
-              {seasonsByYear.map(({ year, seasons: yearSeasons }) => (
-                <div key={year} className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-                      {year}
-                    </h2>
-                    <div className="flex-1 h-px bg-slate-300 dark:bg-slate-600"></div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {yearSeasons.map((season) => (
-                      <div
-                        key={season.id}
-                        className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-4 flex flex-col"
-                      >
+            <>
+              {/* Selected Season Rounds Display */}
+              {selectedSeason && (
+                <div className="mb-8 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6">
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">
+                    {selectedSeason.name} - Rounds
+                  </h2>
+                  {displayedRounds.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {displayedRounds.map((round) => (
+                        <div
+                          key={round.id}
+                          className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700"
+                        >
+                          <div className="font-semibold text-slate-900 dark:text-white mb-2">
+                            {round.name}
+                          </div>
+                          <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">
+                            {round.location}
+                          </div>
+                          {round.date && (
+                            <div className="text-xs text-slate-500 dark:text-slate-500">
+                              {new Date(round.date).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </div>
+                          )}
+                          <div className="mt-2">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                              round.status === 'completed' 
+                                ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+                                : round.status === 'upcoming'
+                                ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+                                : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
+                            }`}>
+                              {round.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-slate-500 dark:text-slate-400">
+                      No rounds for this season yet.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* All Seasons Display */}
+              <div className="space-y-8">
+                {seasonsByYear.map(({ year, seasons: yearSeasons }) => (
+                  <div key={year} className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                        {year}
+                      </h2>
+                      <div className="flex-1 h-px bg-slate-300 dark:bg-slate-600"></div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {yearSeasons.map((season) => (
+                        <div
+                          key={season.id}
+                          onClick={() => handleCardClick(season)}
+                          className={`bg-white dark:bg-slate-800 rounded-xl shadow-md border p-4 flex flex-col cursor-pointer transition-all ${
+                            selectedSeason?.id === season.id
+                              ? 'border-primary-500 ring-2 ring-primary-500'
+                              : 'border-slate-200 dark:border-slate-700 hover:shadow-lg'
+                          }`}
+                        >
                         <div className="flex items-start justify-between mb-3">
                           <h2 className="text-lg font-bold text-slate-900 dark:text-white flex-1 pr-2">
                             {season.name}
@@ -167,58 +233,42 @@ export default function SeasonPage() {
                           </span>
                         </div>
 
-                        <div className="text-xs text-slate-600 dark:text-slate-400 mb-3">
-                          <span className="font-medium">{season.rounds.length}</span> round{season.rounds.length !== 1 ? 's' : ''}
-                        </div>
-
-                        {season.rounds.length > 0 && (
-                          <div className="mt-auto">
-                            <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                              Rounds:
-                            </h3>
-                            <div className="space-y-1.5 min-h-[280px]">
-                              {[...season.rounds].sort((a, b) => a.roundNumber - b.roundNumber).map((round) => (
-                                <div
-                                  key={round.id}
-                                  className="px-2 py-1.5 bg-slate-100 dark:bg-slate-700 rounded text-xs text-slate-700 dark:text-slate-300"
-                                >
-                                  <div className="font-medium">Round {round.roundNumber}</div>
-                                  <div className="text-slate-600 dark:text-slate-400 truncate">{round.name}</div>
-                                  {round.date && (
-                                    <div className="text-slate-500 dark:text-slate-500 text-[10px] mt-0.5">
-                                      {new Date(round.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
+                        <div className="mt-auto pt-3 border-t border-slate-200 dark:border-slate-700">
+                          <div className="text-xs text-slate-600 dark:text-slate-400">
+                            <span className="font-medium">{season.rounds.length}</span> round{season.rounds.length !== 1 ? 's' : ''}
                           </div>
-                        )}
+                          {selectedSeason?.id === season.id && (
+                            <div className="mt-2 text-xs text-primary-600 dark:text-primary-400 font-medium">
+                              Selected
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
               ))}
-            </div>
+              </div>
+            </>
           )}
         </div>
       </div>
-
-      <AddSeasonModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onAdd={handleAddSeason}
-      />
 
       <EditSeasonModal
         isOpen={isEditModalOpen}
         onClose={() => {
           setIsEditModalOpen(false);
-          setSelectedSeason(null);
+          setEditingSeason(null);
         }}
-        season={selectedSeason}
+        season={editingSeason}
         onUpdate={handleUpdateSeason}
         locations={mockLocations}
+      />
+
+      <AddSeasonModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAdd={handleAddSeason}
       />
     </>
   );
