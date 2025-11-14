@@ -38,6 +38,7 @@ export interface Race {
   name: string;
   season: string;
   round: number;
+  roundNumber?: number; // Optional for backwards compatibility
   date: string;
   location: string;
   address: string;
