@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Header from '@/components/Header';
 import AddDriverModal from '@/components/AddDriverModal';
-import { mockDrivers, mockRaces } from '@/data/mockData';
+import { useSeason } from '@/components/SeasonContext';
 import { Driver, Division, DriverStatus, RaceResult } from '@/types';
-import { Edit, Trash2, X, Save, User, Clock, Trophy, MapPin, Calendar, Plus } from 'lucide-react';
+import { Edit, Trash2, X, Save, User, Clock, Trophy, MapPin, Calendar, Plus, Loader2 } from 'lucide-react';
 
 // Helper function to get division color
 const getDivisionColor = (division: Division) => {
@@ -78,15 +78,15 @@ const formatStatus = (status: string): string => {
   return status.charAt(0) + status.slice(1).toLowerCase();
 };
 
-// Helper function to get race history for a driver
-const getDriverRaceHistory = (driverId: string): RaceResult[] => {
+// TODO: Replace with API call to fetch race history for a driver
+const getDriverRaceHistory = (driverId: string, races: any[]): RaceResult[] => {
   const history: RaceResult[] = [];
   
-  mockRaces
+  races
     .filter((race) => race.status === 'completed' && race.results)
     .forEach((race) => {
-      race.results?.forEach((divisionResult) => {
-        const driverResult = divisionResult.results.find((r) => r.driverId === driverId);
+      race.results?.forEach((divisionResult: any) => {
+        const driverResult = divisionResult.results.find((r: any) => r.driverId === driverId);
         if (driverResult) {
           history.push({
             raceId: race.id,
@@ -108,7 +108,9 @@ const getDriverRaceHistory = (driverId: string): RaceResult[] => {
 };
 
 export default function DriversPage() {
-  const [drivers, setDrivers] = useState(mockDrivers);
+  const { selectedSeason } = useSeason();
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [divisionFilter, setDivisionFilter] = useState<Division | 'all'>('all');
   const [teamFilter, setTeamFilter] = useState<string>('all');
@@ -118,6 +120,32 @@ export default function DriversPage() {
   const [editForm, setEditForm] = useState<Partial<Driver>>({});
   const [dateOfBirth, setDateOfBirth] = useState<{ day: number; month: number; year: number }>({ day: 0, month: 0, year: 0 });
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // Fetch drivers from API
+  useEffect(() => {
+    const fetchDrivers = async () => {
+      if (!selectedSeason) {
+        setDrivers([]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setDrivers(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch drivers:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDrivers();
+  }, [selectedSeason]);
 
   const teams = useMemo(() => {
     const teamSet = new Set(drivers.map((d) => d.teamName).filter(Boolean));
@@ -136,10 +164,13 @@ export default function DriversPage() {
     });
   }, [drivers, searchQuery, divisionFilter, teamFilter, statusFilter]);
 
+  // TODO: Fetch races from API
+  const [races] = useState<any[]>([]);
+  
   const selectedDriverRaceHistory = useMemo(() => {
     if (!selectedDriver) return [];
-    return getDriverRaceHistory(selectedDriver.id);
-  }, [selectedDriver]);
+    return getDriverRaceHistory(selectedDriver.id, races);
+  }, [selectedDriver, races]);
 
   const handleEdit = (driver: Driver) => {
     setSelectedDriver(driver);
@@ -149,31 +180,59 @@ export default function DriversPage() {
     setIsEditing(true);
   };
 
-  const handleSave = () => {
-    if (selectedDriver) {
+  const handleSave = async () => {
+    if (!selectedDriver || !selectedSeason) return;
+
+    try {
       const dateString = combineDate(dateOfBirth.day, dateOfBirth.month, dateOfBirth.year);
       const finalForm = { ...editForm, dateOfBirth: dateString || editForm.dateOfBirth };
-      setDrivers(
-        drivers.map((d) => (d.id === selectedDriver.id ? { ...d, ...finalForm } as Driver : d))
-      );
       const updatedDriver = { ...selectedDriver, ...finalForm } as Driver;
-      setSelectedDriver(updatedDriver);
-      setIsEditing(false);
-      setDateOfBirth({ day: 0, month: 0, year: 0 });
+      
+      // Update via API
+      const response = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedDriver),
+      });
+
+      if (response.ok) {
+        // Update local state
+        setDrivers(
+          drivers.map((d) => (d.id === selectedDriver.id ? updatedDriver : d))
+        );
+        setSelectedDriver(updatedDriver);
+        setIsEditing(false);
+        setDateOfBirth({ day: 0, month: 0, year: 0 });
+      } else {
+        alert('Failed to update driver. Please try again.');
+      }
+    } catch (error) {
+      console.error('Failed to update driver:', error);
+      alert('Failed to update driver. Please try again.');
     }
   };
 
-  const handleDelete = (driverId: string) => {
-    if (confirm('Are you sure you want to delete this driver?')) {
+  const handleDelete = async (driverId: string) => {
+    if (!selectedSeason) return;
+    if (!confirm('Are you sure you want to delete this driver?')) {
+      return;
+    }
+
+    try {
+      // TODO: Implement delete driver API endpoint
+      // For now, just update local state
       setDrivers(drivers.filter((d) => d.id !== driverId));
       if (selectedDriver?.id === driverId) {
         setSelectedDriver(null);
         setIsEditing(false);
       }
+    } catch (error) {
+      console.error('Failed to delete driver:', error);
+      alert('Failed to delete driver. Please try again.');
     }
   };
 
-  const handleAddDriver = (driverData: {
+  const handleAddDriver = async (driverData: {
     firstName?: string;
     lastName?: string;
     name: string;
@@ -183,23 +242,73 @@ export default function DriversPage() {
     homeTrack?: string;
     status: DriverStatus;
   }) => {
-    const newDriver: Driver = {
-      id: `driver-${Date.now()}`,
-      name: driverData.name,
-      firstName: driverData.firstName,
-      lastName: driverData.lastName,
-      email: driverData.email,
-      division: driverData.division,
-      dateOfBirth: driverData.dateOfBirth,
-      homeTrack: driverData.homeTrack,
-      status: driverData.status,
-      lastRacePosition: 0,
-      fastestLap: '0:00.00',
-      pointsTotal: 0,
-      lastUpdated: new Date().toISOString().split('T')[0],
-    };
-    setDrivers([...drivers, newDriver]);
+    if (!selectedSeason) {
+      alert('Please select a season first');
+      return;
+    }
+
+    try {
+      const newDriver: Driver = {
+        id: `driver-${Date.now()}`,
+        name: driverData.name,
+        firstName: driverData.firstName,
+        lastName: driverData.lastName,
+        email: driverData.email,
+        division: driverData.division,
+        dateOfBirth: driverData.dateOfBirth,
+        homeTrack: driverData.homeTrack,
+        status: driverData.status,
+        lastRacePosition: 0,
+        fastestLap: '0:00.00',
+        pointsTotal: 0,
+        lastUpdated: new Date().toISOString().split('T')[0],
+      };
+
+      // Add driver via API
+      const response = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newDriver),
+      });
+
+      if (response.ok) {
+        // Refresh drivers list
+        const refreshResponse = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
+        if (refreshResponse.ok) {
+          const data = await refreshResponse.json();
+          setDrivers(data);
+        } else {
+          // If refresh fails, add to local state
+          setDrivers([...drivers, newDriver]);
+        }
+        setIsAddModalOpen(false);
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to add driver: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Failed to add driver:', error);
+      alert('Failed to add driver. Please try again.');
+    }
   };
+
+  if (loading) {
+    return (
+      <>
+        <Header hideSearch />
+        <div className="p-4 md:p-6">
+          <div className="max-w-[95%] mx-auto">
+            <div className="flex items-center justify-center min-h-[400px]">
+              <div className="flex flex-col items-center gap-4">
+                <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+                <p className="text-slate-600 dark:text-slate-400">Loading drivers...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

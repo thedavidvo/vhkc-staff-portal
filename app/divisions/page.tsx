@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Header from '@/components/Header';
-import { mockDrivers } from '@/data/mockData';
+import { useSeason } from '@/components/SeasonContext';
 import { Driver, Division } from '@/types';
-import { Search, Check, X } from 'lucide-react';
+import { Search, Check, X, Loader2 } from 'lucide-react';
 
 interface PendingDivisionChange {
   driverId: string;
@@ -33,10 +33,38 @@ const getDivisionColor = (division: Division) => {
 };
 
 export default function DivisionsPage() {
-  const [drivers, setDrivers] = useState(mockDrivers);
+  const { selectedSeason } = useSeason();
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [divisionFilter, setDivisionFilter] = useState<Division | 'all'>('all');
   const [pendingChanges, setPendingChanges] = useState<PendingDivisionChange[]>([]);
+
+  // Fetch drivers from API
+  useEffect(() => {
+    const fetchDrivers = async () => {
+      if (!selectedSeason) {
+        setDrivers([]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setDrivers(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch drivers:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDrivers();
+  }, [selectedSeason]);
 
   const filteredDrivers = useMemo(() => {
     const filtered = drivers.filter((driver) => {
@@ -104,18 +132,43 @@ export default function DivisionsPage() {
     }
   };
 
-  const handleConfirmChange = (pendingChange: PendingDivisionChange) => {
-    // Update the driver's division
-    setDrivers(
-      drivers.map((d) =>
-        d.id === pendingChange.driverId
-          ? { ...d, division: pendingChange.newDivision, lastUpdated: new Date().toISOString().split('T')[0] }
-          : d
-      )
-    );
-    
-    // Remove from pending changes
-    setPendingChanges(pendingChanges.filter((p) => p.driverId !== pendingChange.driverId));
+  const handleConfirmChange = async (pendingChange: PendingDivisionChange) => {
+    if (!selectedSeason) return;
+
+    try {
+      // Find the driver
+      const driver = drivers.find(d => d.id === pendingChange.driverId);
+      if (!driver) return;
+
+      // Update driver division via API
+      const updatedDriver = {
+        ...driver,
+        division: pendingChange.newDivision,
+        lastUpdated: new Date().toISOString().split('T')[0],
+      };
+
+      const response = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedDriver),
+      });
+
+      if (response.ok) {
+        // Update local state
+        setDrivers(
+          drivers.map((d) =>
+            d.id === pendingChange.driverId ? updatedDriver : d
+          )
+        );
+        // Remove from pending changes
+        setPendingChanges(pendingChanges.filter((p) => p.driverId !== pendingChange.driverId));
+      } else {
+        alert('Failed to update driver division. Please try again.');
+      }
+    } catch (error) {
+      console.error('Failed to update driver division:', error);
+      alert('Failed to update driver division. Please try again.');
+    }
   };
 
   const handleDeclineChange = (driverId: string) => {
@@ -124,15 +177,18 @@ export default function DivisionsPage() {
   };
 
   const driversByDivision = useMemo(() => {
-    const grouped: Record<Division, Driver[]> = {
+    const grouped: Record<Division, any[]> = {
       'Division 1': [],
       'Division 2': [],
       'Division 3': [],
       'Division 4': [],
       'New': [],
     };
-    drivers.forEach((driver) => {
-      grouped[driver.division].push(driver);
+    drivers.forEach((driver: any) => {
+      const division = driver.division as Division;
+      if (grouped[division]) {
+        grouped[division].push(driver);
+      }
     });
     return grouped;
   }, [drivers]);
@@ -144,6 +200,24 @@ export default function DivisionsPage() {
   const demotions = useMemo(() => {
     return pendingChanges.filter((p) => p.type === 'demotion');
   }, [pendingChanges]);
+
+  if (loading) {
+    return (
+      <>
+        <Header hideSearch />
+        <div className="p-4 md:p-6">
+          <div className="max-w-[95%] mx-auto">
+            <div className="flex items-center justify-center min-h-[400px]">
+              <div className="flex flex-col items-center gap-4">
+                <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+                <p className="text-slate-600 dark:text-slate-400">Loading drivers...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

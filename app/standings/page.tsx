@@ -2,19 +2,19 @@
 
 import { useState, useMemo } from 'react';
 import Header from '@/components/Header';
-import { mockDrivers, mockRaces } from '@/data/mockData';
+// TODO: Replace with API calls to fetch drivers and races by season
 import { Division, RaceResult } from '@/types';
 import { Trophy, Medal, Award } from 'lucide-react';
 
-// Helper function to get race history for a driver
-const getDriverRaceHistory = (driverId: string): RaceResult[] => {
+// TODO: Replace with API call to fetch race history for a driver
+const getDriverRaceHistory = (driverId: string, races: any[]): RaceResult[] => {
   const history: RaceResult[] = [];
   
-  mockRaces
+  races
     .filter((race) => race.status === 'completed' && race.results)
     .forEach((race) => {
-      race.results?.forEach((divisionResult) => {
-        const driverResult = divisionResult.results.find((r) => r.driverId === driverId);
+      race.results?.forEach((divisionResult: any) => {
+        const driverResult = divisionResult.results.find((r: any) => r.driverId === driverId);
         if (driverResult) {
           history.push({
             raceId: race.id,
@@ -40,14 +40,18 @@ export default function StandingsPage() {
   const [viewMode, setViewMode] = useState<'drivers' | 'teams'>('drivers');
 
   const divisions: Division[] = ['Division 1', 'Division 2', 'Division 3', 'Division 4'];
+  
+  // TODO: Fetch drivers and races from API based on selected season
+  const [drivers] = useState<any[]>([]);
+  const [races] = useState<any[]>([]);
 
   const standings = useMemo(() => {
-    const driversInDivision = mockDrivers
+    const driversInDivision = drivers
       .filter((d) => d.division === selectedDivision && d.status === 'ACTIVE')
       .sort((a, b) => b.pointsTotal - a.pointsTotal);
 
     return driversInDivision.map((driver, index) => {
-      const raceHistory = getDriverRaceHistory(driver.id);
+      const raceHistory = getDriverRaceHistory(driver.id, races);
       const roundPoints = raceHistory.map((race) => ({
         round: race.round,
         points: race.points,
@@ -66,13 +70,13 @@ export default function StandingsPage() {
         dropRound,
       };
     });
-  }, [selectedDivision]);
+  }, [selectedDivision, drivers, races]);
 
   // Calculate team standings
   const teamStandings = useMemo(() => {
-    const teamsMap = new Map<string, { name: string; drivers: typeof mockDrivers; totalPoints: number }>();
+    const teamsMap = new Map<string, { name: string; drivers: any[]; totalPoints: number }>();
     
-    mockDrivers
+    drivers
       .filter((d) => d.division === selectedDivision && d.status === 'ACTIVE' && d.teamName)
       .forEach((driver) => {
         const teamName = driver.teamName!;
@@ -90,7 +94,7 @@ export default function StandingsPage() {
         ...team,
         rank: index + 1,
       }));
-  }, [selectedDivision]);
+  }, [selectedDivision, drivers]);
 
   const getRankIcon = (rank: number) => {
     if (rank === 1) return <Trophy className="w-5 h-5 text-amber-500" />;

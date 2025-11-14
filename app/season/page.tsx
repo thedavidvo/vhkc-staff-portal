@@ -3,31 +3,65 @@
 import Header from '@/components/Header';
 import EditSeasonModal from '@/components/EditSeasonModal';
 import AddSeasonModal from '@/components/AddSeasonModal';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSeason } from '@/components/SeasonContext';
-import { mockLocations } from '@/data/mockData';
 import { Round } from '@/types';
 import { Edit2, Trash2, Calendar, Plus, X } from 'lucide-react';
 
+interface Location {
+  id: string;
+  name: string;
+  address: string;
+}
+
 export default function SeasonPage() {
   const router = useRouter();
-  const { seasons, selectedSeason, setSelectedSeason, updateSeason, deleteSeason, addSeason } = useSeason();
+  const { seasons, selectedSeason, setSelectedSeason, updateSeason, deleteSeason, addSeason, loading } = useSeason();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingSeason, setEditingSeason] = useState<typeof seasons[0] | null>(null);
   const [selectedRound, setSelectedRound] = useState<Round | null>(null);
   const [isRoundDetailsOpen, setIsRoundDetailsOpen] = useState(false);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(true);
 
-  const handleUpdateSeason = (updatedSeason: typeof seasons[0]) => {
-    updateSeason(updatedSeason);
+  // Fetch locations from API
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        setLocationsLoading(true);
+        const response = await fetch('/api/locations');
+        if (response.ok) {
+          const data = await response.json();
+          setLocations(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch locations:', error);
+      } finally {
+        setLocationsLoading(false);
+      }
+    };
+    fetchLocations();
+  }, []);
+
+  const handleUpdateSeason = async (updatedSeason: typeof seasons[0]) => {
+    try {
+      await updateSeason(updatedSeason);
+    } catch (error) {
+      alert('Failed to update season. Please try again.');
+    }
   };
 
-  const handleDeleteSeason = (seasonId: string) => {
+  const handleDeleteSeason = async (seasonId: string) => {
     if (!confirm('Are you sure you want to delete this season? This action cannot be undone.')) {
       return;
     }
-    deleteSeason(seasonId);
+    try {
+      await deleteSeason(seasonId);
+    } catch (error) {
+      alert('Failed to delete season. Please try again.');
+    }
   };
 
   const handleEditSeason = (season: typeof seasons[0]) => {
@@ -39,24 +73,28 @@ export default function SeasonPage() {
     setSelectedSeason(season);
   };
 
-  const handleAddSeason = (seasonData: {
+  const handleAddSeason = async (seasonData: {
     name: string;
     startDate: string;
     endDate: string;
     numberOfRounds: number;
   }) => {
-    const newSeason = {
-      id: `season-${Date.now()}`,
-      name: seasonData.name,
-      startDate: seasonData.startDate,
-      endDate: seasonData.endDate,
-      numberOfRounds: seasonData.numberOfRounds,
-      rounds: [],
-    };
-    addSeason(newSeason);
-    setIsAddModalOpen(false);
-    // Reset dashboard when a new season is added
-    router.push('/dashboard');
+    try {
+      const newSeason = {
+        id: `season-${Date.now()}`,
+        name: seasonData.name,
+        startDate: seasonData.startDate,
+        endDate: seasonData.endDate,
+        numberOfRounds: seasonData.numberOfRounds,
+        rounds: [],
+      };
+      await addSeason(newSeason);
+      setIsAddModalOpen(false);
+      // Reset dashboard when a new season is added
+      router.push('/dashboard');
+    } catch (error) {
+      alert('Failed to add season. Please try again.');
+    }
   };
 
   const handleRoundClick = (round: Round) => {
@@ -64,17 +102,21 @@ export default function SeasonPage() {
     setIsRoundDetailsOpen(true);
   };
 
-  const handleDeleteRound = (roundId: string) => {
+  const handleDeleteRound = async (roundId: string) => {
     if (!selectedSeason) return;
     if (!confirm('Are you sure you want to delete this round? This action cannot be undone.')) {
       return;
     }
-    const updatedSeason = {
-      ...selectedSeason,
-      rounds: selectedSeason.rounds.filter((r) => r.id !== roundId),
-    };
-    updateSeason(updatedSeason);
-    setSelectedSeason(updatedSeason);
+    try {
+      const updatedSeason = {
+        ...selectedSeason,
+        rounds: selectedSeason.rounds.filter((r) => r.id !== roundId),
+      };
+      await updateSeason(updatedSeason);
+      setSelectedSeason(updatedSeason);
+    } catch (error) {
+      alert('Failed to delete round. Please try again.');
+    }
   };
 
   const handleEditRound = (round: Round) => {
@@ -149,7 +191,11 @@ export default function SeasonPage() {
             </button>
           </div>
 
-          {seasons.length === 0 ? (
+          {loading ? (
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-12 text-center">
+              <p className="text-slate-500 dark:text-slate-400">Loading seasons...</p>
+            </div>
+          ) : seasons.length === 0 ? (
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-12 text-center">
               <Calendar className="w-16 h-16 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
@@ -324,7 +370,36 @@ export default function SeasonPage() {
         }}
         season={editingSeason}
         onUpdate={handleUpdateSeason}
-        locations={mockLocations}
+        locations={locations.map(l => l.name)}
+        onLocationAdded={async (locationName: string, address: string) => {
+          try {
+            const newLocation = {
+              id: `location-${Date.now()}`,
+              name: locationName,
+              address: address,
+            };
+            
+            const response = await fetch('/api/locations', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newLocation),
+            });
+            
+            if (response.ok) {
+              // Refresh locations
+              const refreshResponse = await fetch('/api/locations');
+              if (refreshResponse.ok) {
+                const data = await refreshResponse.json();
+                setLocations(data);
+              }
+            } else {
+              throw new Error('Failed to add location');
+            }
+          } catch (error) {
+            console.error('Failed to add location:', error);
+            throw error;
+          }
+        }}
       />
 
       <AddSeasonModal

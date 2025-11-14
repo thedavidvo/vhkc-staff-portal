@@ -3,21 +3,61 @@
 import { useState, useEffect, useMemo } from 'react';
 import Header from '@/components/Header';
 import { useSeason } from '@/components/SeasonContext';
-import { mockRaces } from '@/data/mockData';
 import { Race, Division, DriverRaceResult } from '@/types';
-import { Plus, Save, Trash2 } from 'lucide-react';
+import { Plus, Save, Trash2, Loader2 } from 'lucide-react';
 
 export default function RacesPage() {
   const { selectedSeason } = useSeason();
-  const [allRaces] = useState(mockRaces);
+  const [rounds, setRounds] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   
-  // Filter races by selected season
+  // Fetch rounds from API
+  useEffect(() => {
+    const fetchRounds = async () => {
+      if (!selectedSeason) {
+        setRounds([]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/rounds?seasonId=${selectedSeason.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          // Sort rounds by date
+          const sortedRounds = data.sort((a: any, b: any) => {
+            const dateA = new Date(a.date || 0).getTime();
+            const dateB = new Date(b.date || 0).getTime();
+            return dateA - dateB;
+          });
+          setRounds(sortedRounds);
+        }
+      } catch (error) {
+        console.error('Failed to fetch rounds:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRounds();
+  }, [selectedSeason]);
+  
+  // Convert rounds to races format
   const races = useMemo(() => {
-    if (!selectedSeason) {
-      return allRaces;
-    }
-    return allRaces.filter((race) => race.season === selectedSeason.name);
-  }, [allRaces, selectedSeason]);
+    return rounds.map((round) => ({
+      id: round.id,
+      name: round.name,
+      season: selectedSeason?.name || '',
+      round: round.roundNumber,
+      roundNumber: round.roundNumber,
+      date: round.date,
+      location: round.location,
+      address: round.address,
+      status: round.status,
+      results: [], // Will be populated from race results if needed
+    }));
+  }, [rounds, selectedSeason]);
 
   const [selectedEvent, setSelectedEvent] = useState<Race | null>(null);
   const [selectedDivision, setSelectedDivision] = useState<Division | null>(null);
@@ -165,6 +205,24 @@ export default function RacesPage() {
     alert(`Successfully saved ${validResults.length} driver result(s)!`);
   };
 
+  if (loading) {
+    return (
+      <>
+        <Header hideSearch />
+        <div className="p-4 md:p-6">
+          <div className="max-w-[95%] mx-auto">
+            <div className="flex items-center justify-center min-h-[400px]">
+              <div className="flex flex-col items-center gap-4">
+                <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+                <p className="text-slate-600 dark:text-slate-400">Loading rounds...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
     <Header hideSearch />
@@ -180,35 +238,43 @@ export default function RacesPage() {
               <h2 className="text-base font-bold text-slate-900 dark:text-white">Event</h2>
             </div>
             <div className="overflow-y-auto max-h-[calc(100vh-200px)]">
-              <div className="divide-y divide-slate-200 dark:divide-slate-700">
-                {races.map((race) => (
-                  <div
-                    key={race.id}
-                    onClick={() => {
-                      setSelectedEvent(race);
-                      setSelectedDivision('Division 1');
-                      setSelectedType(null);
-                      setTypes([]);
-                      setDriverResults([]);
-                    }}
-                    className={`p-2 cursor-pointer transition-colors ${
-                      selectedEvent?.id === race.id
-                        ? 'bg-primary-50 dark:bg-primary-900/20'
-                        : 'hover:bg-slate-50 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    <h3 className="font-semibold text-slate-900 dark:text-white text-sm">
-                      {race.name}
-                    </h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
-                      {race.season} • R{race.round}
-                    </p>
-                    <p className="text-sm text-slate-500 dark:text-slate-500 mt-0.5">
-                      {new Date(race.date).toLocaleDateString()}
-                    </p>
-                  </div>
-                ))}
-              </div>
+              {races.length > 0 ? (
+                <div className="divide-y divide-slate-200 dark:divide-slate-700">
+                  {races.map((race) => (
+                    <div
+                      key={race.id}
+                      onClick={() => {
+                        setSelectedEvent(race);
+                        setSelectedDivision('Division 1');
+                        setSelectedType(null);
+                        setTypes([]);
+                        setDriverResults([]);
+                      }}
+                      className={`p-2 cursor-pointer transition-colors ${
+                        selectedEvent?.id === race.id
+                          ? 'bg-primary-50 dark:bg-primary-900/20'
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      <h3 className="font-semibold text-slate-900 dark:text-white text-sm">
+                        {race.name}
+                      </h3>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
+                        Round {race.roundNumber || race.round}
+                      </p>
+                      {race.date && (
+                        <p className="text-sm text-slate-500 dark:text-slate-500 mt-0.5">
+                          {new Date(race.date).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-sm">
+                  No rounds available
+                </div>
+              )}
             </div>
           </div>
 
@@ -251,9 +317,11 @@ export default function RacesPage() {
                         }`}
                       >
                         <div className="font-medium">{division}</div>
-                        <div className="text-sm mt-0.5 opacity-75">
-                          {selectedEvent.results?.find((r) => r.division === division)?.results.length || 0} drivers
-                        </div>
+                        {hasResults && (
+                          <div className="text-sm mt-0.5 opacity-75">
+                            {selectedEvent.results?.find((r) => r.division === division)?.results.length || 0} drivers
+                          </div>
+                        )}
                       </button>
                     );
                   })}
@@ -330,8 +398,15 @@ export default function RacesPage() {
         {/* Race Results Panel - Moved to Bottom */}
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Race Results</h2>
-            {selectedEvent && selectedDivision && (
+            <div>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Race Results</h2>
+              {selectedEvent && selectedDivision && (
+                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                  {selectedEvent.name} • Round {selectedEvent.roundNumber || selectedEvent.round} • {selectedDivision}
+                </p>
+              )}
+            </div>
+            {selectedEvent && selectedDivision && selectedType && (
               <button
                 onClick={handleSave}
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all shadow-md text-sm font-medium"

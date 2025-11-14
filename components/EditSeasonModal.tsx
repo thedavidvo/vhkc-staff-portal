@@ -10,6 +10,7 @@ interface EditSeasonModalProps {
   season: Season | null;
   onUpdate: (season: Season) => void;
   locations: string[];
+  onLocationAdded?: (locationName: string, address: string) => void;
 }
 
 export default function EditSeasonModal({
@@ -18,6 +19,7 @@ export default function EditSeasonModal({
   season,
   onUpdate,
   locations,
+  onLocationAdded,
 }: EditSeasonModalProps) {
   const [formData, setFormData] = useState<Season | null>(null);
   const [editingRound, setEditingRound] = useState<Round | null>(null);
@@ -287,6 +289,7 @@ export default function EditSeasonModal({
             setShowRoundForm(false);
             setEditingRound(null);
           }}
+          onLocationAdded={onLocationAdded}
         />
       )}
     </div>
@@ -298,10 +301,14 @@ interface RoundFormProps {
   locations: string[];
   onSave: (round: Round) => void;
   onCancel: () => void;
+  onLocationAdded?: (locationName: string, address: string) => void;
 }
 
-function RoundForm({ round, locations, onSave, onCancel }: RoundFormProps) {
+function RoundForm({ round, locations, onSave, onCancel, onLocationAdded }: RoundFormProps) {
   const [formData, setFormData] = useState<Round>(round);
+  const [showManualLocation, setShowManualLocation] = useState(false);
+  const [manualLocation, setManualLocation] = useState('');
+  const [manualAddress, setManualAddress] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -367,18 +374,106 @@ function RoundForm({ round, locations, onSave, onCancel }: RoundFormProps) {
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               Location
             </label>
-            <select
-              required
-              value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              {locations.map((loc) => (
-                <option key={loc} value={loc}>
-                  {loc}
-                </option>
-              ))}
-            </select>
+            {!showManualLocation ? (
+              <div className="space-y-2">
+                <select
+                  required
+                  value={formData.location}
+                  onChange={(e) => {
+                    if (e.target.value === '__manual__') {
+                      setShowManualLocation(true);
+                    } else {
+                      setFormData({ ...formData, location: e.target.value });
+                    }
+                  }}
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  {locations.length > 0 ? (
+                    <>
+                      <option value="">Select a location</option>
+                      {locations.map((loc) => (
+                        <option key={loc} value={loc}>
+                          {loc}
+                        </option>
+                      ))}
+                    </>
+                  ) : (
+                    <option value="">No locations available</option>
+                  )}
+                  <option value="__manual__">+ Add New Location</option>
+                </select>
+                {locations.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowManualLocation(true)}
+                    className="w-full px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    + Add Location Manually
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  required
+                  value={manualLocation}
+                  onChange={(e) => setManualLocation(e.target.value)}
+                  placeholder="Location name"
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <input
+                  type="text"
+                  value={manualAddress}
+                  onChange={(e) => setManualAddress(e.target.value)}
+                  placeholder="Address (optional)"
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!manualLocation.trim()) {
+                        alert('Please enter a location name');
+                        return;
+                      }
+                      
+                      // Add location to spreadsheet via API
+                      if (onLocationAdded) {
+                        try {
+                          await onLocationAdded(manualLocation.trim(), manualAddress.trim());
+                          setFormData({ ...formData, location: manualLocation.trim(), address: manualAddress.trim() || formData.address });
+                          setShowManualLocation(false);
+                          setManualLocation('');
+                          setManualAddress('');
+                        } catch (error) {
+                          console.error('Failed to add location:', error);
+                          alert('Failed to add location. Please try again.');
+                        }
+                      } else {
+                        // If no callback, just update form data
+                        setFormData({ ...formData, location: manualLocation.trim(), address: manualAddress.trim() || formData.address });
+                        setShowManualLocation(false);
+                      }
+                    }}
+                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                  >
+                    Save Location
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowManualLocation(false);
+                      setManualLocation('');
+                      setManualAddress('');
+                    }}
+                    className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div>

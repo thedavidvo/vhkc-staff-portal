@@ -1,41 +1,103 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Season } from '@/types';
-import { mockSeasons } from '@/data/mockData';
 
 interface SeasonContextType {
   seasons: Season[];
   selectedSeason: Season | null;
   setSelectedSeason: (season: Season | null) => void;
-  addSeason: (season: Season) => void;
-  updateSeason: (season: Season) => void;
-  deleteSeason: (seasonId: string) => void;
+  addSeason: (season: Season) => Promise<void>;
+  updateSeason: (season: Season) => Promise<void>;
+  deleteSeason: (seasonId: string) => Promise<void>;
+  refreshSeasons: () => Promise<void>;
+  loading: boolean;
 }
 
 const SeasonContext = createContext<SeasonContextType | undefined>(undefined);
 
 export function SeasonProvider({ children }: { children: ReactNode }) {
-  const [seasons, setSeasons] = useState<Season[]>(mockSeasons);
-  const [selectedSeason, setSelectedSeason] = useState<Season | null>(mockSeasons[0] || null);
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [selectedSeason, setSelectedSeason] = useState<Season | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const addSeason = (season: Season) => {
-    setSeasons([...seasons, season]);
-    setSelectedSeason(season);
-  };
-
-  const updateSeason = (updatedSeason: Season) => {
-    setSeasons(seasons.map((s) => (s.id === updatedSeason.id ? updatedSeason : s)));
-    if (selectedSeason?.id === updatedSeason.id) {
-      setSelectedSeason(updatedSeason);
+  const refreshSeasons = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/seasons');
+      if (!response.ok) {
+        throw new Error('Failed to fetch seasons');
+      }
+      const data = await response.json();
+      setSeasons(data);
+      if (data.length > 0 && !selectedSeason) {
+        setSelectedSeason(data[0]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch seasons:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const deleteSeason = (seasonId: string) => {
-    setSeasons(seasons.filter((s) => s.id !== seasonId));
-    if (selectedSeason?.id === seasonId) {
-      const remainingSeasons = seasons.filter((s) => s.id !== seasonId);
-      setSelectedSeason(remainingSeasons[0] || null);
+  useEffect(() => {
+    refreshSeasons();
+  }, []);
+
+  const addSeason = async (season: Season) => {
+    try {
+      const response = await fetch('/api/seasons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(season),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to add season');
+      }
+      await refreshSeasons();
+      setSelectedSeason(season);
+    } catch (error) {
+      console.error('Failed to add season:', error);
+      throw error;
+    }
+  };
+
+  const updateSeason = async (season: Season) => {
+    try {
+      const response = await fetch('/api/seasons', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(season),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to update season');
+      }
+      await refreshSeasons();
+      if (selectedSeason?.id === season.id) {
+        setSelectedSeason(season);
+      }
+    } catch (error) {
+      console.error('Failed to update season:', error);
+      throw error;
+    }
+  };
+
+  const deleteSeason = async (seasonId: string) => {
+    try {
+      const response = await fetch(`/api/seasons?seasonId=${seasonId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to delete season');
+      }
+      await refreshSeasons();
+      if (selectedSeason?.id === seasonId) {
+        const remainingSeasons = seasons.filter(s => s.id !== seasonId);
+        setSelectedSeason(remainingSeasons[0] || null);
+      }
+    } catch (error) {
+      console.error('Failed to delete season:', error);
+      throw error;
     }
   };
 
@@ -48,6 +110,8 @@ export function SeasonProvider({ children }: { children: ReactNode }) {
         addSeason,
         updateSeason,
         deleteSeason,
+        refreshSeasons,
+        loading,
       }}
     >
       {children}
@@ -62,4 +126,3 @@ export function useSeason() {
   }
   return context;
 }
-

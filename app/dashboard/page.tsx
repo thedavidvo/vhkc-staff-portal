@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import StatsCards from '@/components/StatsCards';
@@ -8,8 +8,7 @@ import RaceHistory from '@/components/RaceHistory';
 import PromotionsModal from '@/components/PromotionsModal';
 import DemotionsModal from '@/components/DemotionsModal';
 import { useSeason } from '@/components/SeasonContext';
-import { mockDrivers, mockRaces, mockPromotions, mockDemotions } from '@/data/mockData';
-import { Calendar, MapPin, Flag, Trophy, Medal, Award } from 'lucide-react';
+import { Calendar, MapPin, Flag, Trophy, Medal, Award, Loader2 } from 'lucide-react';
 import { Division } from '@/types';
 
 export default function Dashboard() {
@@ -17,28 +16,84 @@ export default function Dashboard() {
   const { selectedSeason } = useSeason();
   const [isPromotionsModalOpen, setIsPromotionsModalOpen] = useState(false);
   const [isDemotionsModalOpen, setIsDemotionsModalOpen] = useState(false);
-  const [promotions, setPromotions] = useState(mockPromotions);
-  const [demotions, setDemotions] = useState(mockDemotions);
+  const [promotions, setPromotions] = useState<any[]>([]);
+  const [demotions, setDemotions] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [rounds, setRounds] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch drivers and rounds from API
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!selectedSeason) {
+        setDrivers([]);
+        setRounds([]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const [driversResponse, roundsResponse] = await Promise.all([
+          fetch(`/api/drivers?seasonId=${selectedSeason.id}`),
+          fetch(`/api/rounds?seasonId=${selectedSeason.id}`),
+        ]);
+
+        if (driversResponse.ok) {
+          const driversData = await driversResponse.json();
+          setDrivers(driversData);
+        }
+
+        if (roundsResponse.ok) {
+          const roundsData = await roundsResponse.json();
+          // Sort rounds by date
+          const sortedRounds = roundsData.sort((a: any, b: any) => {
+            const dateA = new Date(a.date || 0).getTime();
+            const dateB = new Date(b.date || 0).getTime();
+            return dateA - dateB;
+          });
+          setRounds(sortedRounds);
+        }
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [selectedSeason]);
 
   // Calculate dynamic stats
   const stats = useMemo(() => {
-    const activeDrivers = mockDrivers.filter((d) => d.status === 'ACTIVE');
-    const uniqueDivisions = new Set(mockDrivers.map((d) => d.division));
+    const activeDrivers = drivers.filter((d) => d.status === 'ACTIVE');
+    const uniqueDivisions = new Set(drivers.map((d) => d.division));
     return {
       totalDrivers: activeDrivers.length,
       driversPromoted: promotions.length,
       driversDemoted: demotions.length,
       activeDivisions: uniqueDivisions.size,
     };
-  }, [promotions, demotions]);
+  }, [promotions, demotions, drivers]);
+
+  // Convert rounds to races format for compatibility
+  const races = useMemo(() => {
+    return rounds.map((round) => ({
+      id: round.id,
+      name: round.name,
+      season: selectedSeason?.name || '',
+      round: round.roundNumber,
+      date: round.date,
+      location: round.location,
+      address: round.address,
+      status: round.status,
+    }));
+  }, [rounds, selectedSeason]);
 
   // Filter races by selected season
   const filteredRaces = useMemo(() => {
-    if (!selectedSeason) {
-      return mockRaces;
-    }
-    return mockRaces.filter((race) => race.season === selectedSeason.name);
-  }, [selectedSeason]);
+    return races;
+  }, [races]);
 
   // Check if season has ended
   const isSeasonEnded = useMemo(() => {
@@ -52,29 +107,41 @@ export default function Dashboard() {
     return endDate < today;
   }, [selectedSeason]);
 
-  // Find next upcoming race
+  // Find next upcoming race - sorted by date
   const nextUpcomingRace = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    const upcomingRaces = filteredRaces
-      .filter((race) => race.status === 'upcoming')
-      .map((race) => {
-        const raceDate = new Date(race.date);
+    const upcomingRounds = rounds
+      .filter((round) => round.status === 'upcoming' && round.date)
+      .map((round) => {
+        const raceDate = new Date(round.date);
         raceDate.setHours(0, 0, 0, 0);
         return {
-          ...race,
+          ...round,
           raceDate,
         };
       })
-      .filter((race) => {
+      .filter((round) => {
         // Show upcoming races that are today or in the future
-        return race.raceDate >= today;
+        return round.raceDate >= today;
       })
       .sort((a, b) => a.raceDate.getTime() - b.raceDate.getTime());
     
-    return upcomingRaces.length > 0 ? upcomingRaces[0] : null;
-  }, [filteredRaces]);
+    if (upcomingRounds.length === 0) return null;
+    
+    const nextRound = upcomingRounds[0];
+    return {
+      id: nextRound.id,
+      name: nextRound.name,
+      season: selectedSeason?.name || '',
+      round: nextRound.roundNumber,
+      date: nextRound.date,
+      location: nextRound.location,
+      address: nextRound.address,
+      status: nextRound.status,
+    };
+  }, [rounds, selectedSeason]);
 
   // Check if there are no upcoming races
   const hasNoUpcomingRaces = !nextUpcomingRace;
@@ -84,7 +151,7 @@ export default function Dashboard() {
     if (!isSeasonEnded) return null;
 
     const divisions: Division[] = ['Division 1', 'Division 2', 'Division 3', 'Division 4'];
-    const result: Record<Division, typeof mockDrivers> = {
+    const result: Record<Division, any[]> = {
       'Division 1': [],
       'Division 2': [],
       'Division 3': [],
@@ -93,7 +160,7 @@ export default function Dashboard() {
     };
 
     divisions.forEach((division) => {
-      const driversInDivision = mockDrivers
+      const driversInDivision = drivers
         .filter((d) => d.division === division && d.status === 'ACTIVE')
         .sort((a, b) => b.pointsTotal - a.pointsTotal)
         .slice(0, 3); // Get top 3
@@ -130,6 +197,24 @@ export default function Dashboard() {
     // In a real app, this would make an API call to decline the demotion
     setDemotions(demotions.filter((d) => d.driverId !== driverId));
   };
+
+  if (loading) {
+    return (
+      <>
+        <Header hideSearch />
+        <div className="p-4 md:p-6">
+          <div className="max-w-[95%] mx-auto">
+            <div className="flex items-center justify-center min-h-[400px]">
+              <div className="flex flex-col items-center gap-4">
+                <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+                <p className="text-slate-600 dark:text-slate-400">Loading dashboard data...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
