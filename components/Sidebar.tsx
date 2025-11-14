@@ -133,36 +133,36 @@ export default function Sidebar() {
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto flex flex-col">
           <div className="flex-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={handleLinkClick}
-                  className={`relative flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out ${
-                    isActive
-                      ? 'bg-primary text-white shadow-lg'
-                      : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                  }`}
-                >
-                  <Icon 
-                    className={`w-5 h-5 flex-shrink-0 transition-all duration-300 ${
-                      isActive ? 'scale-105' : 'scale-100'
-                    }`} 
-                  />
-                  {(!isCollapsed || (mounted && isMobile)) && (
-                    <span className="font-medium transition-opacity duration-300">
-                      {item.name}
-                    </span>
-                  )}
-                  {isActive && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-white rounded-r-full transition-all duration-300" />
-                  )}
-                </Link>
-              );
-            })}
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={handleLinkClick}
+                className={`relative flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out ${
+                  isActive
+                    ? 'bg-primary text-white shadow-lg'
+                    : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                }`}
+              >
+                <Icon 
+                  className={`w-5 h-5 flex-shrink-0 transition-all duration-300 ${
+                    isActive ? 'scale-105' : 'scale-100'
+                  }`} 
+                />
+                {(!isCollapsed || (mounted && isMobile)) && (
+                  <span className="font-medium transition-opacity duration-300">
+                    {item.name}
+                  </span>
+                )}
+                {isActive && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-white rounded-r-full transition-all duration-300" />
+                )}
+              </Link>
+            );
+          })}
           </div>
           
           {/* Coming Soon Section */}

@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import Header from '@/components/Header';
 import { mockDrivers } from '@/data/mockData';
 import { Driver, Division } from '@/types';
-import { Search, Check, X } from 'lucide-react';
+import { Search, Check, X, Plus, Edit2, Trash2 } from 'lucide-react';
 
 interface PendingDivisionChange {
   driverId: string;
@@ -15,7 +15,7 @@ interface PendingDivisionChange {
 }
 
 // Helper function to get division color
-const getDivisionColor = (division: Division) => {
+const getDivisionColor = (division: string) => {
   switch (division) {
     case 'Division 1':
       return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
@@ -37,6 +37,11 @@ export default function DivisionsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [divisionFilter, setDivisionFilter] = useState<Division | 'all'>('all');
   const [pendingChanges, setPendingChanges] = useState<PendingDivisionChange[]>([]);
+  const [divisions, setDivisions] = useState<Division[]>(['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New']);
+  const [isAddDivisionModalOpen, setIsAddDivisionModalOpen] = useState(false);
+  const [isEditDivisionModalOpen, setIsEditDivisionModalOpen] = useState(false);
+  const [editingDivision, setEditingDivision] = useState<Division | null>(null);
+  const [newDivisionName, setNewDivisionName] = useState('');
 
   const filteredDrivers = useMemo(() => {
     const filtered = drivers.filter((driver) => {
@@ -47,10 +52,13 @@ export default function DivisionsPage() {
     
     // Sort by division when "all" is selected
     if (divisionFilter === 'all') {
-      const divisionOrder: Division[] = ['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'];
       return filtered.sort((a, b) => {
-        const aIndex = divisionOrder.indexOf(a.division);
-        const bIndex = divisionOrder.indexOf(b.division);
+        const aIndex = divisions.indexOf(a.division);
+        const bIndex = divisions.indexOf(b.division);
+        // If division not found in list, put it at the end
+        if (aIndex === -1 && bIndex === -1) return 0;
+        if (aIndex === -1) return 1;
+        if (bIndex === -1) return -1;
         return aIndex - bIndex;
       });
     }
@@ -70,10 +78,11 @@ export default function DivisionsPage() {
     }
 
     // Determine if it's a promotion or demotion
-    const divisionOrder: Division[] = ['New', 'Division 4', 'Division 3', 'Division 2', 'Division 1'];
-    const currentIndex = divisionOrder.indexOf(driver.division);
-    const newIndex = divisionOrder.indexOf(newDiv);
-    const type = newIndex > currentIndex ? 'promotion' : 'demotion';
+    // Use the divisions list order, assuming lower index = lower division
+    const currentIndex = divisions.indexOf(driver.division);
+    const newIndex = divisions.indexOf(newDiv);
+    // If indices are valid, compare them; otherwise default to demotion
+    const type = (currentIndex !== -1 && newIndex !== -1 && newIndex > currentIndex) ? 'promotion' : 'demotion';
 
     // Check if this driver already has a pending change
     const existingIndex = pendingChanges.findIndex((p) => p.driverId === driverId);
@@ -124,18 +133,18 @@ export default function DivisionsPage() {
   };
 
   const driversByDivision = useMemo(() => {
-    const grouped: Record<Division, Driver[]> = {
-      'Division 1': [],
-      'Division 2': [],
-      'Division 3': [],
-      'Division 4': [],
-      'New': [],
-    };
+    const grouped: Record<string, Driver[]> = {};
+    divisions.forEach((div) => {
+      grouped[div] = [];
+    });
     drivers.forEach((driver) => {
+      if (!grouped[driver.division]) {
+        grouped[driver.division] = [];
+      }
       grouped[driver.division].push(driver);
     });
     return grouped;
-  }, [drivers]);
+  }, [drivers, divisions]);
 
   const promotions = useMemo(() => {
     return pendingChanges.filter((p) => p.type === 'promotion');
@@ -144,6 +153,65 @@ export default function DivisionsPage() {
   const demotions = useMemo(() => {
     return pendingChanges.filter((p) => p.type === 'demotion');
   }, [pendingChanges]);
+
+  const handleAddDivision = () => {
+    setIsAddDivisionModalOpen(true);
+    setNewDivisionName('');
+  };
+
+  const handleSaveNewDivision = () => {
+    if (newDivisionName.trim() && !divisions.includes(newDivisionName.trim() as Division)) {
+      setDivisions([...divisions, newDivisionName.trim() as Division]);
+      setIsAddDivisionModalOpen(false);
+      setNewDivisionName('');
+    }
+  };
+
+  const handleEditDivision = (division: Division) => {
+    setEditingDivision(division);
+    setNewDivisionName(division);
+    setIsEditDivisionModalOpen(true);
+  };
+
+  const handleSaveEditDivision = () => {
+    if (editingDivision && newDivisionName.trim() && newDivisionName.trim() !== editingDivision) {
+      // Update division name in all drivers
+      setDrivers(drivers.map((d) => 
+        d.division === editingDivision 
+          ? { ...d, division: newDivisionName.trim() as Division }
+          : d
+      ));
+      
+      // Update divisions list
+      setDivisions(divisions.map((d) => d === editingDivision ? newDivisionName.trim() as Division : d));
+      
+      // Update pending changes
+      setPendingChanges(pendingChanges.map((p) => ({
+        ...p,
+        currentDivision: p.currentDivision === editingDivision ? newDivisionName.trim() as Division : p.currentDivision,
+        newDivision: p.newDivision === editingDivision ? newDivisionName.trim() as Division : p.newDivision,
+      })));
+      
+      setIsEditDivisionModalOpen(false);
+      setEditingDivision(null);
+      setNewDivisionName('');
+    }
+  };
+
+  const handleDeleteDivision = (division: Division) => {
+    const driverCount = driversByDivision[division]?.length || 0;
+    if (driverCount > 0) {
+      alert(`Cannot delete ${division}. There are ${driverCount} driver(s) registered to this division.`);
+      return;
+    }
+    
+    if (confirm(`Are you sure you want to delete ${division}? This action cannot be undone.`)) {
+      setDivisions(divisions.filter((d) => d !== division));
+      if (divisionFilter === division) {
+        setDivisionFilter('all');
+      }
+    }
+  };
 
   return (
     <>
@@ -173,11 +241,11 @@ export default function DivisionsPage() {
                 className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="all">All Divisions</option>
-                <option value="Division 1">Division 1</option>
-                <option value="Division 2">Division 2</option>
-                <option value="Division 3">Division 3</option>
-                <option value="Division 4">Division 4</option>
-                <option value="New">New</option>
+                {divisions.map((div) => (
+                  <option key={div} value={div}>
+                    {div}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -186,28 +254,62 @@ export default function DivisionsPage() {
             {/* Division Overview - Left Side (Thinner) */}
             <div className="lg:col-span-1">
               <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-3">
-                <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-3">
-                  Divisions
-                </h2>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Divisions
+                  </h2>
+                  <button
+                    onClick={handleAddDivision}
+                    className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                    aria-label="Add division"
+                  >
+                    <Plus className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                  </button>
+                </div>
                 <div className="space-y-2">
-                  {(['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'] as Division[]).map(
-                    (division) => (
-                      <div
-                        key={division}
-                        onClick={() => setDivisionFilter(divisionFilter === division ? 'all' : division)}
-                        className={`p-2 bg-slate-50 dark:bg-slate-900 rounded-lg cursor-pointer transition-all hover:shadow-md ${
-                          divisionFilter === division ? 'ring-2 ring-primary ring-offset-1' : ''
-                        }`}
-                      >
-                        <h3 className="font-semibold text-xs text-slate-900 dark:text-white mb-0.5">
-                          {division}
-                        </h3>
-                        <p className="text-lg font-bold text-primary">
-                          {driversByDivision[division].length}
-                        </p>
+                  {divisions.map((division) => (
+                    <div
+                      key={division}
+                      className={`p-2 bg-slate-50 dark:bg-slate-900 rounded-lg transition-all hover:shadow-md ${
+                        divisionFilter === division ? 'ring-2 ring-primary ring-offset-1' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div
+                          onClick={() => setDivisionFilter(divisionFilter === division ? 'all' : division)}
+                          className="flex-1 cursor-pointer"
+                        >
+                          <h3 className="font-semibold text-xs text-slate-900 dark:text-white mb-0.5">
+                            {division}
+                          </h3>
+                          <p className="text-lg font-bold text-primary">
+                            {driversByDivision[division]?.length || 0}
+                          </p>
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleEditDivision(division)}
+                            className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                            aria-label="Edit division"
+                          >
+                            <Edit2 className="w-3 h-3 text-slate-600 dark:text-slate-400" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteDivision(division)}
+                            className="p-1 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                            aria-label="Delete division"
+                            disabled={(driversByDivision[division]?.length || 0) > 0}
+                          >
+                            <Trash2 className={`w-3 h-3 ${
+                              (driversByDivision[division]?.length || 0) > 0
+                                ? 'text-slate-400 dark:text-slate-600 cursor-not-allowed'
+                                : 'text-red-600 dark:text-red-400'
+                            }`} />
+                          </button>
+                        </div>
                       </div>
-                    )
-                  )}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -262,11 +364,11 @@ export default function DivisionsPage() {
                                 }}
                                 className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary text-sm"
                               >
-                                <option value="Division 1">Division 1</option>
-                                <option value="Division 2">Division 2</option>
-                                <option value="Division 3">Division 3</option>
-                                <option value="Division 4">Division 4</option>
-                                <option value="New">New</option>
+                                {divisions.map((div) => (
+                                  <option key={div} value={div}>
+                                    {div}
+                                  </option>
+                                ))}
                               </select>
                             </td>
                           </tr>
@@ -386,6 +488,135 @@ export default function DivisionsPage() {
           </div>
         </div>
       </div>
+
+      {/* Add Division Modal */}
+      {isAddDivisionModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full">
+            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                Add New Division
+              </h2>
+              <button
+                onClick={() => {
+                  setIsAddDivisionModalOpen(false);
+                  setNewDivisionName('');
+                }}
+                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                aria-label="Close modal"
+              >
+                <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Division Name
+                </label>
+                <input
+                  type="text"
+                  value={newDivisionName}
+                  onChange={(e) => setNewDivisionName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSaveNewDivision();
+                    } else if (e.key === 'Escape') {
+                      setIsAddDivisionModalOpen(false);
+                      setNewDivisionName('');
+                    }
+                  }}
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Enter division name"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 p-6 border-t border-slate-200 dark:border-slate-700">
+              <button
+                onClick={() => {
+                  setIsAddDivisionModalOpen(false);
+                  setNewDivisionName('');
+                }}
+                className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveNewDivision}
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-md"
+              >
+                Add Division
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Division Modal */}
+      {isEditDivisionModalOpen && editingDivision && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full">
+            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                Edit Division
+              </h2>
+              <button
+                onClick={() => {
+                  setIsEditDivisionModalOpen(false);
+                  setEditingDivision(null);
+                  setNewDivisionName('');
+                }}
+                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                aria-label="Close modal"
+              >
+                <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Division Name
+                </label>
+                <input
+                  type="text"
+                  value={newDivisionName}
+                  onChange={(e) => setNewDivisionName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSaveEditDivision();
+                    } else if (e.key === 'Escape') {
+                      setIsEditDivisionModalOpen(false);
+                      setEditingDivision(null);
+                      setNewDivisionName('');
+                    }
+                  }}
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Enter division name"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 p-6 border-t border-slate-200 dark:border-slate-700">
+              <button
+                onClick={() => {
+                  setIsEditDivisionModalOpen(false);
+                  setEditingDivision(null);
+                  setNewDivisionName('');
+                }}
+                className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEditDivision}
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-md"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
