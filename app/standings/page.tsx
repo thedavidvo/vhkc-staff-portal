@@ -46,17 +46,52 @@ export default function StandingsPage() {
       .filter((d) => d.division === selectedDivision && d.status === 'ACTIVE')
       .sort((a, b) => b.pointsTotal - a.pointsTotal);
 
+    // Get all unique rounds from completed races in this division
+    const allRounds = new Set<number>();
+    mockRaces
+      .filter((race) => race.status === 'completed' && race.results)
+      .forEach((race) => {
+        race.results?.forEach((divisionResult) => {
+          if (divisionResult.division === selectedDivision) {
+            allRounds.add(race.round);
+          }
+        });
+      });
+    
+    const sortedRounds = Array.from(allRounds).sort((a, b) => a - b);
+
     return driversInDivision.map((driver, index) => {
       const raceHistory = getDriverRaceHistory(driver.id);
-      const roundPoints = raceHistory.map((race) => ({
-        round: race.round,
-        points: race.points,
-        raceName: race.raceName,
-      }));
       
-      // Find the lowest points round (drop round)
-      const dropRound = roundPoints.length > 0 
-        ? roundPoints.reduce((min, current) => current.points < min.points ? current : min)
+      // Create a map of round to points for quick lookup
+      const roundPointsMap = new Map<number, { round: number; points: number; raceName: string }>();
+      raceHistory.forEach((race) => {
+        roundPointsMap.set(race.round, {
+          round: race.round,
+          points: race.points,
+          raceName: race.raceName,
+        });
+      });
+      
+      // Create round points for all rounds, setting 0 for missing rounds
+      const roundPoints = sortedRounds.map((round) => {
+        const existing = roundPointsMap.get(round);
+        if (existing) {
+          return existing;
+        }
+        // Find race name for this round if available
+        const race = mockRaces.find((r) => r.round === round && r.status === 'completed');
+        return {
+          round,
+          points: 0,
+          raceName: race?.name || `Round ${round}`,
+        };
+      });
+      
+      // Find the lowest points round (drop round) - exclude 0 point rounds from being drop rounds
+      const nonZeroRounds = roundPoints.filter((rp) => rp.points > 0);
+      const dropRound = nonZeroRounds.length > 0 
+        ? nonZeroRounds.reduce((min, current) => current.points < min.points ? current : min)
         : null;
       
       return {
@@ -184,36 +219,41 @@ export default function StandingsPage() {
                     </div>
                     
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                      {driver.roundPoints.map((round) => (
-                        <div
-                          key={round.round}
-                          className="bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-3"
-                        >
-                          <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">
-                            Round {round.round}
+                      {driver.roundPoints.map((round) => {
+                        const isDropRound = driver.dropRound && driver.dropRound.round === round.round;
+                        return (
+                          <div
+                            key={round.round}
+                            className={`rounded-lg border p-3 ${
+                              isDropRound
+                                ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                                : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+                            }`}
+                          >
+                            <div className={`text-xs mb-1 ${
+                              isDropRound
+                                ? 'text-red-700 dark:text-red-400 font-semibold'
+                                : 'text-slate-600 dark:text-slate-400'
+                            }`}>
+                              {isDropRound ? 'Drop Round' : `Round ${round.round}`}
+                            </div>
+                            <div className={`text-lg font-bold ${
+                              isDropRound
+                                ? 'text-red-900 dark:text-red-200'
+                                : 'text-slate-900 dark:text-white'
+                            }`}>
+                              {round.points}
+                            </div>
+                            <div className={`text-xs truncate mt-1 ${
+                              isDropRound
+                                ? 'text-red-600 dark:text-red-400'
+                                : 'text-slate-500 dark:text-slate-500'
+                            }`}>
+                              {round.raceName}
+                            </div>
                           </div>
-                          <div className="text-lg font-bold text-slate-900 dark:text-white">
-                            {round.points}
-                          </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-500 truncate mt-1">
-                            {round.raceName}
-                          </div>
-                        </div>
-                      ))}
-                      
-                      {driver.dropRound && (
-                        <div className="bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 p-3">
-                          <div className="text-xs text-red-700 dark:text-red-400 mb-1 font-semibold">
-                            Drop Round
-                          </div>
-                          <div className="text-lg font-bold text-red-900 dark:text-red-200">
-                            {driver.dropRound.points}
-                          </div>
-                          <div className="text-xs text-red-600 dark:text-red-400 truncate mt-1">
-                            Round {driver.dropRound.round}
-                          </div>
-                        </div>
-                      )}
+                        );
+                      })}
                     </div>
                   </div>
                 ))
@@ -260,11 +300,43 @@ export default function StandingsPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                         {team.drivers.map((driver) => {
                           const raceHistory = getDriverRaceHistory(driver.id);
-                          const roundPoints = raceHistory.map((race) => ({
-                            round: race.round,
-                            points: race.points,
-                            raceName: race.raceName,
-                          }));
+                          
+                          // Get all unique rounds from completed races in this division
+                          const allRounds = new Set<number>();
+                          mockRaces
+                            .filter((race) => race.status === 'completed' && race.results)
+                            .forEach((race) => {
+                              race.results?.forEach((divisionResult) => {
+                                if (divisionResult.division === selectedDivision) {
+                                  allRounds.add(race.round);
+                                }
+                              });
+                            });
+                          
+                          const sortedRounds = Array.from(allRounds).sort((a, b) => a - b);
+                          
+                          // Create a map of round to points for quick lookup
+                          const roundPointsMap = new Map<number, { round: number; points: number; raceName: string }>();
+                          raceHistory.forEach((race) => {
+                            roundPointsMap.set(race.round, {
+                              round: race.round,
+                              points: race.points,
+                              raceName: race.raceName,
+                            });
+                          });
+                          
+                          // Create round points for all rounds, setting 0 for missing rounds
+                          const roundPoints = sortedRounds.map((round) => {
+                            const existing = roundPointsMap.get(round);
+                            if (existing) {
+                              return existing;
+                            }
+                            return {
+                              round,
+                              points: 0,
+                              raceName: `Round ${round}`,
+                            };
+                          });
                           
                           return (
                             <div
@@ -285,7 +357,11 @@ export default function StandingsPage() {
                                 {roundPoints.map((round) => (
                                   <div
                                     key={round.round}
-                                    className="text-xs px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded text-slate-700 dark:text-slate-300"
+                                    className={`text-xs px-2 py-1 rounded ${
+                                      round.points === 0
+                                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-500'
+                                        : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                                    }`}
                                   >
                                     R{round.round}: {round.points}
                                   </div>

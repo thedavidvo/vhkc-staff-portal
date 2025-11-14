@@ -18,6 +18,8 @@ export default function SeasonPage() {
   const [editingSeason, setEditingSeason] = useState<typeof seasons[0] | null>(null);
   const [selectedRound, setSelectedRound] = useState<Round | null>(null);
   const [isRoundDetailsOpen, setIsRoundDetailsOpen] = useState(false);
+  const [isRoundEditOpen, setIsRoundEditOpen] = useState(false);
+  const [editingRound, setEditingRound] = useState<Round | null>(null);
 
   const handleUpdateSeason = (updatedSeason: typeof seasons[0]) => {
     updateSeason(updatedSeason);
@@ -79,9 +81,23 @@ export default function SeasonPage() {
 
   const handleEditRound = (round: Round) => {
     if (!selectedSeason) return;
-    setEditingSeason(selectedSeason);
-    setIsEditModalOpen(true);
-    // The EditSeasonModal will handle editing the round
+    setEditingRound(round);
+    setIsRoundEditOpen(true);
+  };
+
+  const handleSaveRound = (updatedRound: Round) => {
+    if (!selectedSeason) return;
+    const updatedRounds = selectedSeason.rounds.map((r) => 
+      r.id === updatedRound.id ? updatedRound : r
+    );
+    const updatedSeason = {
+      ...selectedSeason,
+      rounds: updatedRounds,
+    };
+    updateSeason(updatedSeason);
+    setSelectedSeason(updatedSeason);
+    setIsRoundEditOpen(false);
+    setEditingRound(null);
   };
 
   const formatDate = (dateString: string) => {
@@ -333,6 +349,19 @@ export default function SeasonPage() {
         onAdd={handleAddSeason}
       />
 
+      {/* Round Edit Modal */}
+      {isRoundEditOpen && editingRound && (
+        <RoundEditForm
+          round={editingRound}
+          locations={mockLocations}
+          onSave={handleSaveRound}
+          onCancel={() => {
+            setIsRoundEditOpen(false);
+            setEditingRound(null);
+          }}
+        />
+      )}
+
       {/* Round Details Modal */}
       {isRoundDetailsOpen && selectedRound && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -431,5 +460,147 @@ export default function SeasonPage() {
         </div>
       )}
     </>
+  );
+}
+
+// Round Edit Form Component
+function RoundEditForm({
+  round,
+  locations,
+  onSave,
+  onCancel,
+}: {
+  round: Round;
+  locations: string[];
+  onSave: (round: Round) => void;
+  onCancel: () => void;
+}) {
+  const [formData, setFormData] = useState<Round>(round);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full">
+        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+            Edit Round
+          </h3>
+          <button
+            onClick={onCancel}
+            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+          >
+            <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Round Number
+            </label>
+            <input
+              type="number"
+              required
+              min="1"
+              value={formData.roundNumber}
+              onChange={(e) => setFormData({ ...formData, roundNumber: parseInt(e.target.value) || 1 })}
+              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Round Name
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Date <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">(optional)</span>
+            </label>
+            <input
+              type="date"
+              value={formData.date}
+              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Location
+            </label>
+            <select
+              required
+              value={formData.location}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              {locations.map((loc) => (
+                <option key={loc} value={loc}>
+                  {loc}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Address
+            </label>
+            <input
+              type="text"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="123 Racing Blvd, City, State 12345"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Status
+            </label>
+            <select
+              required
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value as Round['status'] })}
+              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="upcoming">Upcoming</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-md"
+            >
+              Save Round
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
