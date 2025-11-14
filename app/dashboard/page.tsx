@@ -22,9 +22,25 @@ export default function Dashboard() {
   const [rounds, setRounds] = useState<any[]>([]);
   const [raceResults, setRaceResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Check authentication on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isAuthenticated = localStorage.getItem('isAuthenticated');
+      if (isAuthenticated !== 'true') {
+        // User is not authenticated, redirect to login
+        router.replace('/login');
+      } else {
+        setIsCheckingAuth(false);
+      }
+    }
+  }, [router]);
 
   // Fetch drivers, rounds, and race results from API
   useEffect(() => {
+    // Don't fetch data if still checking auth
+    if (isCheckingAuth) return;
     const fetchData = async () => {
       if (!selectedSeason) {
         setDrivers([]);
@@ -329,7 +345,8 @@ export default function Dashboard() {
     setDemotions(demotions.filter((d) => d.driverId !== driverId));
   };
 
-  if (loading) {
+  // Show loading state while checking auth or loading data
+  if (isCheckingAuth || loading) {
     return (
       <>
         <Header hideSearch />
@@ -338,7 +355,9 @@ export default function Dashboard() {
             <div className="flex items-center justify-center min-h-[400px]">
               <div className="flex flex-col items-center gap-4">
                 <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
-                <p className="text-slate-600 dark:text-slate-400">Loading dashboard data...</p>
+                <p className="text-slate-600 dark:text-slate-400">
+                  {isCheckingAuth ? 'Checking authentication...' : 'Loading dashboard data...'}
+                </p>
               </div>
             </div>
           </div>

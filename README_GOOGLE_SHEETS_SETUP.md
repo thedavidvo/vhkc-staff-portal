@@ -67,13 +67,14 @@ id | seasonId | name | email | division | teamName | status | lastRacePosition |
 ### Sheet 4: "Race Results"
 Headers (Row 1):
 ```
-roundId | driverId | division | kartNumber | position | fastestLap | points | raceType | confirmed
+roundId | driverId | division | kartNumber | position | fastestLap | points | raceType | raceName | confirmed
 ```
 
 **Note:** 
 - `division` is the division the driver was racing in for that specific result
 - `kartNumber` is the kart number used by the driver in that race
 - `raceType` can be: `qualification` (standard points), `heat` (minor points), or `final` (major points)
+- `raceName` is the custom name for the race (e.g., "Race 1 (qualification)", "Heat 1 (heat)")
 - `confirmed` should be `true` or `false` to track if points have been confirmed
 
 ### Sheet 5: "Locations"

@@ -40,6 +40,10 @@ export async function PUT(request: NextRequest) {
     }
     
     const result = await request.json();
+    // Ensure raceType is included in the result for proper matching
+    if (!result.raceType) {
+      return NextResponse.json({ error: 'raceType is required' }, { status: 400 });
+    }
     await updateRaceResult(roundId, driverId, result);
     return NextResponse.json({ success: true });
   } catch (error) {

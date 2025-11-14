@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogIn, Mail, Lock } from 'lucide-react';
 
@@ -10,6 +10,23 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Check if user is already authenticated
+  useEffect(() => {
+    const checkAuth = () => {
+      if (typeof window !== 'undefined') {
+        const isAuthenticated = localStorage.getItem('isAuthenticated');
+        if (isAuthenticated === 'true') {
+          // User is already logged in, redirect to dashboard
+          router.replace('/dashboard');
+        } else {
+          setIsCheckingAuth(false);
+        }
+      }
+    };
+    checkAuth();
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,17 +36,31 @@ export default function LoginPage() {
     // Simulate login process
     // In a real app, you would make an API call here
     setTimeout(() => {
-      setIsLoading(false);
       // For demo purposes, accept any non-empty credentials
       if (email.trim() && password.trim()) {
         // Store login state (in a real app, use proper auth tokens)
         localStorage.setItem('isAuthenticated', 'true');
-        router.push('/dashboard');
+        
+        // Use replace instead of push to avoid back button issues
+        // Add a small delay to ensure localStorage is committed
+        setTimeout(() => {
+          router.replace('/dashboard');
+        }, 100);
       } else {
         setError('Please enter both email and password');
+        setIsLoading(false);
       }
     }, 500);
   };
+
+  // Show loading state while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: '#0C0C36' }}>
+        <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: '#0C0C36' }}>

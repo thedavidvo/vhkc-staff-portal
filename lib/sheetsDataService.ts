@@ -353,7 +353,7 @@ export async function getDriverPointsBySeason(driverId: string, seasonId: string
 }
 
 // Race Results operations
-async function getRaceResults(): Promise<(DriverRaceResult & { roundId: string; division: string; raceType?: string; confirmed?: boolean })[]> {
+async function getRaceResults(): Promise<(DriverRaceResult & { roundId: string; division: string; raceType?: string; raceName?: string; confirmed?: boolean })[]> {
   try {
     const rows = await readSheet('Race Results');
     const results = rowsToObjects<any>(rows);
@@ -363,10 +363,12 @@ async function getRaceResults(): Promise<(DriverRaceResult & { roundId: string; 
       driverId: result.driverId || '',
       driverName: '', // Will be populated when needed from Drivers sheet
       division: result.division || '',
+      kartNumber: result.kartNumber || '',
       position: parseInt(result.position?.toString() || '0'),
       fastestLap: result.fastestLap || '',
       points: parseInt(result.points?.toString() || '0'),
-      raceType: result.raceType || result.raceType || 'qualification',
+      raceType: result.raceType || 'qualification',
+      raceName: result.raceName || '',
       confirmed: result.confirmed === 'true' || result.confirmed === true,
     }));
   } catch (error) {
@@ -405,6 +407,7 @@ export async function getRaceResultsByRound(roundId: string): Promise<Race['resu
         fastestLap: r.fastestLap,
         points: r.points,
         raceType: r.raceType,
+        raceName: r.raceName || '',
         confirmed: r.confirmed,
       }))
       .sort((a, b) => a.position - b.position);
@@ -420,15 +423,17 @@ export async function getRaceResultsByRound(roundId: string): Promise<Race['resu
   return grouped;
 }
 
-export async function addRaceResult(result: DriverRaceResult & { roundId: string; division: string; raceType?: string; confirmed?: boolean }): Promise<void> {
+export async function addRaceResult(result: DriverRaceResult & { roundId: string; division: string; raceType?: string; raceName?: string; confirmed?: boolean }): Promise<void> {
   await appendRow('Race Results', [
     result.roundId,
     result.driverId,
     result.division,
+    result.kartNumber || '', // kartNumber column
     result.position.toString(),
     result.fastestLap || '',
     result.points.toString(),
     result.raceType || 'qualification',
+    result.raceName || '',
     result.confirmed ? 'true' : 'false',
   ]);
 }
@@ -436,19 +441,28 @@ export async function addRaceResult(result: DriverRaceResult & { roundId: string
 export async function updateRaceResult(
   roundId: string,
   driverId: string,
-  result: DriverRaceResult & { division: string; raceType?: string; confirmed?: boolean }
+  result: DriverRaceResult & { division: string; raceType?: string; raceName?: string; confirmed?: boolean }
 ): Promise<void> {
-  // For race results, we need to find the row by roundId + driverId combination
+  // For race results, we need to find the row by roundId + driverId + raceType combination
+  // This is important because a driver can have multiple results for the same round (different race types)
   const rows = await readSheet('Race Results');
   if (rows.length < 2) return;
   
   const headers = rows[0];
   const roundIdIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'roundid');
   const driverIdIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'driverid');
+  const raceTypeIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'racetype');
   
-  const rowIndex = rows.findIndex((row, index) => 
-    index > 0 && row[roundIdIndex] === roundId && row[driverIdIndex] === driverId
-  );
+  const raceType = result.raceType || 'qualification';
+  
+  // Find row by roundId, driverId, AND raceType
+  const rowIndex = rows.findIndex((row, index) => {
+    if (index === 0) return false; // Skip header
+    const rowRoundId = row[roundIdIndex];
+    const rowDriverId = row[driverIdIndex];
+    const rowRaceType = raceTypeIndex >= 0 ? row[raceTypeIndex] : '';
+    return rowRoundId === roundId && rowDriverId === driverId && rowRaceType === raceType;
+  });
   
   if (rowIndex === -1) {
     // If not found, add new
@@ -463,31 +477,42 @@ export async function updateRaceResult(
     if (headerLower === 'roundid') resultRow[index] = roundId;
     else if (headerLower === 'driverid') resultRow[index] = driverId;
     else if (headerLower === 'division') resultRow[index] = result.division;
+    else if (headerLower === 'kartnumber') resultRow[index] = result.kartNumber || '';
     else if (headerLower === 'position') resultRow[index] = result.position.toString();
     else if (headerLower === 'fastestlap') resultRow[index] = result.fastestLap || '';
     else if (headerLower === 'points') resultRow[index] = result.points.toString();
-    else if (headerLower === 'racetype') resultRow[index] = result.raceType || 'qualification';
+    else if (headerLower === 'racetype') resultRow[index] = raceType;
+    else if (headerLower === 'racename') resultRow[index] = result.raceName || '';
     else if (headerLower === 'confirmed') resultRow[index] = result.confirmed ? 'true' : 'false';
     else resultRow[index] = rows[rowIndex][index] || '';
   });
   
-  // Use updateRowById pattern but we need to create a unique ID for race results
-  // For now, let's delete and re-add
-  await deleteRaceResult(roundId, driverId);
+  // Delete and re-add to ensure correct update
+  await deleteRaceResult(roundId, driverId, raceType);
   await addRaceResult({ ...result, roundId });
 }
 
-async function deleteRaceResult(roundId: string, driverId: string): Promise<void> {
+async function deleteRaceResult(roundId: string, driverId: string, raceType?: string): Promise<void> {
   const rows = await readSheet('Race Results');
   if (rows.length < 2) return;
   
   const headers = rows[0];
   const roundIdIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'roundid');
   const driverIdIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'driverid');
+  const raceTypeIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'racetype');
   
-  const rowIndex = rows.findIndex((row, index) => 
-    index > 0 && row[roundIdIndex] === roundId && row[driverIdIndex] === driverId
-  );
+  // Find row by roundId, driverId, and optionally raceType
+  const rowIndex = rows.findIndex((row, index) => {
+    if (index === 0) return false; // Skip header
+    const rowRoundId = row[roundIdIndex];
+    const rowDriverId = row[driverIdIndex];
+    const rowRaceType = raceTypeIndex >= 0 ? row[raceTypeIndex] : '';
+    if (raceType) {
+      return rowRoundId === roundId && rowDriverId === driverId && rowRaceType === raceType;
+    } else {
+      return rowRoundId === roundId && rowDriverId === driverId;
+    }
+  });
   
   if (rowIndex === -1) return;
   
@@ -536,7 +561,7 @@ export async function deleteRaceResultsByRaceType(roundId: string, raceType: str
   const raceTypeResults = results.filter(r => r.roundId === roundId && r.raceType === raceType);
   
   for (const result of raceTypeResults) {
-    await deleteRaceResult(roundId, result.driverId);
+    await deleteRaceResult(roundId, result.driverId, raceType);
   }
 }
 

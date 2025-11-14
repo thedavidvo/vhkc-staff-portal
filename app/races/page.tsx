@@ -149,47 +149,77 @@ export default function RacesPage() {
         const divisionResults = divisionResult.results || [];
         
         // Extract unique race types from saved results and populate types array
-        const uniqueRaceTypes = new Set<string>();
+        // Use functional update to ensure we work with the latest types value
+        setTypes((prevTypes) => {
+          const uniqueRaceTypes = new Set<string>();
+          
+          // IMPORTANT: Preserve existing manually added types (that haven't been saved yet)
+          // This allows users to add multiple race names before saving
+          prevTypes.forEach(type => uniqueRaceTypes.add(type));
+          
+          // Add race types from saved results
+          divisionResults.forEach((result: any) => {
+            if (result.raceType) {
+              // Use raceName from saved data if available, otherwise reconstruct from raceType
+              let raceName = result.raceName;
+              if (!raceName || raceName.trim() === '') {
+                // Fallback: create race name format based on race type
+                const raceTypeName = result.raceType.charAt(0).toUpperCase() + result.raceType.slice(1);
+                raceName = `${raceTypeName} (${result.raceType})`;
+              }
+              
+              // Check if we already have this exact race name
+              if (!uniqueRaceTypes.has(raceName)) {
+                uniqueRaceTypes.add(raceName);
+              }
+            }
+          });
+          
+          // Return merged types (saved + manually added)
+          const mergedTypes = Array.from(uniqueRaceTypes);
+          
+          // Only update if types have actually changed to avoid unnecessary re-renders
+          const currentTypesSet = new Set(prevTypes);
+          const hasChanged = mergedTypes.length !== currentTypesSet.size || 
+                            mergedTypes.some(t => !currentTypesSet.has(t)) ||
+                            prevTypes.some(t => !uniqueRaceTypes.has(t));
+          
+          if (hasChanged) {
+            return mergedTypes;
+          }
+          return prevTypes; // No change, return previous value
+        });
         
-        // Preserve existing types that are already in the types array
-        types.forEach(type => uniqueRaceTypes.add(type));
-        
-        // Add race types from saved results
+        // Calculate existing types for selection logic
+        const uniqueRaceTypesForSelection = new Set<string>();
+        types.forEach(type => uniqueRaceTypesForSelection.add(type));
         divisionResults.forEach((result: any) => {
           if (result.raceType) {
-            // Check if we already have a type with this raceType
-            const hasMatchingType = Array.from(uniqueRaceTypes).some(type => 
-              type.includes(`(${result.raceType})`)
-            );
-            
-            if (!hasMatchingType) {
-              // Create race name format based on race type
+            let raceName = result.raceName;
+            if (!raceName || raceName.trim() === '') {
               const raceTypeName = result.raceType.charAt(0).toUpperCase() + result.raceType.slice(1);
-              const raceName = `${raceTypeName} (${result.raceType})`;
-              uniqueRaceTypes.add(raceName);
+              raceName = `${raceTypeName} (${result.raceType})`;
+            }
+            if (!uniqueRaceTypesForSelection.has(raceName)) {
+              uniqueRaceTypesForSelection.add(raceName);
             }
           }
         });
+        const existingTypes = Array.from(uniqueRaceTypesForSelection);
         
-        // Update types array with unique race types found in results
-        const existingTypes = Array.from(uniqueRaceTypes);
-        // Only update if types have actually changed
-        const currentTypesSet = new Set(types);
-        const hasChanged = existingTypes.length !== currentTypesSet.size || 
-                          existingTypes.some(t => !currentTypesSet.has(t));
-        
-        if (hasChanged && existingTypes.length > 0) {
-          setTypes(existingTypes);
-          // Auto-select the first type if none is selected, or keep current selection if it exists
-          if (!selectedType || !existingTypes.includes(selectedType)) {
-            setSelectedType(existingTypes[0]);
-          }
+        // Auto-select the first type if none is selected
+        if (!selectedType || !existingTypes.includes(selectedType)) {
+          // If we have manually added types, prefer keeping the last selected one
+          // Otherwise select the first one
+          setSelectedType(existingTypes[existingTypes.length - 1] || existingTypes[0] || null);
         }
         
         // Only update driver results if we should load them (not when user is typing)
-        if (shouldLoadResultsRef.current && selectedType) {
+        // Use the first type if selectedType is null (it will be set above)
+        const typeToUse = selectedType || existingTypes[0];
+        if (shouldLoadResultsRef.current && typeToUse) {
           // Extract race type from selectedType (e.g., "Race Name (qualification)" -> "qualification")
-          const match = selectedType.match(/\((\w+)\)$/);
+          const match = typeToUse.match(/\((\w+)\)$/);
           const typeRaceType = match ? match[1] : null;
           if (typeRaceType) {
             const filteredResults = divisionResults.filter((r: any) => r.raceType === typeRaceType);
@@ -199,7 +229,7 @@ export default function RacesPage() {
             setDriverResults([]);
           }
           shouldLoadResultsRef.current = false; // Don't auto-load again until type/division changes
-        } else if (shouldLoadResultsRef.current && !selectedType) {
+        } else if (shouldLoadResultsRef.current && !typeToUse) {
           // If no type selected, show empty
           setDriverResults([]);
           shouldLoadResultsRef.current = false;
@@ -209,10 +239,13 @@ export default function RacesPage() {
         if (shouldLoadResultsRef.current) {
           setDriverResults([]);
         }
+        // Only clear types if there are no manually added types and no saved results
+        // This preserves manually added race names even when there are no saved results yet
         if (types.length === 0) {
           setTypes([]);
           setSelectedType(null);
         }
+        // If types exist (manually added), keep them even if there are no saved results
       }
     }
   }, [selectedEvent, selectedDivision, selectedType]);
@@ -266,7 +299,14 @@ export default function RacesPage() {
   const handleTypeModalSubmit = () => {
     if (newTypeName && newTypeName.trim() && selectedRaceType) {
       const raceName = `${newTypeName.trim()} (${selectedRaceType})`;
-      setTypes([...types, raceName]);
+      // Use functional update to ensure we're working with the latest types value
+      setTypes((prevTypes) => {
+        // Check if this race name already exists
+        if (prevTypes.includes(raceName)) {
+          return prevTypes; // Don't add duplicates
+        }
+        return [...prevTypes, raceName];
+      });
       setSelectedType(raceName);
       setNewTypeName('');
       setSelectedRaceType('qualification');
@@ -387,14 +427,17 @@ export default function RacesPage() {
     }
     
     try {
+      // Extract raceType from selectedType (e.g., "Race 1 (qualification)" -> "qualification")
+      if (!selectedType) {
+        alert('Please select a race type before saving.');
+        return;
+      }
+      
+      const match = selectedType.match(/\((\w+)\)$/);
+      const raceType = match ? match[1] : 'qualification';
+      
       // Determine if there's a heat race (check if there are multiple race types for this round)
-      // For now, we'll check if selectedType indicates a heat
-      const hasHeatRace = types.length > 1 || (selectedType && selectedType.toLowerCase().includes('heat'));
-      const raceType = selectedType?.toLowerCase().includes('final') 
-        ? 'final' 
-        : selectedType?.toLowerCase().includes('heat')
-        ? 'heat'
-        : 'qualification';
+      const hasHeatRace = types.length > 1 || raceType === 'heat';
       
       // VALIDATION: Check for duplicate drivers in the same race
       const driverIds = new Set<string>();
@@ -481,6 +524,7 @@ export default function RacesPage() {
             fastestLap: result.fastestLap || '',
             points: calculatedPoints,
             raceType: raceType,
+            raceName: selectedType, // Save the full race name (e.g., "Race 1 (qualification)")
           };
         })
       );
@@ -637,8 +681,10 @@ export default function RacesPage() {
                       setSelectedEvent({ ...race, results });
                       setSelectedDivision('Division 1');
                       setSelectedType(null);
-                      setTypes([]);
                       setDriverResults([]);
+                      // Reset the load flag so types will be loaded from results
+                      shouldLoadResultsRef.current = true;
+                      // Don't clear types here - let the useEffect populate them from results
                     }}
                       className={`p-2 cursor-pointer transition-colors ${
                         selectedEvent?.id === race.id
@@ -917,6 +963,10 @@ function SpreadsheetTable({
   onUpdate: (index: number, field: keyof DriverRaceResult, value: string | number, forceAddRow?: boolean) => void;
   drivers: any[];
 }) {
+  const [suggestions, setSuggestions] = useState<Record<number, any[]>>({});
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<Record<number, number>>({});
+  const [showSuggestions, setShowSuggestions] = useState<Record<number, boolean>>({});
+  
   // Determine if this is a qualification race
   const isQualification = type?.toLowerCase().includes('qual') || type?.toLowerCase().includes('qualification');
   
@@ -935,8 +985,8 @@ function SpreadsheetTable({
   }));
 
   const fields: (keyof DriverRaceResult)[] = isQualification 
-    ? ['driverAlias', 'driverName', 'division', 'kartNumber', 'fastestLap']
-    : ['driverAlias', 'driverName', 'division', 'kartNumber', 'gridPosition', 'overallPosition', 'fastestLap'];
+    ? ['driverName', 'driverAlias', 'division', 'kartNumber', 'fastestLap']
+    : ['driverName', 'driverAlias', 'division', 'kartNumber', 'gridPosition', 'overallPosition', 'fastestLap'];
 
   // Merge saved results with default rows
   const rowsToDisplay = [...defaultRows];
@@ -945,6 +995,83 @@ function SpreadsheetTable({
       rowsToDisplay[index] = result;
     }
   });
+
+  // Function to get matching drivers based on input
+  const getMatchingDrivers = (input: string): any[] => {
+    if (!input || input.trim().length < 1) return [];
+    
+    const lowerInput = input.toLowerCase().trim();
+    return drivers.filter((driver) => {
+      const nameMatch = driver.name?.toLowerCase().includes(lowerInput);
+      const firstNameMatch = driver.firstName?.toLowerCase().includes(lowerInput);
+      const lastNameMatch = driver.lastName?.toLowerCase().includes(lowerInput);
+      const fullNameMatch = `${driver.firstName || ''} ${driver.lastName || ''}`.toLowerCase().trim().includes(lowerInput);
+      const aliasMatch = driver.alias?.toLowerCase().includes(lowerInput);
+      const aliasesMatch = driver.aliases?.some((a: string) => a.toLowerCase().includes(lowerInput));
+      
+      return nameMatch || firstNameMatch || lastNameMatch || fullNameMatch || aliasMatch || aliasesMatch;
+    }).slice(0, 10); // Limit to 10 suggestions
+  };
+
+  // Handle driver name input change
+  const handleDriverNameChange = (index: number, value: string) => {
+    onUpdate(index, 'driverName', value);
+    
+    // Get matching drivers for suggestions
+    const matches = getMatchingDrivers(value);
+    setSuggestions(prev => ({ ...prev, [index]: matches }));
+    setShowSuggestions(prev => ({ ...prev, [index]: matches.length > 0 && value.trim().length > 0 }));
+    setActiveSuggestionIndex(prev => ({ ...prev, [index]: -1 }));
+    
+    // Check if exact match found - auto-fill alias and division
+    const exactMatch = drivers.find((d) => {
+      const nameMatch = d.name?.toLowerCase() === value.toLowerCase().trim();
+      const firstNameMatch = d.firstName?.toLowerCase() === value.toLowerCase().trim();
+      const lastNameMatch = d.lastName?.toLowerCase() === value.toLowerCase().trim();
+      const fullNameMatch = `${d.firstName || ''} ${d.lastName || ''}`.toLowerCase().trim() === value.toLowerCase().trim();
+      return nameMatch || firstNameMatch || lastNameMatch || fullNameMatch;
+    });
+    
+    if (exactMatch) {
+      // Get current result to check if alias is already set
+      const currentResult = rowsToDisplay[index];
+      
+      // Auto-fill alias if available
+      if (exactMatch.alias && !currentResult.driverAlias) {
+        onUpdate(index, 'driverAlias', exactMatch.alias);
+      } else if (exactMatch.aliases && exactMatch.aliases.length > 0 && !currentResult.driverAlias) {
+        onUpdate(index, 'driverAlias', exactMatch.aliases[0]);
+      }
+      // Auto-select division
+      if (exactMatch.division) {
+        onUpdate(index, 'division', exactMatch.division);
+      }
+      // Set driver ID
+      if (exactMatch.id) {
+        onUpdate(index, 'driverId', exactMatch.id);
+      }
+      // Hide suggestions
+      setShowSuggestions(prev => ({ ...prev, [index]: false }));
+    }
+  };
+
+  // Handle suggestion selection
+  const handleSuggestionSelect = (index: number, driver: any) => {
+    onUpdate(index, 'driverName', driver.name || `${driver.firstName || ''} ${driver.lastName || ''}`.trim());
+    if (driver.alias) {
+      onUpdate(index, 'driverAlias', driver.alias);
+    } else if (driver.aliases && driver.aliases.length > 0) {
+      onUpdate(index, 'driverAlias', driver.aliases[0]);
+    }
+    if (driver.division) {
+      onUpdate(index, 'division', driver.division);
+    }
+    if (driver.id) {
+      onUpdate(index, 'driverId', driver.id);
+    }
+    setShowSuggestions(prev => ({ ...prev, [index]: false }));
+    setSuggestions(prev => ({ ...prev, [index]: [] }));
+  };
 
   return (
     <div className="p-4">
@@ -956,10 +1083,10 @@ function SpreadsheetTable({
           <thead className="bg-slate-100 dark:bg-slate-900 sticky top-0">
             <tr>
               <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
-                Driver Alias
+                Driver Name
               </th>
               <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
-                Driver Name
+                Driver Alias
               </th>
               <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
                 Division
@@ -994,6 +1121,98 @@ function SpreadsheetTable({
                 className="hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
               >
                 <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={result.driverName || ''}
+                      onChange={(e) => handleDriverNameChange(index, e.target.value)}
+                      onFocus={() => {
+                        const matches = getMatchingDrivers(result.driverName || '');
+                        if (matches.length > 0) {
+                          setShowSuggestions(prev => ({ ...prev, [index]: true }));
+                          setSuggestions(prev => ({ ...prev, [index]: matches }));
+                        }
+                      }}
+                      onBlur={() => {
+                        // Delay hiding suggestions to allow clicking on them
+                        setTimeout(() => {
+                          setShowSuggestions(prev => ({ ...prev, [index]: false }));
+                        }, 200);
+                      }}
+                      onKeyDown={(e) => {
+                        const currentSuggestions = suggestions[index] || [];
+                        const currentIndex = activeSuggestionIndex[index] ?? -1;
+                        
+                        if (e.key === 'ArrowDown' && currentSuggestions.length > 0) {
+                          e.preventDefault();
+                          const nextIndex = currentIndex < currentSuggestions.length - 1 ? currentIndex + 1 : 0;
+                          setActiveSuggestionIndex(prev => ({ ...prev, [index]: nextIndex }));
+                          setShowSuggestions(prev => ({ ...prev, [index]: true }));
+                        } else if (e.key === 'ArrowUp' && currentSuggestions.length > 0) {
+                          e.preventDefault();
+                          const prevIndex = currentIndex > 0 ? currentIndex - 1 : currentSuggestions.length - 1;
+                          setActiveSuggestionIndex(prev => ({ ...prev, [index]: prevIndex }));
+                          setShowSuggestions(prev => ({ ...prev, [index]: true }));
+                        } else if (e.key === 'Enter' && currentIndex >= 0 && currentSuggestions[currentIndex]) {
+                          e.preventDefault();
+                          handleSuggestionSelect(index, currentSuggestions[currentIndex]);
+                        } else if (e.key === 'Tab') {
+                          e.preventDefault();
+                          setShowSuggestions(prev => ({ ...prev, [index]: false }));
+                          const nextFieldIndex = fields.indexOf('driverName') + 1;
+                          if (nextFieldIndex < fields.length) {
+                            const nextInput = document.querySelector(
+                              `input[data-row="${index}"][data-field="${fields[nextFieldIndex]}"]`
+                            ) as HTMLInputElement;
+                            nextInput?.focus();
+                          } else if (index < rowsToDisplay.length - 1) {
+                            const nextRowInput = document.querySelector(
+                              `input[data-row="${index + 1}"][data-field="driverName"]`
+                            ) as HTMLInputElement;
+                            nextRowInput?.focus();
+                          }
+                        } else if (e.key === 'Enter' && !currentSuggestions.length) {
+                          e.preventDefault();
+                          if (index < rowsToDisplay.length - 1) {
+                            const nextRowInput = document.querySelector(
+                              `input[data-row="${index + 1}"][data-field="driverName"]`
+                            ) as HTMLInputElement;
+                            nextRowInput?.focus();
+                          }
+                        }
+                      }}
+                      data-row={index}
+                      data-field="driverName"
+                      className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:ring-1 focus:ring-blue-500"
+                      placeholder="Name"
+                    />
+                    {showSuggestions[index] && (suggestions[index] || []).length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {(suggestions[index] || []).map((driver, suggestionIndex) => (
+                          <div
+                            key={driver.id || suggestionIndex}
+                            onClick={() => handleSuggestionSelect(index, driver)}
+                            className={`px-3 py-2 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 ${
+                              activeSuggestionIndex[index] === suggestionIndex
+                                ? 'bg-blue-50 dark:bg-blue-900/20'
+                                : ''
+                            }`}
+                          >
+                            <div className="text-sm font-medium text-slate-900 dark:text-white">
+                              {driver.name || `${driver.firstName || ''} ${driver.lastName || ''}`.trim()}
+                            </div>
+                            {(driver.alias || (driver.aliases && driver.aliases.length > 0)) && (
+                              <div className="text-xs text-slate-500 dark:text-slate-400">
+                                {driver.alias || driver.aliases?.[0]}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </td>
+                <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                   <input
                     type="text"
                     value={result.driverAlias || ''}
@@ -1020,7 +1239,7 @@ function SpreadsheetTable({
                           nextInput?.focus();
                         } else if (index < rowsToDisplay.length - 1) {
                           const nextRowInput = document.querySelector(
-                            `input[data-row="${index + 1}"][data-field="driverAlias"]`
+                            `input[data-row="${index + 1}"][data-field="driverName"]`
                           ) as HTMLInputElement;
                           nextRowInput?.focus();
                         }
@@ -1042,77 +1261,27 @@ function SpreadsheetTable({
                 </td>
                 <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                   <div className="relative">
-                    <input
-                      type="text"
-                      value={result.driverName || ''}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        onUpdate(index, 'driverName', value);
-                        // Auto-fill alias if name matches a driver with alias
-                        const matchingDriver = drivers.find(d => d.name?.toLowerCase() === value.toLowerCase().trim());
-                        if (matchingDriver?.alias && !result.driverAlias) {
-                          onUpdate(index, 'driverAlias', matchingDriver.alias);
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Tab') {
-                          e.preventDefault();
-                          const nextFieldIndex = fields.indexOf('driverName') + 1;
-                          if (nextFieldIndex < fields.length) {
-                            const nextInput = document.querySelector(
-                              `input[data-row="${index}"][data-field="${fields[nextFieldIndex]}"]`
-                            ) as HTMLInputElement;
-                            nextInput?.focus();
-                          } else if (index < rowsToDisplay.length - 1) {
-                            const nextRowInput = document.querySelector(
-                              `input[data-row="${index + 1}"][data-field="driverAlias"]`
-                            ) as HTMLInputElement;
-                            nextRowInput?.focus();
-                          }
-                        } else if (e.key === 'Enter') {
-                          e.preventDefault();
-                          if (index < rowsToDisplay.length - 1) {
-                            const nextRowInput = document.querySelector(
-                              `input[data-row="${index + 1}"][data-field="driverName"]`
-                            ) as HTMLInputElement;
-                            nextRowInput?.focus();
-                          }
-                        }
-                      }}
+                    <select
+                      value={result.division || division}
+                      onChange={(e) => onUpdate(index, 'division', e.target.value as Division)}
                       data-row={index}
-                      data-field="driverName"
-                      className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:ring-1 focus:ring-blue-500"
-                      placeholder="Name"
-                      list={`driver-aliases-${index}`}
-                    />
-                    <datalist id={`driver-aliases-${index}`}>
-                      {(() => {
-                        const matchingDriver = drivers.find(d => d.name?.toLowerCase() === result.driverName?.toLowerCase().trim());
-                        if (matchingDriver && (matchingDriver.aliases || matchingDriver.alias)) {
-                          const allAliases = matchingDriver.aliases || (matchingDriver.alias ? [matchingDriver.alias] : []);
-                          return allAliases.map((alias: string, i: number) => (
-                            <option key={i} value={alias} />
-                          ));
-                        }
-                        return null;
-                      })()}
-                    </datalist>
+                      data-field="division"
+                      className={`w-full px-3 py-1.5 rounded-full border-none outline-none text-xs font-semibold transition-all duration-200 cursor-pointer appearance-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${getDivisionColor((result.division || division) as Division)} bg-slate-200/50 dark:bg-slate-700/50 backdrop-blur-sm`}
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                        backgroundPosition: 'right 0.5rem center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '1.5em 1.5em',
+                        paddingRight: '2.5rem'
+                      }}
+                    >
+                      <option value="Division 1">Division 1</option>
+                      <option value="Division 2">Division 2</option>
+                      <option value="Division 3">Division 3</option>
+                      <option value="Division 4">Division 4</option>
+                      <option value="New">New</option>
+                    </select>
                   </div>
-                </td>
-                <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
-                  <select
-                    value={result.division || division}
-                    onChange={(e) => onUpdate(index, 'division', e.target.value as Division)}
-                    data-row={index}
-                    data-field="division"
-                    className={`w-full px-2 py-1 rounded border-none outline-none text-xs font-semibold focus:ring-2 focus:ring-blue-500 ${getDivisionColor((result.division || division) as Division)}`}
-                  >
-                    <option value="Division 1">Division 1</option>
-                    <option value="Division 2">Division 2</option>
-                    <option value="Division 3">Division 3</option>
-                    <option value="Division 4">Division 4</option>
-                    <option value="New">New</option>
-                  </select>
                 </td>
                 <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                   <input
