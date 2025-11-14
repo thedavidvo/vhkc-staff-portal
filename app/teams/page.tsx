@@ -254,7 +254,7 @@ export default function TeamsPage() {
       const currentDriverIds = team.driverIds && Array.isArray(team.driverIds) ? team.driverIds : [];
       const updatedTeam = {
         ...team,
-        driverIds: currentDriverIds.filter((id) => id !== driverId),
+        driverIds: currentDriverIds.filter((id: string) => id !== driverId),
         seasonId: selectedSeason.id,
       };
 

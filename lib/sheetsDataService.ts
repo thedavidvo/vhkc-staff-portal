@@ -358,6 +358,7 @@ async function getRaceResults(): Promise<(DriverRaceResult & { roundId: string; 
     return results.map((result: any) => ({
       roundId: result.roundId || '',
       driverId: result.driverId || '',
+      driverName: '', // Will be populated when needed from Drivers sheet
       division: result.division || '',
       position: parseInt(result.position?.toString() || '0'),
       fastestLap: result.fastestLap || '',
@@ -442,7 +443,7 @@ export async function updateRaceResult(
   
   if (rowIndex === -1) {
     // If not found, add new
-    await addRaceResult(result);
+    await addRaceResult({ ...result, roundId });
     return;
   }
   
@@ -459,11 +460,10 @@ export async function updateRaceResult(
     else resultRow[index] = rows[rowIndex][index] || '';
   });
   
-  const sheets = await (await import('./googleSheets')).readSheet('Race Results');
   // Use updateRowById pattern but we need to create a unique ID for race results
   // For now, let's delete and re-add
   await deleteRaceResult(roundId, driverId);
-  await addRaceResult(result);
+  await addRaceResult({ ...result, roundId });
 }
 
 async function deleteRaceResult(roundId: string, driverId: string): Promise<void> {

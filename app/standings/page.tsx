@@ -7,7 +7,7 @@ import { Division, RaceResult } from '@/types';
 import { Trophy, Medal, Award } from 'lucide-react';
 
 // TODO: Replace with API call to fetch race history for a driver
-const getDriverRaceHistory = (driverId: string, races: any[]): RaceResult[] => {
+const getDriverRaceHistory = (driverId: string, races: any[] = []): RaceResult[] => {
   const history: RaceResult[] = [];
   
   races
@@ -188,7 +188,7 @@ export default function StandingsPage() {
                     </div>
                     
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                      {driver.roundPoints.map((round) => (
+                      {driver.roundPoints.map((round: { round: number; points: number; raceName: string }) => (
                         <div
                           key={round.round}
                           className="bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-3"
@@ -263,8 +263,9 @@ export default function StandingsPage() {
                       </h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                         {team.drivers.map((driver) => {
-                          const raceHistory = getDriverRaceHistory(driver.id);
-                          const roundPoints = raceHistory.map((race) => ({
+                          const raceHistory = getDriverRaceHistory(driver.id, races);
+                          type RoundPoint = { round: number; points: number; raceName: string };
+                          const roundPoints: RoundPoint[] = raceHistory.map((race) => ({
                             round: race.round,
                             points: race.points,
                             raceName: race.raceName,
@@ -286,7 +287,7 @@ export default function StandingsPage() {
                                 </div>
                               </div>
                               <div className="flex flex-wrap gap-1">
-                                {roundPoints.map((round) => (
+                                {roundPoints.map((round: { round: number; points: number; raceName: string }) => (
                                   <div
                                     key={round.round}
                                     className="text-xs px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded text-slate-700 dark:text-slate-300"

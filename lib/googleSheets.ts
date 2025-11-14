@@ -18,7 +18,7 @@ export async function getSheetsClient() {
   });
 
   const authClient = await auth.getClient();
-  return google.sheets({ version: 'v4', auth: authClient });
+  return google.sheets({ version: 'v4', auth: authClient as any });
 }
 
 // Read all rows from a sheet
