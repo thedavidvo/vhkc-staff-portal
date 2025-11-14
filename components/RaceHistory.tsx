@@ -12,9 +12,9 @@ export default function RaceHistory({ races }: RaceHistoryProps) {
   const [selectedRace, setSelectedRace] = useState<Race | null>(null);
   const [selectedDivision, setSelectedDivision] = useState<Division>('Division 1');
 
-  // Show all races sorted by date (most recent first)
+  // Show all races sorted by date (first race at top)
   const sortedRaces = [...races].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
   // Set default race to most recent if available
@@ -91,7 +91,7 @@ export default function RaceHistory({ races }: RaceHistoryProps) {
                           ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
                           : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
                       }`}>
-                        {race.status}
+                        {race.status.charAt(0).toUpperCase() + race.status.slice(1).toLowerCase()}
                       </span>
                     </div>
                     <div className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
@@ -207,9 +207,9 @@ export default function RaceHistory({ races }: RaceHistoryProps) {
               ) : (
                 <div className="p-8 text-center text-slate-500 dark:text-slate-400">
                   {selectedRace?.status === 'upcoming' 
-                    ? 'This race is upcoming. Results will be available after completion.'
+                    ? 'This race is Upcoming. Results will be available after completion.'
                     : selectedRace?.status === 'cancelled'
-                    ? 'This race has been cancelled.'
+                    ? 'This race has been Cancelled.'
                     : 'No results available for this race.'}
                 </div>
               )}

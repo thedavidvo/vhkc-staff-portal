@@ -4,6 +4,8 @@ export type DriverStatus = 'ACTIVE' | 'INACTIVE' | 'BANNED';
 export interface Driver {
   id: string;
   name: string;
+  aliases?: string[]; // Support multiple aliases
+  alias?: string; // Deprecated - kept for backwards compatibility
   firstName?: string;
   lastName?: string;
   dateOfBirth?: string;
@@ -55,6 +57,7 @@ export interface DriverRaceResult {
   driverId: string;
   driverAlias?: string;
   driverName: string;
+  division?: Division; // Add division to race results
   kartNumber?: string;
   position: number;
   gridPosition?: number;
@@ -77,6 +80,7 @@ export interface Promotion {
   fromDivision: Division;
   toDivision: Division;
   date: string;
+  roundName?: string;
 }
 
 export interface Stats {

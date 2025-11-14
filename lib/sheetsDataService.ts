@@ -232,6 +232,7 @@ export async function getDriversBySeason(seasonId: string): Promise<Driver[]> {
       .map((driver: any) => ({
         id: driver.id || '',
         name: driver.name || '',
+        alias: driver.alias || undefined,
         firstName: driver.firstName || undefined,
         lastName: driver.lastName || undefined,
         dateOfBirth: driver.dateOfBirth || undefined,
@@ -240,9 +241,9 @@ export async function getDriversBySeason(seasonId: string): Promise<Driver[]> {
         email: driver.email || '',
         teamName: driver.teamName || undefined,
         status: (driver.status || 'ACTIVE') as 'ACTIVE' | 'INACTIVE' | 'BANNED',
-        lastRacePosition: parseInt(driver.lastRacePosition?.toString() || '0'),
-        fastestLap: driver.fastestLap || '',
-        pointsTotal: parseInt(driver.pointsTotal?.toString() || '0'),
+        lastRacePosition: 0, // Not used, kept for backward compatibility
+        fastestLap: '', // Not used, kept for backward compatibility
+        pointsTotal: 0, // Not used, kept for backward compatibility
         lastUpdated: driver.lastUpdated || new Date().toISOString().split('T')[0],
       }));
   } catch (error) {
@@ -260,14 +261,15 @@ export async function addDriver(driver: Driver, seasonId: string): Promise<void>
     driver.division || 'New',
     driver.teamName || '',
     driver.status || 'ACTIVE',
-    driver.lastRacePosition?.toString() || '0',
-    driver.fastestLap || '',
-    driver.pointsTotal?.toString() || '0',
+    '', // lastRacePosition - not used
+    '', // fastestLap - not used
+    '', // pointsTotal - not used
     driver.lastUpdated || new Date().toISOString().split('T')[0],
     driver.firstName || '',
     driver.lastName || '',
     driver.dateOfBirth || '',
     driver.homeTrack || '',
+    driver.alias || '',
   ]);
 }
 
@@ -308,14 +310,15 @@ export async function updateDriver(driver: Driver, seasonId: string): Promise<vo
     else if (headerLower === 'division') driverRow[index] = driver.division || 'New';
     else if (headerLower === 'teamname') driverRow[index] = driver.teamName || '';
     else if (headerLower === 'status') driverRow[index] = driver.status || 'ACTIVE';
-    else if (headerLower === 'lastraceposition') driverRow[index] = driver.lastRacePosition?.toString() || '0';
-    else if (headerLower === 'fastestlap') driverRow[index] = driver.fastestLap || '';
-    else if (headerLower === 'pointstotal') driverRow[index] = driver.pointsTotal?.toString() || '0';
+    else if (headerLower === 'lastraceposition') driverRow[index] = ''; // Not used
+    else if (headerLower === 'fastestlap') driverRow[index] = ''; // Not used
+    else if (headerLower === 'pointstotal') driverRow[index] = ''; // Not used
     else if (headerLower === 'lastupdated') driverRow[index] = driver.lastUpdated || new Date().toISOString().split('T')[0];
     else if (headerLower === 'firstname') driverRow[index] = driver.firstName || '';
     else if (headerLower === 'lastname') driverRow[index] = driver.lastName || '';
     else if (headerLower === 'dateofbirth') driverRow[index] = driver.dateOfBirth || '';
     else if (headerLower === 'hometrack') driverRow[index] = driver.homeTrack || '';
+    else if (headerLower === 'alias') driverRow[index] = driver.alias || '';
     else {
       // Preserve existing values for columns we don't update
       driverRow[index] = rows[rowIndex][index] || '';
@@ -350,7 +353,7 @@ export async function getDriverPointsBySeason(driverId: string, seasonId: string
 }
 
 // Race Results operations
-async function getRaceResults(): Promise<(DriverRaceResult & { roundId: string; division: string })[]> {
+async function getRaceResults(): Promise<(DriverRaceResult & { roundId: string; division: string; raceType?: string; confirmed?: boolean })[]> {
   try {
     const rows = await readSheet('Race Results');
     const results = rowsToObjects<any>(rows);
@@ -363,6 +366,8 @@ async function getRaceResults(): Promise<(DriverRaceResult & { roundId: string; 
       position: parseInt(result.position?.toString() || '0'),
       fastestLap: result.fastestLap || '',
       points: parseInt(result.points?.toString() || '0'),
+      raceType: result.raceType || result.raceType || 'qualification',
+      confirmed: result.confirmed === 'true' || result.confirmed === true,
     }));
   } catch (error) {
     console.error('Error getting race results:', error);
@@ -399,6 +404,8 @@ export async function getRaceResultsByRound(roundId: string): Promise<Race['resu
         position: r.position,
         fastestLap: r.fastestLap,
         points: r.points,
+        raceType: r.raceType,
+        confirmed: r.confirmed,
       }))
       .sort((a, b) => a.position - b.position);
     
@@ -413,7 +420,7 @@ export async function getRaceResultsByRound(roundId: string): Promise<Race['resu
   return grouped;
 }
 
-export async function addRaceResult(result: DriverRaceResult & { roundId: string; division: string }): Promise<void> {
+export async function addRaceResult(result: DriverRaceResult & { roundId: string; division: string; raceType?: string; confirmed?: boolean }): Promise<void> {
   await appendRow('Race Results', [
     result.roundId,
     result.driverId,
@@ -421,13 +428,15 @@ export async function addRaceResult(result: DriverRaceResult & { roundId: string
     result.position.toString(),
     result.fastestLap || '',
     result.points.toString(),
+    result.raceType || 'qualification',
+    result.confirmed ? 'true' : 'false',
   ]);
 }
 
 export async function updateRaceResult(
   roundId: string,
   driverId: string,
-  result: DriverRaceResult & { division: string }
+  result: DriverRaceResult & { division: string; raceType?: string; confirmed?: boolean }
 ): Promise<void> {
   // For race results, we need to find the row by roundId + driverId combination
   const rows = await readSheet('Race Results');
@@ -457,6 +466,8 @@ export async function updateRaceResult(
     else if (headerLower === 'position') resultRow[index] = result.position.toString();
     else if (headerLower === 'fastestlap') resultRow[index] = result.fastestLap || '';
     else if (headerLower === 'points') resultRow[index] = result.points.toString();
+    else if (headerLower === 'racetype') resultRow[index] = result.raceType || 'qualification';
+    else if (headerLower === 'confirmed') resultRow[index] = result.confirmed ? 'true' : 'false';
     else resultRow[index] = rows[rowIndex][index] || '';
   });
   
@@ -517,6 +528,15 @@ async function deleteRaceResultsBySeason(seasonId: string): Promise<void> {
   const rounds = await getRoundsBySeason(seasonId);
   for (const round of rounds) {
     await deleteRaceResultsByRound(round.id);
+  }
+}
+
+export async function deleteRaceResultsByRaceType(roundId: string, raceType: string): Promise<void> {
+  const results = await getRaceResults();
+  const raceTypeResults = results.filter(r => r.roundId === roundId && r.raceType === raceType);
+  
+  for (const result of raceTypeResults) {
+    await deleteRaceResult(roundId, result.driverId);
   }
 }
 

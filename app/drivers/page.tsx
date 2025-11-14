@@ -236,6 +236,7 @@ export default function DriversPage() {
     firstName?: string;
     lastName?: string;
     name: string;
+    alias?: string;
     email: string;
     division: Division;
     dateOfBirth?: string;
@@ -251,6 +252,7 @@ export default function DriversPage() {
       const newDriver: Driver = {
         id: `driver-${Date.now()}`,
         name: driverData.name,
+        alias: driverData.alias,
         firstName: driverData.firstName,
         lastName: driverData.lastName,
         email: driverData.email,
@@ -601,6 +603,18 @@ export default function DriversPage() {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                          Alias
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.alias || selectedDriver.alias || ''}
+                          onChange={(e) => setEditForm({ ...editForm, alias: e.target.value })}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                          placeholder={selectedDriver.alias || 'Alias'}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                           Home Track
                         </label>
                         <input
@@ -695,6 +709,12 @@ export default function DriversPage() {
                         <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${getDivisionColor(selectedDriver.division)}`}>
                           {selectedDriver.division}
                         </span>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">Alias</p>
+                        <p className="text-base font-medium text-slate-900 dark:text-white">
+                          {selectedDriver.alias || 'N/A'}
+                        </p>
                       </div>
                       <div>
                         <p className="text-sm text-slate-600 dark:text-slate-400">Team</p>

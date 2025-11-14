@@ -59,6 +59,11 @@ export default function DemotionsModal({
                       <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                         {demotion.fromDivision} → {demotion.toDivision}
                       </p>
+                      {demotion.roundName && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          After: {demotion.roundName}
+                        </p>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-slate-500 dark:text-slate-400">

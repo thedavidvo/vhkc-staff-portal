@@ -234,7 +234,7 @@ export default function EditSeasonModal({
                         Round {round.roundNumber}: {round.name}
                       </div>
                       <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                        {round.date && new Date(round.date).toLocaleDateString()} • {round.location} • {round.status}
+                        {round.date && new Date(round.date).toLocaleDateString()} • {round.location} • {round.status.charAt(0).toUpperCase() + round.status.slice(1).toLowerCase()}
                       </div>
                     </div>
                     <div className="flex gap-2">

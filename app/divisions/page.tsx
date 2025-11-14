@@ -259,8 +259,8 @@ export default function DivisionsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Division Overview - Left Side (Thinner) */}
             <div className="lg:col-span-1">
-              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-3">
-                <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-3">
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-3 h-[calc(100vh-200px)] overflow-y-auto">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-3 sticky top-0 bg-white dark:bg-slate-800 pb-2 z-10">
                   Divisions
                 </h2>
                 <div className="space-y-2">
@@ -296,12 +296,12 @@ export default function DivisionsPage() {
                 </div>
                 <div className="overflow-x-auto flex-1 overflow-y-auto">
                   <table className="w-full">
-                    <thead className="bg-slate-50 dark:bg-slate-900 sticky top-0">
+                    <thead className="bg-slate-50 dark:bg-slate-900 sticky top-0 z-10">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase sticky left-0 bg-slate-50 dark:bg-slate-900 z-20">
                           Name
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                        <th className="px-2 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase sticky left-[200px] bg-slate-50 dark:bg-slate-900 z-20 w-32">
                           Current Division
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
@@ -319,10 +319,10 @@ export default function DivisionsPage() {
                               pendingChange ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
                             }`}
                           >
-                            <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white">
+                            <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white sticky left-0 bg-white dark:bg-slate-800 z-10">
                               {driver.name}
                             </td>
-                            <td className="px-4 py-3 text-sm">
+                            <td className="px-2 py-3 text-sm sticky left-[200px] bg-white dark:bg-slate-800 z-10 w-32">
                               <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getDivisionColor(driver.division)}`}>
                                 {driver.division}
                               </span>

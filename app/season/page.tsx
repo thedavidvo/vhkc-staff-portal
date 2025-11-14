@@ -277,7 +277,7 @@ export default function SeasonPage() {
                                 ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
                                 : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
                             }`}>
-                              {round.status}
+                              {round.status.charAt(0).toUpperCase() + round.status.slice(1).toLowerCase()}
                             </span>
                           </div>
                         </div>

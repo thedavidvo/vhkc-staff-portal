@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRaceResultsByRound, addRaceResult, updateRaceResult } from '@/lib/sheetsDataService';
+import { getRaceResultsByRound, addRaceResult, updateRaceResult, deleteRaceResultsByRaceType } from '@/lib/sheetsDataService';
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,6 +45,24 @@ export async function PUT(request: NextRequest) {
   } catch (error) {
     console.error('Error in PUT /api/race-results:', error);
     return NextResponse.json({ error: 'Failed to update race result' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const roundId = searchParams.get('roundId');
+    const raceType = searchParams.get('raceType');
+    
+    if (!roundId || !raceType) {
+      return NextResponse.json({ error: 'roundId and raceType required' }, { status: 400 });
+    }
+    
+    await deleteRaceResultsByRaceType(roundId, raceType);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error in DELETE /api/race-results:', error);
+    return NextResponse.json({ error: 'Failed to delete race results' }, { status: 500 });
   }
 }
 

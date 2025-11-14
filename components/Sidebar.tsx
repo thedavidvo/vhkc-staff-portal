@@ -33,7 +33,9 @@ const navItems: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Drivers', href: '/drivers', icon: Users },
   { name: 'Races', href: '/races', icon: Flag },
-  { name: 'Divisions', href: '/divisions', icon: Trophy },
+  { name: 'Results', href: '/results', icon: FileText },
+  { name: 'Points', href: '/points', icon: Trophy },
+  { name: 'Divisions', href: '/divisions', icon: ShieldCheck },
   { name: 'Standings', href: '/standings', icon: BarChart3 },
   { name: 'Teams', href: '/teams', icon: UsersRound },
 ];

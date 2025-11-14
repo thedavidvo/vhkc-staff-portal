@@ -20,14 +20,16 @@ export default function Dashboard() {
   const [demotions, setDemotions] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
   const [rounds, setRounds] = useState<any[]>([]);
+  const [raceResults, setRaceResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch drivers and rounds from API
+  // Fetch drivers, rounds, and race results from API
   useEffect(() => {
     const fetchData = async () => {
       if (!selectedSeason) {
         setDrivers([]);
         setRounds([]);
+        setRaceResults([]);
         setLoading(false);
         return;
       }
@@ -53,6 +55,31 @@ export default function Dashboard() {
             return dateA - dateB;
           });
           setRounds(sortedRounds);
+
+          // Fetch race results for all rounds to track promotions/demotions
+          const allResults: any[] = [];
+          for (const round of sortedRounds) {
+            try {
+              const resultsResponse = await fetch(`/api/race-results?roundId=${round.id}`);
+              if (resultsResponse.ok) {
+                const resultsData = await resultsResponse.json();
+                resultsData.forEach((divisionResult: any) => {
+                  divisionResult.results?.forEach((result: any) => {
+                    allResults.push({
+                      ...result,
+                      roundId: round.id,
+                      roundName: round.name,
+                      roundDate: round.date,
+                      division: divisionResult.division,
+                    });
+                  });
+                });
+              }
+            } catch (error) {
+              console.error(`Error fetching results for round ${round.id}:`, error);
+            }
+          }
+          setRaceResults(allResults);
         }
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
@@ -63,6 +90,110 @@ export default function Dashboard() {
 
     fetchData();
   }, [selectedSeason]);
+
+  // Calculate promotions and demotions based on race results
+  useEffect(() => {
+    if (!selectedSeason || drivers.length === 0 || raceResults.length === 0) {
+      setPromotions([]);
+      setDemotions([]);
+      return;
+    }
+
+    // Track driver divisions by round
+    const driverDivisionsByRound: Record<string, Record<string, Division>> = {};
+    const roundsByDate = [...rounds].sort((a, b) => {
+      const dateA = new Date(a.date || 0).getTime();
+      const dateB = new Date(b.date || 0).getTime();
+      return dateA - dateB;
+    });
+
+    // Get current divisions for all drivers
+    const currentDivisions: Record<string, Division> = {};
+    drivers.forEach(driver => {
+      currentDivisions[driver.id] = driver.division;
+    });
+
+    // Process race results chronologically to track division changes
+    const promotionsList: any[] = [];
+    const demotionsList: any[] = [];
+    const divisionOrder: Division[] = ['New', 'Division 4', 'Division 3', 'Division 2', 'Division 1'];
+
+    roundsByDate.forEach(round => {
+      const roundResults = raceResults.filter(r => r.roundId === round.id);
+      
+      // Group results by division and calculate standings
+      const divisionStandings: Record<Division, any[]> = {
+        'Division 1': [],
+        'Division 2': [],
+        'Division 3': [],
+        'Division 4': [],
+        'New': [],
+      };
+
+      roundResults.forEach(result => {
+        const division = result.division as Division;
+        if (divisionStandings[division]) {
+          divisionStandings[division].push(result);
+        }
+      });
+
+      // Check for promotions/demotions after this round
+      Object.keys(divisionStandings).forEach(division => {
+        const standings = divisionStandings[division as Division]
+          .sort((a, b) => (a.position || 0) - (b.position || 0));
+        
+        // Top performers might be promoted, bottom performers might be demoted
+        // This is a simplified logic - you may want to adjust based on your rules
+        standings.forEach((result, index) => {
+          const driverId = result.driverId;
+          const previousDivision = currentDivisions[driverId] || 'New';
+          
+          // Check if driver should be promoted (top 3 in lower division)
+          if (index < 3 && division !== 'Division 1') {
+            const currentIndex = divisionOrder.indexOf(division as Division);
+            const nextDivision = divisionOrder[currentIndex + 1];
+            if (nextDivision && previousDivision === division) {
+              promotionsList.push({
+                driverId,
+                driverName: result.driverName || 'Unknown Driver',
+                fromDivision: division,
+                toDivision: nextDivision,
+                date: round.date || new Date().toISOString(),
+                roundName: round.name,
+              });
+            }
+          }
+          
+          // Check if driver should be demoted (bottom 3 in higher division)
+          if (index >= standings.length - 3 && division !== 'New') {
+            const currentIndex = divisionOrder.indexOf(division as Division);
+            const prevDivision = divisionOrder[currentIndex - 1];
+            if (prevDivision && previousDivision === division) {
+              demotionsList.push({
+                driverId,
+                driverName: result.driverName || 'Unknown Driver',
+                fromDivision: division,
+                toDivision: prevDivision,
+                date: round.date || new Date().toISOString(),
+                roundName: round.name,
+              });
+            }
+          }
+        });
+      });
+    });
+
+    // Remove duplicates and sort by date
+    const uniquePromotions = promotionsList.filter((p, index, self) =>
+      index === self.findIndex((t) => t.driverId === p.driverId && t.date === p.date)
+    );
+    const uniqueDemotions = demotionsList.filter((d, index, self) =>
+      index === self.findIndex((t) => t.driverId === d.driverId && t.date === d.date)
+    );
+
+    setPromotions(uniquePromotions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    setDemotions(uniqueDemotions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+  }, [drivers, rounds, raceResults, selectedSeason]);
 
   // Calculate dynamic stats
   const stats = useMemo(() => {

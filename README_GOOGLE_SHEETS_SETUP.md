@@ -56,14 +56,25 @@ id | seasonId | roundNumber | name | date | location | address | status
 ### Sheet 3: "Drivers"
 Headers (Row 1):
 ```
-id | seasonId | name | email | division | teamName | status | lastRacePosition | fastestLap | pointsTotal | lastUpdated | firstName | lastName | dateOfBirth | homeTrack
+id | seasonId | name | email | division | teamName | status | lastRacePosition | fastestLap | pointsTotal | lastUpdated | firstName | lastName | dateOfBirth | homeTrack | alias | aliases
 ```
+
+**Note:** 
+- The `alias` column is deprecated but kept for backwards compatibility. Use `aliases` instead.
+- The `aliases` column should contain comma-separated aliases (e.g., `Alias1,Alias2,Alias3`)
+- `lastRacePosition`, `fastestLap`, and `pointsTotal` columns are not used by the application and can be managed manually in Google Sheets.
 
 ### Sheet 4: "Race Results"
 Headers (Row 1):
 ```
-roundId | driverId | division | position | fastestLap | points
+roundId | driverId | division | kartNumber | position | fastestLap | points | raceType | confirmed
 ```
+
+**Note:** 
+- `division` is the division the driver was racing in for that specific result
+- `kartNumber` is the kart number used by the driver in that race
+- `raceType` can be: `qualification` (standard points), `heat` (minor points), or `final` (major points)
+- `confirmed` should be `true` or `false` to track if points have been confirmed
 
 ### Sheet 5: "Locations"
 Headers (Row 1):

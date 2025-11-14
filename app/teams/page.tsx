@@ -229,11 +229,38 @@ export default function TeamsPage() {
       });
 
       if (response.ok) {
-        // Refresh teams
+        // Update driver's teamName in the Drivers sheet
+        const driverToUpdate = drivers.find(d => d.id === driverId);
+        if (driverToUpdate) {
+          try {
+            const driverUpdateResponse = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ...driverToUpdate,
+                teamName: team.name,
+              }),
+            });
+            if (!driverUpdateResponse.ok) {
+              console.error('Failed to update driver teamName');
+            }
+          } catch (error) {
+            console.error('Error updating driver teamName:', error);
+          }
+        }
+        
+        // Refresh teams and drivers
         const refreshResponse = await fetch(`/api/teams?seasonId=${selectedSeason.id}`);
         if (refreshResponse.ok) {
           const data = await refreshResponse.json();
           setTeams(data);
+        }
+        
+        // Refresh drivers to get updated teamName
+        const driversResponse = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
+        if (driversResponse.ok) {
+          const driversData = await driversResponse.json();
+          setDrivers(driversData);
         }
       } else {
         alert('Failed to add driver to team. Please try again.');
@@ -265,11 +292,38 @@ export default function TeamsPage() {
       });
 
       if (response.ok) {
-        // Refresh teams
+        // Update driver's teamName to empty in the Drivers sheet
+        const driverToUpdate = drivers.find(d => d.id === driverId);
+        if (driverToUpdate) {
+          try {
+            const driverUpdateResponse = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ...driverToUpdate,
+                teamName: undefined,
+              }),
+            });
+            if (!driverUpdateResponse.ok) {
+              console.error('Failed to update driver teamName');
+            }
+          } catch (error) {
+            console.error('Error updating driver teamName:', error);
+          }
+        }
+        
+        // Refresh teams and drivers
         const refreshResponse = await fetch(`/api/teams?seasonId=${selectedSeason.id}`);
         if (refreshResponse.ok) {
           const data = await refreshResponse.json();
           setTeams(data);
+        }
+        
+        // Refresh drivers to get updated teamName
+        const driversResponse = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
+        if (driversResponse.ok) {
+          const driversData = await driversResponse.json();
+          setDrivers(driversData);
         }
       } else {
         alert('Failed to remove driver from team. Please try again.');

@@ -11,6 +11,8 @@ interface AddDriverModalProps {
     firstName?: string;
     lastName?: string;
     name: string;
+    aliases?: string[];
+    alias?: string; // Deprecated - kept for backwards compatibility
     email: string;
     division: Division;
     dateOfBirth?: string;
@@ -22,9 +24,14 @@ interface AddDriverModalProps {
 // Helper function to combine day, month, year into date string
 const combineDate = (day: number, month: number, year: number): string => {
   if (!day || !month || !year) return '';
-  const date = new Date(year, month - 1, day);
+  // Use UTC to avoid timezone issues
+  const date = new Date(Date.UTC(year, month - 1, day));
   if (isNaN(date.getTime())) return '';
-  return date.toISOString().split('T')[0];
+  // Format as YYYY-MM-DD using UTC to avoid timezone shifts
+  const yearStr = date.getUTCFullYear().toString();
+  const monthStr = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+  const dayStr = date.getUTCDate().toString().padStart(2, '0');
+  return `${yearStr}-${monthStr}-${dayStr}`;
 };
 
 // Helper function to format status with normal casing
@@ -54,7 +61,7 @@ export default function AddDriverModal({
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
-    name: '',
+    aliases: [''], // Support multiple aliases
     email: '',
     division: 'Division 4' as Division,
     dateOfBirth: { day: 0, month: 0, year: 0 },
@@ -67,19 +74,24 @@ export default function AddDriverModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Combine first and last name into name if name is not provided
-    const driverName = formData.name || `${formData.firstName} ${formData.lastName}`.trim();
+    // Combine first and last name into name
+    const driverName = `${formData.firstName} ${formData.lastName}`.trim();
     if (!driverName) {
-      alert('Please provide either a full name or first and last name');
+      alert('Please provide first and last name');
       return;
     }
 
     const dateString = combineDate(formData.dateOfBirth.day, formData.dateOfBirth.month, formData.dateOfBirth.year);
     
+    // Filter out empty aliases
+    const validAliases = formData.aliases.filter(a => a.trim() !== '');
+    
     onAdd({
       firstName: formData.firstName || undefined,
       lastName: formData.lastName || undefined,
       name: driverName,
+      aliases: validAliases.length > 0 ? validAliases : undefined,
+      alias: validAliases[0] || undefined, // Keep first alias for backwards compatibility
       email: formData.email,
       division: formData.division,
       dateOfBirth: dateString || undefined,
@@ -91,7 +103,7 @@ export default function AddDriverModal({
     setFormData({
       firstName: '',
       lastName: '',
-      name: '',
+      aliases: [''],
       email: '',
       division: 'Division 4',
       dateOfBirth: { day: 0, month: 0, year: 0 },
@@ -150,15 +162,46 @@ export default function AddDriverModal({
 
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Full Name <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">(or leave blank to use first + last)</span>
+              Aliases <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">(optional)</span>
             </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="Full Name (optional)"
-            />
+            <div className="space-y-2">
+              {formData.aliases.map((alias, index) => (
+                <div key={index} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={alias}
+                    onChange={(e) => {
+                      const newAliases = [...formData.aliases];
+                      newAliases[index] = e.target.value;
+                      setFormData({ ...formData, aliases: newAliases });
+                    }}
+                    className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder={`Alias ${index + 1}`}
+                  />
+                  {index > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newAliases = formData.aliases.filter((_, i) => i !== index);
+                        setFormData({ ...formData, aliases: newAliases });
+                      }}
+                      className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setFormData({ ...formData, aliases: [...formData.aliases, ''] });
+                }}
+                className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+              >
+                + Add Another Alias
+              </button>
+            </div>
           </div>
 
           <div>
@@ -240,7 +283,7 @@ export default function AddDriverModal({
               onChange={(e) => setFormData({ ...formData, division: e.target.value as Division })}
               className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
             >
-              <option value="Division 1">Division 1 (Pro)</option>
+              <option value="Division 1">Division 1</option>
               <option value="Division 2">Division 2</option>
               <option value="Division 3">Division 3</option>
               <option value="Division 4">Division 4</option>
