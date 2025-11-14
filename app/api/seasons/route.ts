@@ -1,9 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSeasons, addSeason, updateSeason, deleteSeason } from '@/lib/sheetsDataService';
+import { cache } from '@/lib/cache';
+
+const CACHE_KEY = 'seasons';
 
 export async function GET() {
   try {
+    // Try to get from cache first
+    const cached = cache.get(CACHE_KEY);
+    if (cached) {
+      return NextResponse.json(cached);
+    }
+
+    // If not cached, fetch from Google Sheets
     const seasons = await getSeasons();
+    
+    // Cache the result for 5 minutes
+    cache.set(CACHE_KEY, seasons, 5 * 60 * 1000);
+    
     return NextResponse.json(seasons);
   } catch (error: any) {
     console.error('Error in GET /api/seasons:', error);
@@ -17,6 +31,10 @@ export async function POST(request: NextRequest) {
   try {
     const season = await request.json();
     await addSeason(season);
+    
+    // Invalidate cache
+    cache.invalidate(CACHE_KEY);
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in POST /api/seasons:', error);
@@ -28,6 +46,9 @@ export async function PUT(request: NextRequest) {
   try {
     const season = await request.json();
     await updateSeason(season);
+    
+    // Invalidate cache
+    cache.invalidate(CACHE_KEY);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in PUT /api/seasons:', error);
@@ -43,6 +64,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'seasonId required' }, { status: 400 });
     }
     await deleteSeason(seasonId);
+    
+    // Invalidate cache
+    cache.invalidate(CACHE_KEY);
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in DELETE /api/seasons:', error);

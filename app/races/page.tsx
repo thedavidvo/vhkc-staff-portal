@@ -7,21 +7,21 @@ import { Race, Division, DriverRaceResult } from '@/types';
 import { Plus, Save, Trash2, Loader2 } from 'lucide-react';
 import { getPointsForPosition } from '@/lib/pointsSystem';
 
-// Helper function to get division color
+// Helper function to get division color (lighter shades)
 const getDivisionColor = (division: Division) => {
   switch (division) {
     case 'Division 1':
-      return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
+      return 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300';
     case 'Division 2':
-      return 'bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200';
+      return 'bg-pink-50 dark:bg-pink-950 text-pink-700 dark:text-pink-300';
     case 'Division 3':
-      return 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200';
+      return 'bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-300';
     case 'Division 4':
-      return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
+      return 'bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300';
     case 'New':
-      return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
+      return 'bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300';
     default:
-      return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
+      return 'bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300';
   }
 };
 
@@ -153,29 +153,41 @@ export default function RacesPage() {
         setTypes((prevTypes) => {
           const uniqueRaceTypes = new Set<string>();
           
-          // IMPORTANT: Preserve existing manually added types (that haven't been saved yet)
-          // This allows users to add multiple race names before saving
-          prevTypes.forEach(type => uniqueRaceTypes.add(type));
-          
-          // Add race types from saved results
+          // First, collect all race types from saved results
+          const savedRaceTypes = new Set<string>();
           divisionResults.forEach((result: any) => {
-            if (result.raceType) {
-              // Use raceName from saved data if available, otherwise reconstruct from raceType
+            if (result.raceName) {
+              // Use the saved raceName directly
+              // Handle both old format "(qualification)" and new format "- qualification"
               let raceName = result.raceName;
-              if (!raceName || raceName.trim() === '') {
-                // Fallback: create race name format based on race type
-                const raceTypeName = result.raceType.charAt(0).toUpperCase() + result.raceType.slice(1);
-                raceName = `${raceTypeName} (${result.raceType})`;
+              
+              // Convert old format to new format if needed
+              const oldFormatMatch = raceName.match(/^(.+)\s*\((\w+)\)$/);
+              if (oldFormatMatch) {
+                raceName = `${oldFormatMatch[1]} - ${oldFormatMatch[2]}`;
               }
               
-              // Check if we already have this exact race name
-              if (!uniqueRaceTypes.has(raceName)) {
-                uniqueRaceTypes.add(raceName);
-              }
+              savedRaceTypes.add(raceName);
+              uniqueRaceTypes.add(raceName);
+            } else if (result.raceType) {
+              // Fallback: construct from raceType if raceName not available
+              const raceTypeName = result.raceType.charAt(0).toUpperCase() + result.raceType.slice(1);
+              const raceName = `${raceTypeName} - ${result.raceType}`;
+              
+              savedRaceTypes.add(raceName);
+              uniqueRaceTypes.add(raceName);
             }
           });
           
-          // Return merged types (saved + manually added)
+          // Only preserve manually added types that DON'T exist in saved results
+          // This prevents duplicates when saving and reloading
+          prevTypes.forEach(type => {
+            if (!savedRaceTypes.has(type)) {
+              uniqueRaceTypes.add(type);
+            }
+          });
+          
+          // Return merged types (saved + manually added that aren't saved yet)
           const mergedTypes = Array.from(uniqueRaceTypes);
           
           // Only update if types have actually changed to avoid unnecessary re-renders
@@ -298,7 +310,7 @@ export default function RacesPage() {
 
   const handleTypeModalSubmit = () => {
     if (newTypeName && newTypeName.trim() && selectedRaceType) {
-      const raceName = `${newTypeName.trim()} (${selectedRaceType})`;
+      const raceName = `${newTypeName.trim()} - ${selectedRaceType}`;
       // Use functional update to ensure we're working with the latest types value
       setTypes((prevTypes) => {
         // Check if this race name already exists
@@ -328,8 +340,8 @@ export default function RacesPage() {
     
     if (!selectedEvent) return;
     
-    // Extract race type from typeName (e.g., "Race Name (qualification)" -> "qualification")
-    const match = typeName.match(/\((\w+)\)$/);
+    // Extract race type from typeName (e.g., "Race Name - qualification" -> "qualification")
+    const match = typeName.match(/- (\w+)$/);
     const raceType = match ? match[1] : null;
     
     if (raceType && selectedEvent) {
@@ -363,46 +375,94 @@ export default function RacesPage() {
   };
 
   const handleUpdateDriverResult = (index: number, field: keyof DriverRaceResult, value: string | number, forceAddRow = false) => {
-    let updated = [...driverResults];
-    
-    // Ensure the array is large enough
-    while (updated.length <= index) {
-      updated.push({
-        driverId: `temp-${Date.now()}-${updated.length}`,
-        driverAlias: '',
-        driverName: '',
-        kartNumber: '',
-        gridPosition: updated.length + 1,
-        position: updated.length + 1,
-        overallPosition: updated.length + 1,
-        fastestLap: '',
-        points: 0,
-      });
-    }
-    
-    // Update the specific field
-    updated[index] = { ...updated[index], [field]: value };
-    
-    // Auto-add new row if editing the last row and it has data, or if forceAddRow is true
-    const isLastRow = index === updated.length - 1;
-    const hasData = value && (value.toString().trim().length > 0);
-    
-    if (isLastRow && (hasData || forceAddRow)) {
-      const newResult: DriverRaceResult = {
-        driverId: `temp-${Date.now()}-${updated.length}`,
-        driverAlias: '',
-        driverName: '',
-        kartNumber: '',
-        gridPosition: updated.length + 1,
-        position: updated.length + 1,
-        overallPosition: updated.length + 1,
-        fastestLap: '',
-        points: 0,
-      };
-      updated.push(newResult);
-    }
-    
-    setDriverResults(updated);
+    setDriverResults((prev) => {
+      let updated = [...prev];
+      
+      // Ensure the array is large enough
+      while (updated.length <= index) {
+        updated.push({
+          driverId: `temp-${Date.now()}-${updated.length}`,
+          driverAlias: '',
+          driverName: '',
+          kartNumber: '',
+          gridPosition: updated.length + 1,
+          position: updated.length + 1,
+          overallPosition: updated.length + 1,
+          fastestLap: '',
+          points: 0,
+        });
+      }
+      
+      // Update the specific field
+      updated[index] = { ...updated[index], [field]: value };
+      
+      // Auto-add new row if editing the last row and it has data, or if forceAddRow is true
+      const isLastRow = index === updated.length - 1;
+      const hasData = value && (value.toString().trim().length > 0);
+      
+      if (isLastRow && (hasData || forceAddRow)) {
+        const newResult: DriverRaceResult = {
+          driverId: `temp-${Date.now()}-${updated.length}`,
+          driverAlias: '',
+          driverName: '',
+          kartNumber: '',
+          gridPosition: updated.length + 1,
+          position: updated.length + 1,
+          overallPosition: updated.length + 1,
+          fastestLap: '',
+          points: 0,
+        };
+        updated.push(newResult);
+      }
+      
+      return updated;
+    });
+  };
+  
+  // Batch update function for multiple fields at once
+  const handleBatchUpdateDriverResult = (index: number, updates: Partial<DriverRaceResult>, forceAddRow = false) => {
+    setDriverResults((prev) => {
+      let updated = [...prev];
+      
+      // Ensure the array is large enough
+      while (updated.length <= index) {
+        updated.push({
+          driverId: `temp-${Date.now()}-${updated.length}`,
+          driverAlias: '',
+          driverName: '',
+          kartNumber: '',
+          gridPosition: updated.length + 1,
+          position: updated.length + 1,
+          overallPosition: updated.length + 1,
+          fastestLap: '',
+          points: 0,
+        });
+      }
+      
+      // Update all fields at once
+      updated[index] = { ...updated[index], ...updates };
+      
+      // Auto-add new row if editing the last row and it has data, or if forceAddRow is true
+      const isLastRow = index === updated.length - 1;
+      const hasData = Object.values(updates).some(v => v && v.toString().trim().length > 0);
+      
+      if (isLastRow && (hasData || forceAddRow)) {
+        const newResult: DriverRaceResult = {
+          driverId: `temp-${Date.now()}-${updated.length}`,
+          driverAlias: '',
+          driverName: '',
+          kartNumber: '',
+          gridPosition: updated.length + 1,
+          position: updated.length + 1,
+          overallPosition: updated.length + 1,
+          fastestLap: '',
+          points: 0,
+        };
+        updated.push(newResult);
+      }
+      
+      return updated;
+    });
   };
 
   const getDivisionResults = () => {
@@ -433,7 +493,7 @@ export default function RacesPage() {
         return;
       }
       
-      const match = selectedType.match(/\((\w+)\)$/);
+      const match = selectedType.match(/- (\w+)$/);
       const raceType = match ? match[1] : 'qualification';
       
       // Determine if there's a heat race (check if there are multiple race types for this round)
@@ -874,6 +934,7 @@ export default function RacesPage() {
                 type={selectedType}
                 results={driverResults}
                 onUpdate={handleUpdateDriverResult}
+                onBatchUpdate={handleBatchUpdateDriverResult}
                 drivers={drivers}
               />
             ) : (
@@ -955,12 +1016,14 @@ function SpreadsheetTable({
   type,
   results,
   onUpdate,
+  onBatchUpdate,
   drivers,
 }: {
   division: Division;
   type: string | null;
   results: DriverRaceResult[];
   onUpdate: (index: number, field: keyof DriverRaceResult, value: string | number, forceAddRow?: boolean) => void;
+  onBatchUpdate?: (index: number, updates: Partial<DriverRaceResult>, forceAddRow?: boolean) => void;
   drivers: any[];
 }) {
   const [suggestions, setSuggestions] = useState<Record<number, any[]>>({});
@@ -1023,54 +1086,71 @@ function SpreadsheetTable({
     setShowSuggestions(prev => ({ ...prev, [index]: matches.length > 0 && value.trim().length > 0 }));
     setActiveSuggestionIndex(prev => ({ ...prev, [index]: -1 }));
     
-    // Check if exact match found - auto-fill alias and division
-    const exactMatch = drivers.find((d) => {
-      const nameMatch = d.name?.toLowerCase() === value.toLowerCase().trim();
-      const firstNameMatch = d.firstName?.toLowerCase() === value.toLowerCase().trim();
-      const lastNameMatch = d.lastName?.toLowerCase() === value.toLowerCase().trim();
-      const fullNameMatch = `${d.firstName || ''} ${d.lastName || ''}`.toLowerCase().trim() === value.toLowerCase().trim();
-      return nameMatch || firstNameMatch || lastNameMatch || fullNameMatch;
-    });
-    
-    if (exactMatch) {
-      // Get current result to check if alias is already set
-      const currentResult = rowsToDisplay[index];
-      
-      // Auto-fill alias if available
-      if (exactMatch.alias && !currentResult.driverAlias) {
-        onUpdate(index, 'driverAlias', exactMatch.alias);
-      } else if (exactMatch.aliases && exactMatch.aliases.length > 0 && !currentResult.driverAlias) {
-        onUpdate(index, 'driverAlias', exactMatch.aliases[0]);
-      }
-      // Auto-select division
-      if (exactMatch.division) {
-        onUpdate(index, 'division', exactMatch.division);
-      }
-      // Set driver ID
-      if (exactMatch.id) {
-        onUpdate(index, 'driverId', exactMatch.id);
-      }
-      // Hide suggestions
-      setShowSuggestions(prev => ({ ...prev, [index]: false }));
-    }
+    // Don't auto-fill - let user choose from dropdown
   };
 
-  // Handle suggestion selection
-  const handleSuggestionSelect = (index: number, driver: any) => {
-    onUpdate(index, 'driverName', driver.name || `${driver.firstName || ''} ${driver.lastName || ''}`.trim());
-    if (driver.alias) {
-      onUpdate(index, 'driverAlias', driver.alias);
+  // Handle suggestion selection (driver + optional alias)
+  const handleSuggestionSelect = (index: number, driver: any, selectedAlias?: string) => {
+    // Batch all updates together to ensure they're applied
+    const driverName = driver.name || `${driver.firstName || ''} ${driver.lastName || ''}`.trim();
+    
+    // Determine alias to use
+    let aliasToUse = '';
+    if (selectedAlias) {
+      aliasToUse = selectedAlias;
+    } else if (driver.alias) {
+      aliasToUse = driver.alias;
     } else if (driver.aliases && driver.aliases.length > 0) {
-      onUpdate(index, 'driverAlias', driver.aliases[0]);
+      aliasToUse = driver.aliases[0];
     }
-    if (driver.division) {
-      onUpdate(index, 'division', driver.division);
+    
+    // Use batch update if available, otherwise fall back to individual updates
+    if (onBatchUpdate) {
+      const updates: Partial<DriverRaceResult> = {
+        driverName: driverName,
+      };
+      
+      if (aliasToUse) {
+        updates.driverAlias = aliasToUse;
+      }
+      
+      if (driver.division) {
+        updates.division = driver.division;
+      }
+      
+      if (driver.id) {
+        updates.driverId = driver.id;
+      }
+      
+      onBatchUpdate(index, updates);
+    } else {
+      // Fallback to individual updates
+      onUpdate(index, 'driverName', driverName);
+      if (aliasToUse) {
+        onUpdate(index, 'driverAlias', aliasToUse);
+      }
+      if (driver.division) {
+        onUpdate(index, 'division', driver.division);
+      }
+      if (driver.id) {
+        onUpdate(index, 'driverId', driver.id);
+      }
     }
-    if (driver.id) {
-      onUpdate(index, 'driverId', driver.id);
-    }
+    
+    // Hide suggestions immediately
     setShowSuggestions(prev => ({ ...prev, [index]: false }));
     setSuggestions(prev => ({ ...prev, [index]: [] }));
+    
+    // Move focus to next field after a short delay
+    setTimeout(() => {
+      const nextFieldIndex = fields.indexOf('driverName') + 1;
+      if (nextFieldIndex < fields.length) {
+        const nextInput = document.querySelector(
+          `input[data-row="${index}"][data-field="${fields[nextFieldIndex]}"]`
+        ) as HTMLInputElement;
+        nextInput?.focus();
+      }
+    }, 50);
   };
 
   return (
@@ -1143,7 +1223,15 @@ function SpreadsheetTable({
                         const currentSuggestions = suggestions[index] || [];
                         const currentIndex = activeSuggestionIndex[index] ?? -1;
                         
-                        if (e.key === 'ArrowDown' && currentSuggestions.length > 0) {
+                        if (e.key === 'Escape') {
+                          e.preventDefault();
+                          // Clear current input and hide suggestions
+                          onUpdate(index, 'driverName', '');
+                          onUpdate(index, 'driverAlias', '');
+                          onUpdate(index, 'driverId', `temp-${index}`);
+                          setShowSuggestions(prev => ({ ...prev, [index]: false }));
+                          setSuggestions(prev => ({ ...prev, [index]: [] }));
+                        } else if (e.key === 'ArrowDown' && currentSuggestions.length > 0) {
                           e.preventDefault();
                           const nextIndex = currentIndex < currentSuggestions.length - 1 ? currentIndex + 1 : 0;
                           setActiveSuggestionIndex(prev => ({ ...prev, [index]: nextIndex }));
@@ -1187,27 +1275,66 @@ function SpreadsheetTable({
                       placeholder="Name"
                     />
                     {showSuggestions[index] && (suggestions[index] || []).length > 0 && (
-                      <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                        {(suggestions[index] || []).map((driver, suggestionIndex) => (
-                          <div
-                            key={driver.id || suggestionIndex}
-                            onClick={() => handleSuggestionSelect(index, driver)}
-                            className={`px-3 py-2 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 ${
-                              activeSuggestionIndex[index] === suggestionIndex
-                                ? 'bg-blue-50 dark:bg-blue-900/20'
-                                : ''
-                            }`}
-                          >
-                            <div className="text-sm font-medium text-slate-900 dark:text-white">
-                              {driver.name || `${driver.firstName || ''} ${driver.lastName || ''}`.trim()}
-                            </div>
-                            {(driver.alias || (driver.aliases && driver.aliases.length > 0)) && (
-                              <div className="text-xs text-slate-500 dark:text-slate-400">
-                                {driver.alias || driver.aliases?.[0]}
+                      <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl shadow-lg max-h-80 overflow-y-auto">
+                        {(suggestions[index] || []).map((driver, suggestionIndex) => {
+                          const driverAliases = driver.aliases || (driver.alias ? [driver.alias] : []);
+                          const hasMultipleAliases = driverAliases.length > 1;
+                          
+                          return (
+                            <div
+                              key={driver.id || suggestionIndex}
+                              className={`${
+                                activeSuggestionIndex[index] === suggestionIndex
+                                  ? 'bg-blue-50 dark:bg-blue-900/20'
+                                  : ''
+                              }`}
+                            >
+                              <div
+                                onClick={() => handleSuggestionSelect(index, driver)}
+                                className={`px-4 py-2.5 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors border-b border-slate-100 dark:border-slate-700`}
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="flex-1">
+                                    <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                                      {driver.name || `${driver.firstName || ''} ${driver.lastName || ''}`.trim()}
+                                    </div>
+                                    {!hasMultipleAliases && driverAliases.length > 0 && (
+                                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                        Alias: {driverAliases[0]}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className={`px-3 py-1 rounded-full text-xs font-semibold ${getDivisionColor(driver.division)}`}>
+                                    {driver.division}
+                                  </div>
+                                </div>
                               </div>
-                            )}
-                          </div>
-                        ))}
+                              
+                              {/* Show multiple aliases as sub-options */}
+                              {hasMultipleAliases && (
+                                <div className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700">
+                                  <div className="px-4 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400">
+                                    Select alias:
+                                  </div>
+                                  {driverAliases.map((alias: string, aliasIdx: number) => (
+                                    <div
+                                      key={aliasIdx}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSuggestionSelect(index, driver, alias);
+                                      }}
+                                      className="px-6 py-2 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                                    >
+                                      <div className="text-sm text-slate-700 dark:text-slate-300">
+                                        {alias}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -1266,7 +1393,7 @@ function SpreadsheetTable({
                       onChange={(e) => onUpdate(index, 'division', e.target.value as Division)}
                       data-row={index}
                       data-field="division"
-                      className={`w-full px-3 py-1.5 rounded-full border-none outline-none text-xs font-semibold transition-all duration-200 cursor-pointer appearance-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${getDivisionColor((result.division || division) as Division)} bg-slate-200/50 dark:bg-slate-700/50 backdrop-blur-sm`}
+                      className={`w-full px-3 py-1.5 rounded-full border-none outline-none text-xs font-semibold transition-all duration-200 cursor-pointer appearance-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${getDivisionColor((result.division || division) as Division)} bg-slate-200/50 dark:bg-slate-700/50 backdrop-blur-sm [&>option]:bg-white [&>option]:dark:bg-slate-800 [&>option]:text-slate-900 [&>option]:dark:text-white [&>option]:font-normal`}
                       style={{
                         backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
                         backgroundPosition: 'right 0.5rem center',
@@ -1275,11 +1402,11 @@ function SpreadsheetTable({
                         paddingRight: '2.5rem'
                       }}
                     >
-                      <option value="Division 1">Division 1</option>
-                      <option value="Division 2">Division 2</option>
-                      <option value="Division 3">Division 3</option>
-                      <option value="Division 4">Division 4</option>
-                      <option value="New">New</option>
+                      <option value="Division 1" style={{ backgroundColor: 'inherit' }}>Division 1</option>
+                      <option value="Division 2" style={{ backgroundColor: 'inherit' }}>Division 2</option>
+                      <option value="Division 3" style={{ backgroundColor: 'inherit' }}>Division 3</option>
+                      <option value="Division 4" style={{ backgroundColor: 'inherit' }}>Division 4</option>
+                      <option value="New" style={{ backgroundColor: 'inherit' }}>New</option>
                     </select>
                   </div>
                 </td>

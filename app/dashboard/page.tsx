@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
 import StatsCards from '@/components/StatsCards';
 import RaceHistory from '@/components/RaceHistory';
@@ -13,6 +14,7 @@ import { Division } from '@/types';
 
 export default function Dashboard() {
   const router = useRouter();
+  const { isAuthenticated, isLoading: isCheckingAuth } = useAuth();
   const { selectedSeason } = useSeason();
   const [isPromotionsModalOpen, setIsPromotionsModalOpen] = useState(false);
   const [isDemotionsModalOpen, setIsDemotionsModalOpen] = useState(false);
@@ -22,25 +24,11 @@ export default function Dashboard() {
   const [rounds, setRounds] = useState<any[]>([]);
   const [raceResults, setRaceResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-
-  // Check authentication on mount
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const isAuthenticated = localStorage.getItem('isAuthenticated');
-      if (isAuthenticated !== 'true') {
-        // User is not authenticated, redirect to login
-        router.replace('/login');
-      } else {
-        setIsCheckingAuth(false);
-      }
-    }
-  }, [router]);
 
   // Fetch drivers, rounds, and race results from API
   useEffect(() => {
-    // Don't fetch data if still checking auth
-    if (isCheckingAuth) return;
+    // Don't fetch data if still checking auth or not authenticated
+    if (isCheckingAuth || !isAuthenticated) return;
     const fetchData = async () => {
       if (!selectedSeason) {
         setDrivers([]);
@@ -105,7 +93,7 @@ export default function Dashboard() {
     };
 
     fetchData();
-  }, [selectedSeason]);
+  }, [selectedSeason, isCheckingAuth, isAuthenticated]);
 
   // Calculate promotions and demotions based on race results
   useEffect(() => {

@@ -1,32 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useAuth } from '@/components/AuthProvider';
 import { LogIn, Mail, Lock } from 'lucide-react';
 
 export default function LoginPage() {
-  const router = useRouter();
+  const { login, isLoading: isCheckingAuth } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-
-  // Check if user is already authenticated
-  useEffect(() => {
-    const checkAuth = () => {
-      if (typeof window !== 'undefined') {
-        const isAuthenticated = localStorage.getItem('isAuthenticated');
-        if (isAuthenticated === 'true') {
-          // User is already logged in, redirect to dashboard
-          router.replace('/dashboard');
-        } else {
-          setIsCheckingAuth(false);
-        }
-      }
-    };
-    checkAuth();
-  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,14 +21,8 @@ export default function LoginPage() {
     setTimeout(() => {
       // For demo purposes, accept any non-empty credentials
       if (email.trim() && password.trim()) {
-        // Store login state (in a real app, use proper auth tokens)
-        localStorage.setItem('isAuthenticated', 'true');
-        
-        // Use replace instead of push to avoid back button issues
-        // Add a small delay to ensure localStorage is committed
-        setTimeout(() => {
-          router.replace('/dashboard');
-        }, 100);
+        // Call the login function from AuthProvider
+        login();
       } else {
         setError('Please enter both email and password');
         setIsLoading(false);

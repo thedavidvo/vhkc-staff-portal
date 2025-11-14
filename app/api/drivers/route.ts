@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDriversBySeason, getDriverPointsBySeason, addDriver, updateDriver } from '@/lib/sheetsDataService';
+import { cache } from '@/lib/cache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,6 +9,14 @@ export async function GET(request: NextRequest) {
     
     if (!seasonId) {
       return NextResponse.json({ error: 'seasonId required' }, { status: 400 });
+    }
+    
+    const cacheKey = `drivers:${seasonId}`;
+    
+    // Try to get from cache first
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
     }
     
     const drivers = await getDriversBySeason(seasonId);
@@ -19,6 +28,9 @@ export async function GET(request: NextRequest) {
         pointsTotal: await getDriverPointsBySeason(driver.id, seasonId),
       }))
     );
+    
+    // Cache the result for 3 minutes (drivers change more frequently)
+    cache.set(cacheKey, driversWithPoints, 3 * 60 * 1000);
     
     return NextResponse.json(driversWithPoints);
   } catch (error) {
@@ -38,6 +50,10 @@ export async function POST(request: NextRequest) {
     
     const driver = await request.json();
     await addDriver(driver, seasonId);
+    
+    // Invalidate driver cache for this season
+    cache.invalidate(`drivers:${seasonId}`);
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in POST /api/drivers:', error);
@@ -56,6 +72,10 @@ export async function PUT(request: NextRequest) {
     
     const driver = await request.json();
     await updateDriver(driver, seasonId);
+    
+    // Invalidate driver cache for this season
+    cache.invalidate(`drivers:${seasonId}`);
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in PUT /api/drivers:', error);

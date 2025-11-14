@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRaceResultsByRound, addRaceResult, updateRaceResult, deleteRaceResultsByRaceType } from '@/lib/sheetsDataService';
+import { cache } from '@/lib/cache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,7 +11,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'roundId required' }, { status: 400 });
     }
     
+    const cacheKey = `race-results:${roundId}`;
+    
+    // Try to get from cache first
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
+    }
+    
     const results = await getRaceResultsByRound(roundId);
+    
+    // Cache results for 1 minute (race results change frequently)
+    cache.set(cacheKey, results, 1 * 60 * 1000);
+    
     return NextResponse.json(results);
   } catch (error) {
     console.error('Error in GET /api/race-results:', error);
@@ -22,6 +35,15 @@ export async function POST(request: NextRequest) {
   try {
     const result = await request.json();
     await addRaceResult(result);
+    
+    // Invalidate cache for this round and related caches
+    if (result.roundId) {
+      cache.invalidate(`race-results:${result.roundId}`);
+      cache.invalidate(`round-results:${result.roundId}`);
+      // Invalidate drivers cache if we have the season
+      cache.invalidatePattern('drivers:');
+    }
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in POST /api/race-results:', error);
@@ -45,6 +67,12 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'raceType is required' }, { status: 400 });
     }
     await updateRaceResult(roundId, driverId, result);
+    
+    // Invalidate cache for this round and related caches
+    cache.invalidate(`race-results:${roundId}`);
+    cache.invalidate(`round-results:${roundId}`);
+    cache.invalidatePattern('drivers:');
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in PUT /api/race-results:', error);
@@ -63,6 +91,12 @@ export async function DELETE(request: NextRequest) {
     }
     
     await deleteRaceResultsByRaceType(roundId, raceType);
+    
+    // Invalidate cache for this round and related caches
+    cache.invalidate(`race-results:${roundId}`);
+    cache.invalidate(`round-results:${roundId}`);
+    cache.invalidatePattern('drivers:');
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in DELETE /api/race-results:', error);

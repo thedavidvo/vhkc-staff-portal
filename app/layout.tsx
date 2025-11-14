@@ -3,6 +3,8 @@ import './globals.css';
 import LayoutWrapper from '@/components/LayoutWrapper';
 import { SidebarProvider } from '@/components/SidebarContext';
 import { SeasonProvider } from '@/components/SeasonContext';
+import QueryProvider from '@/components/QueryProvider';
+import { AuthProvider } from '@/components/AuthProvider';
 
 export const metadata: Metadata = {
   title: 'VHKC | Staff Portal',
@@ -31,11 +33,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className="overflow-x-hidden">
       <body className="antialiased overflow-x-hidden">
-        <SidebarProvider>
-          <SeasonProvider>
-            <LayoutWrapper>{children}</LayoutWrapper>
-          </SeasonProvider>
-        </SidebarProvider>
+        <QueryProvider>
+          <AuthProvider>
+            <SidebarProvider>
+              <SeasonProvider>
+                <LayoutWrapper>{children}</LayoutWrapper>
+              </SeasonProvider>
+            </SidebarProvider>
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );
