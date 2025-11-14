@@ -31,3 +31,4 @@ export default function QueryProvider({ children }: { children: ReactNode }) {
   );
 }
 
+

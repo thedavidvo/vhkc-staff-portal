@@ -7,21 +7,21 @@ import { Race, Division, DriverRaceResult } from '@/types';
 import { Plus, Save, Trash2, Loader2 } from 'lucide-react';
 import { getPointsForPosition } from '@/lib/pointsSystem';
 
-// Helper function to get division color (lighter shades)
+// Helper function to get division color (for table cells with division badges)
 const getDivisionColor = (division: Division) => {
   switch (division) {
     case 'Division 1':
-      return 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300';
+      return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
     case 'Division 2':
-      return 'bg-pink-50 dark:bg-pink-950 text-pink-700 dark:text-pink-300';
+      return 'bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200';
     case 'Division 3':
-      return 'bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-300';
+      return 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200';
     case 'Division 4':
-      return 'bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300';
+      return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
     case 'New':
-      return 'bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300';
+      return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
     default:
-      return 'bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300';
+      return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
   }
 };
 
@@ -164,7 +164,15 @@ export default function RacesPage() {
               // Convert old format to new format if needed
               const oldFormatMatch = raceName.match(/^(.+)\s*\((\w+)\)$/);
               if (oldFormatMatch) {
-                raceName = `${oldFormatMatch[1]} - ${oldFormatMatch[2]}`;
+                const capitalizedRaceType = oldFormatMatch[2].charAt(0).toUpperCase() + oldFormatMatch[2].slice(1);
+                raceName = `${oldFormatMatch[1]} - ${capitalizedRaceType}`;
+              } else {
+                // Capitalize race type in new format "Name - type"
+                const newFormatMatch = raceName.match(/^(.+)\s*-\s*(\w+)$/);
+                if (newFormatMatch) {
+                  const capitalizedRaceType = newFormatMatch[2].charAt(0).toUpperCase() + newFormatMatch[2].slice(1);
+                  raceName = `${newFormatMatch[1]} - ${capitalizedRaceType}`;
+                }
               }
               
               savedRaceTypes.add(raceName);
@@ -172,7 +180,7 @@ export default function RacesPage() {
             } else if (result.raceType) {
               // Fallback: construct from raceType if raceName not available
               const raceTypeName = result.raceType.charAt(0).toUpperCase() + result.raceType.slice(1);
-              const raceName = `${raceTypeName} - ${result.raceType}`;
+              const raceName = `${raceTypeName} - ${raceTypeName}`;
               
               savedRaceTypes.add(raceName);
               uniqueRaceTypes.add(raceName);
@@ -310,7 +318,8 @@ export default function RacesPage() {
 
   const handleTypeModalSubmit = () => {
     if (newTypeName && newTypeName.trim() && selectedRaceType) {
-      const raceName = `${newTypeName.trim()} - ${selectedRaceType}`;
+      const capitalizedRaceType = selectedRaceType.charAt(0).toUpperCase() + selectedRaceType.slice(1);
+      const raceName = `${newTypeName.trim()} - ${capitalizedRaceType}`;
       // Use functional update to ensure we're working with the latest types value
       setTypes((prevTypes) => {
         // Check if this race name already exists
@@ -718,12 +727,12 @@ export default function RacesPage() {
   return (
     <>
     <Header hideSearch />
-      <div className="p-4 md:p-6">
-      <div className="max-w-[95%] mx-auto">
+      <div className="p-4 md:p-6 flex flex-col h-[calc(100vh-4rem)]">
+      <div className="max-w-[95%] mx-auto flex flex-col flex-1 min-h-0 w-full">
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-6">
           Races Management
         </h1>
-        <div className="grid grid-cols-12 gap-6 mb-6">
+        <div className="grid grid-cols-12 gap-6 mb-6 flex-shrink-0">
           {/* Panel 1: Event */}
           <div className="col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="p-2 border-b border-slate-200 dark:border-slate-700">
@@ -907,8 +916,8 @@ export default function RacesPage() {
         </div>
 
         {/* Race Results Panel - Moved to Bottom */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
-          <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col flex-1 min-h-0">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between flex-shrink-0">
             <div>
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">Race Results</h2>
               {selectedEvent && selectedDivision && (
@@ -927,7 +936,7 @@ export default function RacesPage() {
               </button>
             )}
           </div>
-          <div className="overflow-y-auto max-h-[calc(100vh-300px)]">
+          <div className="flex-1 min-h-0" style={{ overflowY: 'auto', overflowX: 'visible' }}>
             {selectedEvent && selectedDivision && selectedType ? (
               <SpreadsheetTable
                 division={selectedDivision}
@@ -1029,12 +1038,13 @@ function SpreadsheetTable({
   const [suggestions, setSuggestions] = useState<Record<number, any[]>>({});
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<Record<number, number>>({});
   const [showSuggestions, setShowSuggestions] = useState<Record<number, boolean>>({});
+  const [dropdownPosition, setDropdownPosition] = useState<Record<number, { top: number; left: number; width: number }>>({});
   
   // Determine if this is a qualification race
   const isQualification = type?.toLowerCase().includes('qual') || type?.toLowerCase().includes('qualification');
   
-  // Default to 20 rows
-  const defaultRows: DriverRaceResult[] = Array.from({ length: 20 }, (_, i) => ({
+  // Default to 3 rows
+  const defaultRows: DriverRaceResult[] = Array.from({ length: 3 }, (_, i) => ({
     driverId: `temp-${i}`,
     driverAlias: '',
     driverName: '',
@@ -1054,7 +1064,7 @@ function SpreadsheetTable({
   // Merge saved results with default rows
   const rowsToDisplay = [...defaultRows];
   results.forEach((result, index) => {
-    if (index < 20) {
+    if (index < 3) {
       rowsToDisplay[index] = result;
     }
   });
@@ -1073,7 +1083,7 @@ function SpreadsheetTable({
       const aliasesMatch = driver.aliases?.some((a: string) => a.toLowerCase().includes(lowerInput));
       
       return nameMatch || firstNameMatch || lastNameMatch || fullNameMatch || aliasMatch || aliasesMatch;
-    }).slice(0, 10); // Limit to 10 suggestions
+    }).slice(0, 5); // Limit to 5 suggestions
   };
 
   // Handle driver name input change
@@ -1154,11 +1164,11 @@ function SpreadsheetTable({
   };
 
   return (
-    <div className="p-4">
+    <div className="p-4" style={{ overflow: 'visible' }}>
       <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
         Race Results - {division}{type ? ` - ${type}` : ''}
       </h3>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" style={{ overflowY: 'visible' }}>
         <table className="w-full border-collapse border border-slate-300 dark:border-slate-600">
           <thead className="bg-slate-100 dark:bg-slate-900 sticky top-0">
             <tr>
@@ -1200,15 +1210,24 @@ function SpreadsheetTable({
                 key={result.driverId}
                 className="hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
               >
-                <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+                <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-visible">
                   <div className="relative">
                     <input
                       type="text"
                       value={result.driverName || ''}
                       onChange={(e) => handleDriverNameChange(index, e.target.value)}
-                      onFocus={() => {
+                      onFocus={(e) => {
                         const matches = getMatchingDrivers(result.driverName || '');
                         if (matches.length > 0) {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setDropdownPosition(prev => ({ 
+                            ...prev, 
+                            [index]: { 
+                              top: rect.bottom + window.scrollY + 4, 
+                              left: rect.left + window.scrollX,
+                              width: rect.width
+                            } 
+                          }));
                           setShowSuggestions(prev => ({ ...prev, [index]: true }));
                           setSuggestions(prev => ({ ...prev, [index]: matches }));
                         }
@@ -1274,8 +1293,14 @@ function SpreadsheetTable({
                       className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:ring-1 focus:ring-blue-500"
                       placeholder="Name"
                     />
-                    {showSuggestions[index] && (suggestions[index] || []).length > 0 && (
-                      <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl shadow-lg max-h-80 overflow-y-auto">
+                    {showSuggestions[index] && (suggestions[index] || []).length > 0 && dropdownPosition[index] && (
+                      <div className="fixed bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl shadow-2xl overflow-y-auto" style={{ 
+                        zIndex: 1000, 
+                        maxHeight: '400px',
+                        minWidth: '300px',
+                        top: `${dropdownPosition[index].top}px`,
+                        left: `${dropdownPosition[index].left}px`
+                      }}>
                         {(suggestions[index] || []).map((driver, suggestionIndex) => {
                           const driverAliases = driver.aliases || (driver.alias ? [driver.alias] : []);
                           const hasMultipleAliases = driverAliases.length > 1;
@@ -1387,26 +1412,25 @@ function SpreadsheetTable({
                   />
                 </td>
                 <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
-                  <div className="relative">
+                  <div className="relative inline-block">
                     <select
                       value={result.division || division}
                       onChange={(e) => onUpdate(index, 'division', e.target.value as Division)}
                       data-row={index}
                       data-field="division"
-                      className={`w-full px-3 py-1.5 rounded-full border-none outline-none text-xs font-semibold transition-all duration-200 cursor-pointer appearance-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${getDivisionColor((result.division || division) as Division)} bg-slate-200/50 dark:bg-slate-700/50 backdrop-blur-sm [&>option]:bg-white [&>option]:dark:bg-slate-800 [&>option]:text-slate-900 [&>option]:dark:text-white [&>option]:font-normal`}
+                      className={`px-3 py-1.5 pr-8 rounded-full border-none outline-none text-xs font-semibold transition-all duration-200 cursor-pointer appearance-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${getDivisionColor((result.division || division) as Division)} [&>option]:bg-white [&>option]:dark:bg-slate-800 [&>option]:text-slate-900 [&>option]:dark:text-white [&>option]:font-normal`}
                       style={{
                         backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
                         backgroundPosition: 'right 0.5rem center',
                         backgroundRepeat: 'no-repeat',
-                        backgroundSize: '1.5em 1.5em',
-                        paddingRight: '2.5rem'
+                        backgroundSize: '1.5em 1.5em'
                       }}
                     >
-                      <option value="Division 1" style={{ backgroundColor: 'inherit' }}>Division 1</option>
-                      <option value="Division 2" style={{ backgroundColor: 'inherit' }}>Division 2</option>
-                      <option value="Division 3" style={{ backgroundColor: 'inherit' }}>Division 3</option>
-                      <option value="Division 4" style={{ backgroundColor: 'inherit' }}>Division 4</option>
-                      <option value="New" style={{ backgroundColor: 'inherit' }}>New</option>
+                      <option value="Division 1">Division 1</option>
+                      <option value="Division 2">Division 2</option>
+                      <option value="Division 3">Division 3</option>
+                      <option value="Division 4">Division 4</option>
+                      <option value="New">New</option>
                     </select>
                   </div>
                 </td>

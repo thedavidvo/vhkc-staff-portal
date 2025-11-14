@@ -34,3 +34,4 @@ export const calculateDriverPoints = (driverId: string, races: any[]): number =>
   return total;
 };
 
+
