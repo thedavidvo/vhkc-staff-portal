@@ -96,7 +96,7 @@ export default function RacesPage() {
   const [driverResults, setDriverResults] = useState<DriverRaceResult[]>([]);
   const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
-  const [selectedRaceType, setSelectedRaceType] = useState<'qualification' | 'heat' | 'final'>('qualification');
+  const [selectedRaceType, setSelectedRaceType] = useState<'qualification' | 'heat' | 'final'>('final');
   const shouldLoadResultsRef = useRef(true); // Track if we should load results from saved data
 
   // Fetch race results for a specific round
@@ -513,7 +513,7 @@ export default function RacesPage() {
       const duplicateDrivers: string[] = [];
       
       for (const result of validResults) {
-        // Try to find driver by name or alias
+        // Try to find driver by name or aliases
         const driver = drivers.find(
           (d) =>
             d.name?.toLowerCase() === result.driverName?.toLowerCase().trim() ||
@@ -521,8 +521,8 @@ export default function RacesPage() {
             `${d.firstName} ${d.lastName}`.toLowerCase().trim() === result.driverName?.toLowerCase().trim() ||
             d.firstName?.toLowerCase() === result.driverName?.toLowerCase().trim() ||
             d.lastName?.toLowerCase() === result.driverName?.toLowerCase().trim() ||
-            d.alias?.toLowerCase() === result.driverAlias?.toLowerCase().trim() ||
-            d.alias?.toLowerCase() === result.driverName?.toLowerCase().trim()
+            d.aliases?.some((a: string) => a.toLowerCase() === result.driverAlias?.toLowerCase().trim()) ||
+            d.aliases?.some((a: string) => a.toLowerCase() === result.driverName?.toLowerCase().trim())
         );
         
         if (driver) {
@@ -542,7 +542,7 @@ export default function RacesPage() {
       // Find driver IDs from names/aliases and calculate points
       const resultsToSave = await Promise.all(
         validResults.map(async (result) => {
-          // Try to find driver by name or alias - VALIDATION: must exist
+          // Try to find driver by name or aliases - VALIDATION: must exist
           let driverId = result.driverId;
           let driver = null;
           
@@ -554,8 +554,8 @@ export default function RacesPage() {
                 `${d.firstName} ${d.lastName}`.toLowerCase().trim() === result.driverName?.toLowerCase().trim() ||
                 d.firstName?.toLowerCase() === result.driverName?.toLowerCase().trim() ||
                 d.lastName?.toLowerCase() === result.driverName?.toLowerCase().trim() ||
-                d.alias?.toLowerCase() === result.driverAlias?.toLowerCase().trim() ||
-                d.alias?.toLowerCase() === result.driverName?.toLowerCase().trim()
+                d.aliases?.some((a: string) => a.toLowerCase() === result.driverAlias?.toLowerCase().trim()) ||
+                d.aliases?.some((a: string) => a.toLowerCase() === result.driverName?.toLowerCase().trim())
             );
             
             if (driver) {
@@ -571,19 +571,16 @@ export default function RacesPage() {
           // If driver found, autofill name/alias
           if (driver) {
             if (result.driverName && !result.driverAlias && driver.name !== result.driverName) {
-              // If name matches but we have alias in driver, use it
-              result.driverAlias = driver.name;
+              // If name matches but we have aliases in driver, use first alias
+              result.driverAlias = driver.aliases && driver.aliases.length > 0 ? driver.aliases[0] : driver.name;
             } else if (result.driverAlias && !result.driverName) {
               // If alias provided, use driver name
               result.driverName = driver.name;
             }
           }
           
-          // Calculate points based on position and race type
+          // Points are calculated dynamically in results tab, not stored
           const position = result.position || 0;
-          const calculatedPoints = position > 0
-            ? getPointsForPosition(position, raceType as 'qualification' | 'heat' | 'final', hasHeatRace || false)
-            : (result.points || 0);
           
           return {
             roundId: selectedEvent.id,
@@ -591,7 +588,7 @@ export default function RacesPage() {
             division: selectedDivision,
             position: position,
             fastestLap: result.fastestLap || '',
-            points: calculatedPoints,
+            points: 0, // Points are calculated dynamically, not stored
             raceType: raceType,
             raceName: selectedType, // Save the full race name (e.g., "Race 1 (qualification)")
           };
@@ -1079,10 +1076,9 @@ function SpreadsheetTable({
       const firstNameMatch = driver.firstName?.toLowerCase().includes(lowerInput);
       const lastNameMatch = driver.lastName?.toLowerCase().includes(lowerInput);
       const fullNameMatch = `${driver.firstName || ''} ${driver.lastName || ''}`.toLowerCase().trim().includes(lowerInput);
-      const aliasMatch = driver.alias?.toLowerCase().includes(lowerInput);
       const aliasesMatch = driver.aliases?.some((a: string) => a.toLowerCase().includes(lowerInput));
       
-      return nameMatch || firstNameMatch || lastNameMatch || fullNameMatch || aliasMatch || aliasesMatch;
+      return nameMatch || firstNameMatch || lastNameMatch || fullNameMatch || aliasesMatch;
     }).slice(0, 5); // Limit to 5 suggestions
   };
 
@@ -1108,8 +1104,6 @@ function SpreadsheetTable({
     let aliasToUse = '';
     if (selectedAlias) {
       aliasToUse = selectedAlias;
-    } else if (driver.alias) {
-      aliasToUse = driver.alias;
     } else if (driver.aliases && driver.aliases.length > 0) {
       aliasToUse = driver.aliases[0];
     }
@@ -1302,7 +1296,7 @@ function SpreadsheetTable({
                         left: `${dropdownPosition[index].left}px`
                       }}>
                         {(suggestions[index] || []).map((driver, suggestionIndex) => {
-                          const driverAliases = driver.aliases || (driver.alias ? [driver.alias] : []);
+                          const driverAliases = driver.aliases || [];
                           const hasMultipleAliases = driverAliases.length > 1;
                           
                           return (
@@ -1373,7 +1367,7 @@ function SpreadsheetTable({
                       onUpdate(index, 'driverAlias', value);
                       // Auto-fill driver name if alias matches a driver
                       const matchingDriver = drivers.find(d => 
-                        d.alias?.toLowerCase() === value.toLowerCase().trim() || 
+                        d.aliases?.some((a: string) => a.toLowerCase() === value.toLowerCase().trim()) ||
                         d.name?.toLowerCase() === value.toLowerCase().trim()
                       );
                       if (matchingDriver && !result.driverName) {

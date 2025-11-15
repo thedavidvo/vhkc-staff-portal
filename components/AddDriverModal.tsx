@@ -12,7 +12,6 @@ interface AddDriverModalProps {
     lastName?: string;
     name: string;
     aliases?: string[];
-    alias?: string; // Deprecated - kept for backwards compatibility
     email: string;
     division: Division;
     dateOfBirth?: string;
@@ -91,7 +90,6 @@ export default function AddDriverModal({
       lastName: formData.lastName || undefined,
       name: driverName,
       aliases: validAliases.length > 0 ? validAliases : undefined,
-      alias: validAliases[0] || undefined, // Keep first alias for backwards compatibility
       email: formData.email,
       division: formData.division,
       dateOfBirth: dateString || undefined,

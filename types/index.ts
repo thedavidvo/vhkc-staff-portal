@@ -4,8 +4,7 @@ export type DriverStatus = 'ACTIVE' | 'INACTIVE' | 'BANNED';
 export interface Driver {
   id: string;
   name: string;
-  aliases?: string[]; // Support multiple aliases
-  alias?: string; // Deprecated - kept for backwards compatibility
+  aliases?: string[];
   firstName?: string;
   lastName?: string;
   dateOfBirth?: string;

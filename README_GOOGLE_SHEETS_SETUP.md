@@ -56,26 +56,26 @@ id | seasonId | roundNumber | name | date | location | address | status
 ### Sheet 3: "Drivers"
 Headers (Row 1):
 ```
-id | seasonId | name | email | division | teamName | status | lastRacePosition | fastestLap | pointsTotal | lastUpdated | firstName | lastName | dateOfBirth | homeTrack | alias | aliases
+id | seasonId | name | email | division | teamName | status | lastRacePosition | fastestLap | pointsTotal | lastUpdated | firstName | lastName | dateOfBirth | homeTrack | aliases
 ```
 
 **Note:** 
-- The `alias` column is deprecated but kept for backwards compatibility. Use `aliases` instead.
 - The `aliases` column should contain comma-separated aliases (e.g., `Alias1,Alias2,Alias3`)
 - `lastRacePosition`, `fastestLap`, and `pointsTotal` columns are not used by the application and can be managed manually in Google Sheets.
 
 ### Sheet 4: "Race Results"
 Headers (Row 1):
 ```
-roundId | driverId | division | kartNumber | position | fastestLap | points | raceType | raceName | confirmed
+roundId | driverId | division | kartNumber | position | fastestLap | raceType | raceName | confirmed
 ```
 
 **Note:** 
 - `division` is the division the driver was racing in for that specific result
 - `kartNumber` is the kart number used by the driver in that race
-- `raceType` can be: `qualification` (standard points), `heat` (minor points), or `final` (major points)
-- `raceName` is the custom name for the race (e.g., "Race 1 (qualification)", "Heat 1 (heat)")
+- `raceType` can be: `qualification` (standard points), `heat` (minor points), or `final` (major points) - defaults to `final`
+- `raceName` is the custom name for the race (e.g., "Race 1 - Qualification", "Heat 1 - Heat")
 - `confirmed` should be `true` or `false` to track if points have been confirmed
+- **Points are no longer stored** - they are calculated dynamically based on position and race type
 
 ### Sheet 5: "Locations"
 Headers (Row 1):
@@ -90,6 +90,20 @@ id | seasonId | name | division | driverIds | createdAt
 ```
 
 **Note:** The `driverIds` column should contain comma-separated driver IDs (e.g., `driver-1,driver-2,driver-3`)
+
+### Sheet 7: "Race Results Records"
+Headers (Row 1):
+```
+id | seasonId | roundId | division | raceType | driverId | driverName | position | fastestLap | points | rank | createdAt
+```
+
+**Note:** 
+- This sheet stores snapshots of race result standings (rankings) for specific races
+- Each record represents one driver's result in a specific race (round + division + race type)
+- `rank` represents the driver's position in the standings for that race
+- `points` are calculated dynamically based on position and race type
+- Used in the Results tab for saving and viewing race result records
+
 
 ## 6. Share Spreadsheet with Service Account
 

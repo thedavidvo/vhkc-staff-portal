@@ -42,21 +42,38 @@ const getStatusColor = (status: DriverStatus) => {
 // Helper function to parse date string into day, month, year
 const parseDate = (dateString: string | undefined): { day: number; month: number; year: number } => {
   if (!dateString) return { day: 0, month: 0, year: 0 };
+  // Parse YYYY-MM-DD format directly to avoid timezone issues
+  const parts = dateString.split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const day = parseInt(parts[2], 10);
+    if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+      return { day, month, year };
+    }
+  }
+  // Fallback to Date parsing if format is different
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return { day: 0, month: 0, year: 0 };
+  // Use UTC methods to avoid timezone shifts
   return {
-    day: date.getDate(),
-    month: date.getMonth() + 1,
-    year: date.getFullYear(),
+    day: date.getUTCDate(),
+    month: date.getUTCMonth() + 1,
+    year: date.getUTCFullYear(),
   };
 };
 
 // Helper function to combine day, month, year into date string
 const combineDate = (day: number, month: number, year: number): string => {
   if (!day || !month || !year) return '';
-  const date = new Date(year, month - 1, day);
+  // Use UTC to avoid timezone issues
+  const date = new Date(Date.UTC(year, month - 1, day));
   if (isNaN(date.getTime())) return '';
-  return date.toISOString().split('T')[0];
+  // Format as YYYY-MM-DD using UTC to avoid timezone shifts
+  const yearStr = date.getUTCFullYear().toString();
+  const monthStr = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+  const dayStr = date.getUTCDate().toString().padStart(2, '0');
+  return `${yearStr}-${monthStr}-${dayStr}`;
 };
 
 // Helper function to calculate age from date of birth
@@ -174,7 +191,9 @@ export default function DriversPage() {
 
   const handleEdit = (driver: Driver) => {
     setSelectedDriver(driver);
-    setEditForm({ ...driver });
+    // Ensure aliases array always has at least one empty field for editing
+    const aliasesArray = driver.aliases && driver.aliases.length > 0 ? driver.aliases : [];
+    setEditForm({ ...driver, aliases: aliasesArray.length > 0 ? [...aliasesArray, ''] : [''] });
     const parsedDate = parseDate(driver.dateOfBirth);
     setDateOfBirth(parsedDate);
     setIsEditing(true);
@@ -185,7 +204,13 @@ export default function DriversPage() {
 
     try {
       const dateString = combineDate(dateOfBirth.day, dateOfBirth.month, dateOfBirth.year);
-      const finalForm = { ...editForm, dateOfBirth: dateString || editForm.dateOfBirth };
+      // Filter out empty aliases
+      const validAliases = (editForm.aliases || []).filter(a => a.trim() !== '');
+      const finalForm = { 
+        ...editForm, 
+        dateOfBirth: dateString || editForm.dateOfBirth,
+        aliases: validAliases.length > 0 ? validAliases : undefined
+      };
       const updatedDriver = { ...selectedDriver, ...finalForm } as Driver;
       
       // Update via API
@@ -236,7 +261,7 @@ export default function DriversPage() {
     firstName?: string;
     lastName?: string;
     name: string;
-    alias?: string;
+    aliases?: string[];
     email: string;
     division: Division;
     dateOfBirth?: string;
@@ -252,7 +277,7 @@ export default function DriversPage() {
       const newDriver: Driver = {
         id: `driver-${Date.now()}`,
         name: driverData.name,
-        alias: driverData.alias,
+        aliases: driverData.aliases,
         firstName: driverData.firstName,
         lastName: driverData.lastName,
         email: driverData.email,
@@ -603,15 +628,77 @@ export default function DriversPage() {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                          Alias
+                          Aliases
                         </label>
-                        <input
-                          type="text"
-                          value={editForm.alias || selectedDriver.alias || ''}
-                          onChange={(e) => setEditForm({ ...editForm, alias: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                          placeholder={selectedDriver.alias || 'Alias'}
-                        />
+                        <div className="space-y-2">
+                          {(editForm.aliases || ['']).map((alias, index) => (
+                            <div key={index} className="flex gap-2">
+                              <input
+                                type="text"
+                                value={alias}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    const currentAliases = editForm.aliases || [''];
+                                    const trimmedValue = e.currentTarget.value.trim();
+                                    
+                                    // Always add new alias if current one has content and it's the last field
+                                    if (trimmedValue && index === currentAliases.length - 1) {
+                                      // Update the current alias value and add a new empty one
+                                      const newAliases = [...currentAliases];
+                                      newAliases[index] = trimmedValue;
+                                      newAliases.push('');
+                                      setEditForm({ ...editForm, aliases: newAliases });
+                                    } else if (trimmedValue && index < currentAliases.length - 1) {
+                                      // If it's not the last field, just update the current value
+                                      const newAliases = [...currentAliases];
+                                      newAliases[index] = trimmedValue;
+                                      setEditForm({ ...editForm, aliases: newAliases });
+                                    }
+                                  }
+                                }}
+                                onChange={(e) => {
+                                  const currentAliases = editForm.aliases || [''];
+                                  const newAliases = [...currentAliases];
+                                  newAliases[index] = e.target.value;
+                                  setEditForm({ ...editForm, aliases: newAliases });
+                                }}
+                                className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                                placeholder={`Alias ${index + 1}`}
+                              />
+                              {index < (editForm.aliases || ['']).length - 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const currentAliases = editForm.aliases || [''];
+                                    const newAliases = currentAliases.filter((_, i) => i !== index);
+                                    // Ensure at least one empty field remains
+                                    if (newAliases.length === 0) {
+                                      newAliases.push('');
+                                    }
+                                    setEditForm({ ...editForm, aliases: newAliases });
+                                  }}
+                                  className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentAliases = editForm.aliases || [''];
+                              setEditForm({ ...editForm, aliases: [...currentAliases, ''] });
+                            }}
+                            className="px-3 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors text-sm"
+                          >
+                            + Add Alias
+                          </button>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          Press Enter on the last alias field to add another
+                        </p>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -711,9 +798,11 @@ export default function DriversPage() {
                         </span>
                       </div>
                       <div>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">Alias</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">Aliases</p>
                         <p className="text-base font-medium text-slate-900 dark:text-white">
-                          {selectedDriver.alias || 'N/A'}
+                          {selectedDriver.aliases && selectedDriver.aliases.length > 0
+                            ? selectedDriver.aliases.join(', ')
+                            : 'N/A'}
                         </p>
                       </div>
                       <div>

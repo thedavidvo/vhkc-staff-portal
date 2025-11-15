@@ -229,23 +229,35 @@ export async function getDriversBySeason(seasonId: string): Promise<Driver[]> {
     
     return drivers
       .filter((d: any) => d.seasonId === seasonId)
-      .map((driver: any) => ({
-        id: driver.id || '',
-        name: driver.name || '',
-        alias: driver.alias || undefined,
-        firstName: driver.firstName || undefined,
-        lastName: driver.lastName || undefined,
-        dateOfBirth: driver.dateOfBirth || undefined,
-        homeTrack: driver.homeTrack || undefined,
-        division: (driver.division || 'New') as Division,
-        email: driver.email || '',
-        teamName: driver.teamName || undefined,
-        status: (driver.status || 'ACTIVE') as 'ACTIVE' | 'INACTIVE' | 'BANNED',
-        lastRacePosition: 0, // Not used, kept for backward compatibility
-        fastestLap: '', // Not used, kept for backward compatibility
-        pointsTotal: 0, // Not used, kept for backward compatibility
-        lastUpdated: driver.lastUpdated || new Date().toISOString().split('T')[0],
-      }));
+      .map((driver: any) => {
+        // Parse aliases from string (comma-separated) or array
+        let aliases: string[] | undefined = undefined;
+        if (driver.aliases) {
+          if (typeof driver.aliases === 'string') {
+            aliases = driver.aliases.split(',').map((a: string) => a.trim()).filter((a: string) => a);
+          } else if (Array.isArray(driver.aliases)) {
+            aliases = driver.aliases.filter((a: string) => a && a.trim());
+          }
+        }
+        
+        return {
+          id: driver.id || '',
+          name: driver.name || '',
+          aliases: aliases && aliases.length > 0 ? aliases : undefined,
+          firstName: driver.firstName || undefined,
+          lastName: driver.lastName || undefined,
+          dateOfBirth: driver.dateOfBirth || undefined,
+          homeTrack: driver.homeTrack || undefined,
+          division: (driver.division || 'New') as Division,
+          email: driver.email || '',
+          teamName: driver.teamName || undefined,
+          status: (driver.status || 'ACTIVE') as 'ACTIVE' | 'INACTIVE' | 'BANNED',
+          lastRacePosition: 0, // Not used, kept for backward compatibility
+          fastestLap: '', // Not used, kept for backward compatibility
+          pointsTotal: 0, // Not used, kept for backward compatibility
+          lastUpdated: driver.lastUpdated || new Date().toISOString().split('T')[0],
+        };
+      });
   } catch (error) {
     console.error('Error getting drivers:', error);
     return [];
@@ -269,7 +281,7 @@ export async function addDriver(driver: Driver, seasonId: string): Promise<void>
     driver.lastName || '',
     driver.dateOfBirth || '',
     driver.homeTrack || '',
-    driver.alias || '',
+    driver.aliases ? driver.aliases.join(',') : '',
   ]);
 }
 
@@ -318,7 +330,7 @@ export async function updateDriver(driver: Driver, seasonId: string): Promise<vo
     else if (headerLower === 'lastname') driverRow[index] = driver.lastName || '';
     else if (headerLower === 'dateofbirth') driverRow[index] = driver.dateOfBirth || '';
     else if (headerLower === 'hometrack') driverRow[index] = driver.homeTrack || '';
-    else if (headerLower === 'alias') driverRow[index] = driver.alias || '';
+    else if (headerLower === 'aliases') driverRow[index] = driver.aliases ? driver.aliases.join(',') : '';
     else {
       // Preserve existing values for columns we don't update
       driverRow[index] = rows[rowIndex][index] || '';
@@ -366,7 +378,7 @@ async function getRaceResults(): Promise<(DriverRaceResult & { roundId: string; 
       kartNumber: result.kartNumber || '',
       position: parseInt(result.position?.toString() || '0'),
       fastestLap: result.fastestLap || '',
-      points: parseInt(result.points?.toString() || '0'),
+      points: 0, // Points are calculated dynamically, not stored
       raceType: result.raceType || 'qualification',
       raceName: result.raceName || '',
       confirmed: result.confirmed === 'true' || result.confirmed === true,
@@ -405,7 +417,7 @@ export async function getRaceResultsByRound(roundId: string): Promise<Race['resu
         driverName: driversMap.get(r.driverId) || '',
         position: r.position,
         fastestLap: r.fastestLap,
-        points: r.points,
+        points: 0, // Points are calculated dynamically, not stored
         raceType: r.raceType,
         raceName: r.raceName || '',
         confirmed: r.confirmed,
@@ -431,7 +443,6 @@ export async function addRaceResult(result: DriverRaceResult & { roundId: string
     result.kartNumber || '', // kartNumber column
     result.position.toString(),
     result.fastestLap || '',
-    result.points.toString(),
     result.raceType || 'qualification',
     result.raceName || '',
     result.confirmed ? 'true' : 'false',
@@ -480,7 +491,6 @@ export async function updateRaceResult(
     else if (headerLower === 'kartnumber') resultRow[index] = result.kartNumber || '';
     else if (headerLower === 'position') resultRow[index] = result.position.toString();
     else if (headerLower === 'fastestlap') resultRow[index] = result.fastestLap || '';
-    else if (headerLower === 'points') resultRow[index] = result.points.toString();
     else if (headerLower === 'racetype') resultRow[index] = raceType;
     else if (headerLower === 'racename') resultRow[index] = result.raceName || '';
     else if (headerLower === 'confirmed') resultRow[index] = result.confirmed ? 'true' : 'false';
@@ -710,5 +720,100 @@ export async function updateTeam(team: Team): Promise<void> {
 
 export async function deleteTeam(teamId: string): Promise<void> {
   await deleteRowById('Teams', teamId);
+}
+
+// Race Results Records operations (for saving standings snapshots)
+export interface RaceResultRecord {
+  id: string;
+  seasonId: string;
+  roundId: string;
+  division: Division;
+  raceType: string;
+  driverId: string;
+  driverName: string;
+  position: number;
+  fastestLap: string;
+  points: number;
+  rank: number;
+  createdAt: string;
+}
+
+export async function getRaceResultRecordsBySeason(seasonId: string): Promise<RaceResultRecord[]> {
+  try {
+    const rows = await readSheet('Race Results Records');
+    const records = rowsToObjects<any>(rows);
+    
+    return records
+      .filter((r: any) => r.seasonId === seasonId)
+      .map((record: any) => ({
+        id: record.id || '',
+        seasonId: record.seasonId || '',
+        roundId: record.roundId || '',
+        division: (record.division || 'Division 1') as Division,
+        raceType: record.raceType || 'final',
+        driverId: record.driverId || '',
+        driverName: record.driverName || '',
+        position: parseInt(record.position?.toString() || '0'),
+        fastestLap: record.fastestLap || '',
+        points: parseInt(record.points?.toString() || '0'),
+        rank: parseInt(record.rank?.toString() || '0'),
+        createdAt: record.createdAt || new Date().toISOString().split('T')[0],
+      }));
+  } catch (error) {
+    console.error('Error getting race result records:', error);
+    return [];
+  }
+}
+
+export async function getRaceResultRecords(
+  seasonId: string,
+  roundId: string,
+  division: Division,
+  raceType: string
+): Promise<RaceResultRecord[]> {
+  const allRecords = await getRaceResultRecordsBySeason(seasonId);
+  return allRecords.filter(
+    r => r.roundId === roundId && r.division === division && r.raceType === raceType
+  );
+}
+
+export async function addRaceResultRecord(record: RaceResultRecord): Promise<void> {
+  await appendRow('Race Results Records', [
+    record.id,
+    record.seasonId,
+    record.roundId,
+    record.division || 'Division 1',
+    record.raceType || 'final',
+    record.driverId,
+    record.driverName,
+    record.position.toString(),
+    record.fastestLap || '',
+    record.points.toString(),
+    record.rank.toString(),
+    record.createdAt || new Date().toISOString().split('T')[0],
+  ]);
+}
+
+export async function addRaceResultRecords(records: RaceResultRecord[]): Promise<void> {
+  // Add all records in a batch
+  for (const record of records) {
+    await addRaceResultRecord(record);
+  }
+}
+
+export async function deleteRaceResultRecord(recordId: string): Promise<void> {
+  await deleteRowById('Race Results Records', recordId);
+}
+
+export async function deleteRaceResultRecords(
+  seasonId: string,
+  roundId: string,
+  division: Division,
+  raceType: string
+): Promise<void> {
+  const records = await getRaceResultRecords(seasonId, roundId, division, raceType);
+  for (const record of records) {
+    await deleteRaceResultRecord(record.id);
+  }
 }
 
