@@ -91,19 +91,6 @@ id | seasonId | name | division | driverIds | createdAt
 
 **Note:** The `driverIds` column should contain comma-separated driver IDs (e.g., `driver-1,driver-2,driver-3`)
 
-### Sheet 7: "Race Results Records"
-Headers (Row 1):
-```
-id | seasonId | roundId | division | raceType | driverId | driverName | position | fastestLap | points | rank | createdAt
-```
-
-**Note:** 
-- This sheet stores snapshots of race result standings (rankings) for specific races
-- Each record represents one driver's result in a specific race (round + division + race type)
-- `rank` represents the driver's position in the standings for that race
-- `points` are calculated dynamically based on position and race type
-- Used in the Results tab for saving and viewing race result records
-
 
 ## 6. Share Spreadsheet with Service Account
 

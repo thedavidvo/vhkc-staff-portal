@@ -61,9 +61,6 @@ export default function ResultsPage() {
   const [drivers, setDrivers] = useState<any[]>([]);
   
   // Race Results Records state
-  const [recordRoundId, setRecordRoundId] = useState<string>('');
-  const [recordDivision, setRecordDivision] = useState<Division | ''>('');
-  const [recordRaceType, setRecordRaceType] = useState<string>('');
   const [isSavingRecord, setIsSavingRecord] = useState(false);
 
   // Helper function to parse time - time is in decimal format (e.g., 60.131)
@@ -156,33 +153,10 @@ export default function ResultsPage() {
     return Array.from(types).sort();
   }, [raceResults]);
 
-  // Calculate points for each result based on position and race type
-  const resultsWithPoints = useMemo(() => {
-    return raceResults.map(result => {
-      // Calculate points based on position and race type
-      // Check if there's a heat race for this round to determine points calculation
-      const roundHasHeat = raceResults.some(r => 
-        r.roundId === result.roundId && r.raceType === 'heat'
-      );
-      
-      const calculatedPoints = result.position > 0
-        ? getPointsForPosition(
-            result.position,
-            (result.raceType || 'qualification') as 'qualification' | 'heat' | 'final',
-            roundHasHeat
-          )
-        : 0;
-      
-      return {
-        ...result,
-        points: calculatedPoints,
-      };
-    });
-  }, [raceResults]);
-
-  // Filter results
-  const filteredResults = useMemo(() => {
-    let filtered = [...resultsWithPoints];
+  // Filter results and remove duplicates first, then calculate overall positions, then calculate points
+  // This ensures points are based on overall position (global ranking)
+  const filteredResultsWithDuplicates = useMemo(() => {
+    let filtered = [...raceResults];
 
     // Filter by divisions (multiple)
     if (selectedDivisions.length > 0) {
@@ -199,8 +173,105 @@ export default function ResultsPage() {
       filtered = filtered.filter(r => r.roundId === selectedRound);
     }
 
-    // Sort based on selected sort option
-    return filtered.sort((a, b) => {
+    // Remove duplicates: same driver in same round + division + raceType combination
+    // Keep the result with the best (lowest) position
+    const uniqueResultsMap = new Map<string, RaceResult>();
+    filtered.forEach(result => {
+      const key = `${result.roundId}-${result.driverId}-${result.division}-${result.raceType}`;
+      const existing = uniqueResultsMap.get(key);
+      if (!existing || result.position < existing.position || (result.position === existing.position && parseTime(result.fastestLap) < parseTime(existing.fastestLap))) {
+        uniqueResultsMap.set(key, result);
+      }
+    });
+    
+    return Array.from(uniqueResultsMap.values());
+  }, [raceResults, selectedDivisions, selectedRaceType, selectedRound, parseTime]);
+
+  // Calculate overall positions first (before points calculation)
+  const filteredResultsWithOverallPosition = useMemo(() => {
+    // Create a map to store overall positions
+    const positionMap = new Map<string, number>();
+    
+    // Sort all filtered results globally based on sortBy
+    const sorted = [...filteredResultsWithDuplicates].sort((a, b) => {
+      if (sortBy === 'time') {
+        const timeA = parseTime(a.fastestLap);
+        const timeB = parseTime(b.fastestLap);
+        if (timeA !== timeB) return timeA - timeB;
+        return a.position - b.position;
+      } else if (sortBy === 'points') {
+        // For points sort, use position as tiebreaker
+        return a.position - b.position;
+      } else {
+        // Default: Sort by position (race finish) - lowest position is best
+        return a.position - b.position;
+      }
+    });
+
+    // Assign global overall positions (1-based) across all races
+    sorted.forEach((result, index) => {
+      const key = `${result.roundId}-${result.driverId}-${result.division}-${result.raceType}`;
+      positionMap.set(key, index + 1);
+    });
+
+    // Map results with overall positions
+    return filteredResultsWithDuplicates.map(result => {
+      const key = `${result.roundId}-${result.driverId}-${result.division}-${result.raceType}`;
+      return {
+        ...result,
+        overallPosition: positionMap.get(key) || 0,
+      };
+    });
+  }, [filteredResultsWithDuplicates, sortBy, parseTime]);
+
+  // Calculate points based on overall position (not race finish position)
+  const resultsWithPoints = useMemo(() => {
+    // First, determine which races have heat races (grouped by round + division)
+    // Check ALL raceResults (not filtered) to properly detect heat races
+    const racesWithHeat = new Set<string>();
+    raceResults.forEach(result => {
+      if (result.raceType === 'heat') {
+        const raceKey = `${result.roundId}-${result.division}`;
+        racesWithHeat.add(raceKey);
+      }
+    });
+    
+    return filteredResultsWithOverallPosition.map(result => {
+      // Calculate points based on OVERALL POSITION and race type
+      // Check if there's a heat race for this specific round + division combination
+      const raceKey = `${result.roundId}-${result.division}`;
+      const roundDivisionHasHeat = racesWithHeat.has(raceKey);
+      
+      // Use overallPosition instead of position for points calculation
+      const positionForPoints = result.overallPosition || result.position;
+      
+      // Get the race type
+      const raceType = (result.raceType || 'qualification') as 'qualification' | 'heat' | 'final';
+      
+      // Calculate points: 
+      // - Final races ALWAYS use major points (regardless of heat race existence)
+      // - Minor points only used if heat race exists AND race type is not 'final'
+      // - Otherwise use standard/appropriate points based on race type
+      const calculatedPoints = positionForPoints > 0
+        ? getPointsForPosition(
+            positionForPoints,
+            raceType,
+            roundDivisionHasHeat
+          )
+        : 0;
+      
+      return {
+        ...result,
+        points: calculatedPoints,
+      };
+    });
+  }, [filteredResultsWithOverallPosition, raceResults]);
+
+  // Filter and sort results (points already calculated based on overall position)
+  const filteredResults = useMemo(() => {
+    // Results already have points calculated based on overall position
+    // Now just sort based on selected sort option
+    return [...resultsWithPoints].sort((a, b) => {
       // First sort by round date
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
@@ -215,71 +286,17 @@ export default function ResultsPage() {
       } else if (sortBy === 'points') {
         return b.points - a.points; // Descending
       } else {
-        // Default: by position
-        return a.position - b.position;
+        // Default: by overall position (since points are based on overall position)
+        return (a.overallPosition || 0) - (b.overallPosition || 0);
       }
     });
-  }, [resultsWithPoints, selectedDivisions, selectedRaceType, selectedRound, sortBy]);
+  }, [resultsWithPoints, sortBy, parseTime]);
 
-  // Calculate overall position based on sorted results
-  // Overall position is calculated within each race (round + raceType) based on the current sort order
+  // Results already have overall position and points calculated
+  // Just return the filtered results with all calculated values
   const resultsWithOverallPosition = useMemo(() => {
-    // Group by round and race type to calculate overall position per race
-    const grouped: Record<string, Record<string, RaceResult[]>> = {};
-    filteredResults.forEach(result => {
-      const roundKey = result.roundId;
-      const typeKey = result.raceType || 'unknown';
-      if (!grouped[roundKey]) {
-        grouped[roundKey] = {};
-      }
-      if (!grouped[roundKey][typeKey]) {
-        grouped[roundKey][typeKey] = [];
-      }
-      grouped[roundKey][typeKey].push(result);
-    });
-
-    // Create a map to store overall positions
-    const positionMap = new Map<string, number>();
-    
-    // Calculate overall position for each race group based on sortBy
-    Object.keys(grouped).forEach(roundKey => {
-      Object.keys(grouped[roundKey]).forEach(typeKey => {
-        const raceResults = grouped[roundKey][typeKey];
-        // Sort within each race group based on sortBy
-        const sorted = [...raceResults].sort((a, b) => {
-          if (sortBy === 'time') {
-            const timeA = parseTime(a.fastestLap);
-            const timeB = parseTime(b.fastestLap);
-            if (timeA !== timeB) return timeA - timeB;
-            // If times are equal, sort by position
-            return a.position - b.position;
-          } else if (sortBy === 'points') {
-            if (b.points !== a.points) return b.points - a.points;
-            // If points are equal, sort by position
-            return a.position - b.position;
-          } else {
-            // Sort by position (race finish)
-            return a.position - b.position;
-          }
-        });
-
-        // Assign overall positions (1-based)
-        sorted.forEach((result, index) => {
-          const key = `${result.roundId}-${result.driverId}-${result.raceType}`;
-          positionMap.set(key, index + 1);
-        });
-      });
-    });
-
-    // Map results with overall positions
-    return filteredResults.map(result => {
-      const key = `${result.roundId}-${result.driverId}-${result.raceType}`;
-      return {
-        ...result,
-        overallPosition: positionMap.get(key) || 0,
-      };
-    });
-  }, [filteredResults, sortBy]);
+    return filteredResults;
+  }, [filteredResults]);
 
   // Group results by round and race type for comparison
   const groupedResults = useMemo(() => {
@@ -299,17 +316,34 @@ export default function ResultsPage() {
   }, [filteredResults]);
 
   // Get standings for selected race (for Race Results Records)
+  // Use the main filter selections (selectedRound, selectedDivision, selectedRaceType)
   const selectedRaceStandings = useMemo(() => {
-    if (!recordRoundId || !recordDivision || !recordRaceType) {
+    // Only show standings if exactly one round, one division, and one race type are selected
+    if (!selectedRound || selectedDivisions.length !== 1 || !selectedRaceType) {
       return [];
     }
 
-    const standings = resultsWithPoints
+    const selectedDivision = selectedDivisions[0];
+
+    // Get unique drivers for this race (round + division + raceType)
+    // Group by driverId to avoid duplicates
+    const driverMap = new Map<string, RaceResult>();
+    
+    filteredResults
       .filter(r => 
-        r.roundId === recordRoundId && 
-        r.division === recordDivision && 
-        r.raceType === recordRaceType
+        r.roundId === selectedRound && 
+        r.division === selectedDivision && 
+        r.raceType === selectedRaceType
       )
+      .forEach(result => {
+        // Only keep the best result for each driver (lowest position)
+        const existing = driverMap.get(result.driverId);
+        if (!existing || result.position < existing.position) {
+          driverMap.set(result.driverId, result);
+        }
+      });
+
+    const standings = Array.from(driverMap.values())
       .sort((a, b) => {
         // Sort by position for ranking
         if (a.position !== b.position) {
@@ -324,19 +358,7 @@ export default function ResultsPage() {
       }));
 
     return standings;
-  }, [resultsWithPoints, recordRoundId, recordDivision, recordRaceType, parseTime]);
-
-  // Get unique race types from rounds for record selection
-  const availableRecordRaceTypes = useMemo(() => {
-    if (!recordRoundId || !recordDivision) return [];
-    const types = new Set<string>();
-    resultsWithPoints
-      .filter(r => r.roundId === recordRoundId && r.division === recordDivision)
-      .forEach(r => {
-        if (r.raceType) types.add(r.raceType);
-      });
-    return Array.from(types).sort();
-  }, [resultsWithPoints, recordRoundId, recordDivision]);
+  }, [filteredResults, selectedRound, selectedDivisions, selectedRaceType, parseTime]);
 
   if (loading) {
     return (
@@ -676,79 +698,17 @@ export default function ResultsPage() {
           </div>
 
           {/* Race Results Records Section */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6 mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Trophy className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Race Results Records</h2>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Round *
-                </label>
-                <select
-                  value={recordRoundId}
-                  onChange={(e) => {
-                    setRecordRoundId(e.target.value);
-                    setRecordRaceType(''); // Reset race type when round changes
-                  }}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="">Select a round</option>
-                  {rounds.map(round => (
-                    <option key={round.id} value={round.id}>
-                      Round {round.roundNumber}: {round.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Division *
-                </label>
-                <select
-                  value={recordDivision}
-                  onChange={(e) => {
-                    setRecordDivision(e.target.value as Division | '');
-                    setRecordRaceType(''); // Reset race type when division changes
-                  }}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="">Select division</option>
-                  <option value="Division 1">Division 1</option>
-                  <option value="Division 2">Division 2</option>
-                  <option value="Division 3">Division 3</option>
-                  <option value="Division 4">Division 4</option>
-                  <option value="New">New</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Race Type *
-                </label>
-                <select
-                  value={recordRaceType}
-                  onChange={(e) => setRecordRaceType(e.target.value)}
-                  disabled={!recordRoundId || !recordDivision}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select race type</option>
-                  {availableRecordRaceTypes.map(type => (
-                    <option key={type} value={type}>
-                      {type.charAt(0).toUpperCase() + type.slice(1)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="flex items-end">
+          {selectedRound && selectedDivisions.length === 1 && selectedRaceType && (
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Race Results Records</h2>
+                </div>
                 <button
                   onClick={async () => {
-                    if (!recordRoundId || !recordDivision || !recordRaceType || !selectedSeason) {
-                      alert('Please select Round, Division, and Race Type');
+                    if (!selectedRound || selectedDivisions.length !== 1 || !selectedRaceType || !selectedSeason) {
+                      alert('Please select exactly one Round, one Division, and one Race Type');
                       return;
                     }
                     
@@ -761,14 +721,15 @@ export default function ResultsPage() {
                       setIsSavingRecord(true);
                       const timestamp = Date.now();
                       const createdAt = new Date().toISOString().split('T')[0];
+                      const selectedDivision = selectedDivisions[0];
                       
                       // Prepare records to save
                       const recordsToSave = selectedRaceStandings.map((standing, index) => ({
                         id: `record-${timestamp}-${index}`,
                         seasonId: selectedSeason.id,
-                        roundId: recordRoundId,
-                        division: recordDivision,
-                        raceType: recordRaceType,
+                        roundId: selectedRound,
+                        division: selectedDivision,
+                        raceType: selectedRaceType,
                         driverId: standing.driverId,
                         driverName: standing.driverName,
                         position: standing.position,
@@ -798,8 +759,8 @@ export default function ResultsPage() {
                       setIsSavingRecord(false);
                     }
                   }}
-                  disabled={!recordRoundId || !recordDivision || !recordRaceType || selectedRaceStandings.length === 0 || isSavingRecord || !selectedSeason}
-                  className="w-full px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  disabled={selectedRaceStandings.length === 0 || isSavingRecord || !selectedSeason}
+                  className="px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isSavingRecord ? (
                     <>
@@ -814,67 +775,181 @@ export default function ResultsPage() {
                   )}
                 </button>
               </div>
-            </div>
-            
-            {/* Standings Table */}
-            {selectedRaceStandings.length > 0 && (
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50 dark:bg-slate-900">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Rank
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Position
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Driver
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Fastest Lap
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Points
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                    {selectedRaceStandings.map((standing, index) => (
-                      <tr key={standing.driverId} className="hover:bg-slate-50 dark:hover:bg-slate-700">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            {standing.rank === 1 && <Trophy className="w-4 h-4 text-amber-500" />}
-                            <span className="text-sm font-semibold text-slate-900 dark:text-white">
-                              {standing.rank}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-300">
-                          {standing.position}
-                        </td>
-                        <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white">
-                          {standing.driverName || 'Unknown Driver'}
-                        </td>
-                        <td className="px-4 py-3 text-sm font-mono text-slate-600 dark:text-slate-400">
-                          {standing.fastestLap || '-'}
-                        </td>
-                        <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white">
-                          {standing.points}
-                        </td>
+              
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                Showing standings for: <span className="font-semibold">{selectedDivisions[0]}</span> - <span className="font-semibold capitalize">{selectedRaceType}</span>
+              </p>
+              
+              {/* Standings Table */}
+              {selectedRaceStandings.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-slate-50 dark:bg-slate-900">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                          Rank
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                          Position
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                          Driver
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                          Fastest Lap
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                          Points
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                      {selectedRaceStandings.map((standing) => (
+                        <tr key={standing.driverId} className="hover:bg-slate-50 dark:hover:bg-slate-700">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              {standing.rank === 1 && <Trophy className="w-4 h-4 text-amber-500" />}
+                              <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                                {standing.rank}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-300">
+                            {standing.position}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white">
+                            {standing.driverName || 'Unknown Driver'}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-mono text-slate-600 dark:text-slate-400">
+                            {standing.fastestLap || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white">
+                            {standing.points}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-sm">
+                  No results found for the selected filters. Please adjust your filters or ensure race results exist for this combination.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Save Race Records Button - Always visible when filters are applied */}
+          {filteredResults.length > 0 && (
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-4 mb-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
+                    Save Race Results Records
+                  </h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Save the current filtered results to Race Results Records
+                  </p>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!selectedSeason) {
+                      alert('Please select a season');
+                      return;
+                    }
+                    
+                    if (filteredResults.length === 0) {
+                      alert('No results to save. Please adjust your filters.');
+                      return;
+                    }
+                    
+                    if (!window.confirm(`Save ${filteredResults.length} race result(s) to Race Results Records?`)) {
+                      return;
+                    }
+                    
+                    try {
+                      setIsSavingRecord(true);
+                      const timestamp = Date.now();
+                      const createdAt = new Date().toISOString().split('T')[0];
+                      
+                      // Group results by round + division + raceType to create records
+                      const recordsMap = new Map<string, RaceResult[]>();
+                      filteredResults.forEach(result => {
+                        const key = `${result.roundId}-${result.division}-${result.raceType}`;
+                        if (!recordsMap.has(key)) {
+                          recordsMap.set(key, []);
+                        }
+                        recordsMap.get(key)!.push(result);
+                      });
+                      
+                      // Prepare all records to save
+                      const allRecordsToSave: any[] = [];
+                      recordsMap.forEach((results, key) => {
+                        // Sort results by position for ranking
+                        const sortedResults = [...results].sort((a, b) => {
+                          if (a.position !== b.position) {
+                            return a.position - b.position;
+                          }
+                          return parseTime(a.fastestLap) - parseTime(b.fastestLap);
+                        });
+                        
+                        // Create records with ranks
+                        sortedResults.forEach((result, index) => {
+                          allRecordsToSave.push({
+                            id: `record-${timestamp}-${key}-${index}`,
+                            seasonId: selectedSeason.id,
+                            roundId: result.roundId,
+                            division: result.division,
+                            raceType: result.raceType,
+                            driverId: result.driverId,
+                            driverName: result.driverName,
+                            position: result.position,
+                            fastestLap: result.fastestLap || '',
+                            points: result.points,
+                            rank: index + 1,
+                            createdAt: createdAt,
+                          });
+                        });
+                      });
+                      
+                      // Save to Google Sheets via API
+                      const response = await fetch('/api/race-result-records', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(allRecordsToSave),
+                      });
+                      
+                      if (response.ok) {
+                        alert(`Successfully saved ${allRecordsToSave.length} race result records to Google Sheets`);
+                      } else {
+                        const errorData = await response.json();
+                        alert(`Failed to save records: ${errorData.error || 'Unknown error'}`);
+                      }
+                    } catch (error) {
+                      console.error('Failed to save race result records:', error);
+                      alert('Failed to save race result records. Please try again.');
+                    } finally {
+                      setIsSavingRecord(false);
+                    }
+                  }}
+                  disabled={filteredResults.length === 0 || isSavingRecord || !selectedSeason}
+                  className="px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isSavingRecord ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Save Records ({filteredResults.length})
+                    </>
+                  )}
+                </button>
               </div>
-            )}
-            
-            {recordRoundId && recordDivision && recordRaceType && selectedRaceStandings.length === 0 && (
-              <div className="mt-4 text-center py-8 text-slate-500 dark:text-slate-400 text-sm">
-                No results found for the selected race. Please ensure race results exist for this combination.
-              </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Results Table */}
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
@@ -943,7 +1018,13 @@ export default function ResultsPage() {
                           Round {result.roundNumber}: {result.roundName}
                         </td>
                         <td className="px-4 py-3">
-                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200 capitalize">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full capitalize ${
+                            result.raceType === 'final' 
+                              ? 'bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200'
+                              : result.raceType === 'heat'
+                              ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+                              : 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+                          }`}>
                             {result.raceType || 'N/A'}
                           </span>
                         </td>
