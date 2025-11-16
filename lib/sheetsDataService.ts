@@ -373,13 +373,17 @@ async function getRaceResults(): Promise<(DriverRaceResult & { roundId: string; 
     return results.map((result: any) => ({
       roundId: result.roundId || '',
       driverId: result.driverId || '',
+      driverAlias: result.driverAlias || '',
       driverName: '', // Will be populated when needed from Drivers sheet
       division: result.division || '',
       kartNumber: result.kartNumber || '',
+      gridPosition: parseInt(result.gridPosition?.toString() || '0'),
+      overallPosition: parseInt(result.overallPosition?.toString() || '0'),
       position: parseInt(result.position?.toString() || '0'),
       fastestLap: result.fastestLap || '',
       points: 0, // Points are calculated dynamically, not stored
       raceType: result.raceType || 'qualification',
+      finalType: result.finalType || '',
       raceName: result.raceName || '',
       confirmed: result.confirmed === 'true' || result.confirmed === true,
     }));
@@ -414,11 +418,16 @@ export async function getRaceResultsByRound(roundId: string): Promise<Race['resu
       .filter(r => r.division === division)
       .map(r => ({
         driverId: r.driverId,
+        driverAlias: (r as any).driverAlias || '',
         driverName: driversMap.get(r.driverId) || '',
+        kartNumber: r.kartNumber || '',
+        gridPosition: (r as any).gridPosition || 0,
+        overallPosition: (r as any).overallPosition || 0,
         position: r.position,
         fastestLap: r.fastestLap,
         points: 0, // Points are calculated dynamically, not stored
         raceType: r.raceType,
+        finalType: (r as any).finalType || '',
         raceName: r.raceName || '',
         confirmed: r.confirmed,
       }))
@@ -436,17 +445,27 @@ export async function getRaceResultsByRound(roundId: string): Promise<Race['resu
 }
 
 export async function addRaceResult(result: DriverRaceResult & { roundId: string; division: string; raceType?: string; raceName?: string; confirmed?: boolean }): Promise<void> {
-  await appendRow('Race Results', [
-    result.roundId,
-    result.driverId,
-    result.division,
-    result.kartNumber || '', // kartNumber column
-    result.position.toString(),
-    result.fastestLap || '',
-    result.raceType || 'qualification',
-    result.raceName || '',
-    result.confirmed ? 'true' : 'false',
-  ]);
+  // Build row based on current sheet headers to support optional columns like driverAlias/finalType
+  const rows = await readSheet('Race Results');
+  const headers = rows[0] || [];
+  const row: string[] = new Array(headers.length).fill('');
+  headers.forEach((header: string, index: number) => {
+    const h = (header || '').toLowerCase();
+    if (h === 'roundid') row[index] = result.roundId;
+    else if (h === 'driverid') row[index] = result.driverId;
+    else if (h === 'driveralias') row[index] = (result as any).driverAlias || '';
+    else if (h === 'division') row[index] = result.division;
+    else if (h === 'kartnumber') row[index] = result.kartNumber || '';
+    else if (h === 'gridposition') row[index] = (result as any).gridPosition?.toString() || '';
+    else if (h === 'overallposition') row[index] = (result as any).overallPosition?.toString() || '';
+    else if (h === 'position') row[index] = result.position.toString();
+    else if (h === 'fastestlap') row[index] = result.fastestLap || '';
+    else if (h === 'racetype') row[index] = (result.raceType || 'qualification') as string;
+    else if (h === 'finaltype') row[index] = (result as any).finalType || '';
+    else if (h === 'racename') row[index] = result.raceName || '';
+    else if (h === 'confirmed') row[index] = result.confirmed ? 'true' : 'false';
+  });
+  await appendRow('Race Results', row);
 }
 
 export async function updateRaceResult(
@@ -463,16 +482,28 @@ export async function updateRaceResult(
   const roundIdIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'roundid');
   const driverIdIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'driverid');
   const raceTypeIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'racetype');
+  const finalTypeIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'finaltype');
+  const raceNameIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'racename');
   
   const raceType = result.raceType || 'qualification';
+  const finalType = (result as any).finalType || '';
+  const raceName = result.raceName || '';
   
-  // Find row by roundId, driverId, AND raceType
+  // Find row by roundId, driverId, raceType and (if available) finalType or raceName
   const rowIndex = rows.findIndex((row, index) => {
     if (index === 0) return false; // Skip header
     const rowRoundId = row[roundIdIndex];
     const rowDriverId = row[driverIdIndex];
     const rowRaceType = raceTypeIndex >= 0 ? row[raceTypeIndex] : '';
-    return rowRoundId === roundId && rowDriverId === driverId && rowRaceType === raceType;
+    const baseMatch = rowRoundId === roundId && rowDriverId === driverId && rowRaceType === raceType;
+    if (!baseMatch) return false;
+    if (finalTypeIndex >= 0 && finalType) {
+      return (row[finalTypeIndex] || '') === finalType;
+    }
+    if (raceNameIndex >= 0 && raceName) {
+      return (row[raceNameIndex] || '') === raceName;
+    }
+    return true;
   });
   
   if (rowIndex === -1) {
@@ -487,22 +518,32 @@ export async function updateRaceResult(
     const headerLower = header?.toLowerCase() || '';
     if (headerLower === 'roundid') resultRow[index] = roundId;
     else if (headerLower === 'driverid') resultRow[index] = driverId;
+    else if (headerLower === 'driveralias') resultRow[index] = (result as any).driverAlias || '';
     else if (headerLower === 'division') resultRow[index] = result.division;
     else if (headerLower === 'kartnumber') resultRow[index] = result.kartNumber || '';
+    else if (headerLower === 'gridposition') resultRow[index] = ((result as any).gridPosition ?? '').toString();
+    else if (headerLower === 'overallposition') resultRow[index] = ((result as any).overallPosition ?? '').toString();
     else if (headerLower === 'position') resultRow[index] = result.position.toString();
     else if (headerLower === 'fastestlap') resultRow[index] = result.fastestLap || '';
     else if (headerLower === 'racetype') resultRow[index] = raceType;
-    else if (headerLower === 'racename') resultRow[index] = result.raceName || '';
+    else if (headerLower === 'finaltype') resultRow[index] = finalType;
+    else if (headerLower === 'racename') resultRow[index] = raceName;
     else if (headerLower === 'confirmed') resultRow[index] = result.confirmed ? 'true' : 'false';
     else resultRow[index] = rows[rowIndex][index] || '';
   });
   
-  // Delete and re-add to ensure correct update
-  await deleteRaceResult(roundId, driverId, raceType);
-  await addRaceResult({ ...result, roundId });
+  // Update row in place
+  const googleSheets = await import('./googleSheets');
+  const sheets = await googleSheets.getSheetsClient();
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: googleSheets.SPREADSHEET_ID,
+    range: `Race Results!A${rowIndex + 1}:Z${rowIndex + 1}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [resultRow] },
+  });
 }
 
-async function deleteRaceResult(roundId: string, driverId: string, raceType?: string): Promise<void> {
+async function deleteRaceResult(roundId: string, driverId: string, raceType?: string, finalType?: string, raceName?: string): Promise<void> {
   const rows = await readSheet('Race Results');
   if (rows.length < 2) return;
   
@@ -510,6 +551,8 @@ async function deleteRaceResult(roundId: string, driverId: string, raceType?: st
   const roundIdIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'roundid');
   const driverIdIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'driverid');
   const raceTypeIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'racetype');
+  const finalTypeIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'finaltype');
+  const raceNameIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'racename');
   
   // Find row by roundId, driverId, and optionally raceType
   const rowIndex = rows.findIndex((row, index) => {
@@ -517,11 +560,11 @@ async function deleteRaceResult(roundId: string, driverId: string, raceType?: st
     const rowRoundId = row[roundIdIndex];
     const rowDriverId = row[driverIdIndex];
     const rowRaceType = raceTypeIndex >= 0 ? row[raceTypeIndex] : '';
-    if (raceType) {
-      return rowRoundId === roundId && rowDriverId === driverId && rowRaceType === raceType;
-    } else {
-      return rowRoundId === roundId && rowDriverId === driverId;
-    }
+    if (raceType && !(rowRoundId === roundId && rowDriverId === driverId && rowRaceType === raceType)) return false;
+    if (!raceType && !(rowRoundId === roundId && rowDriverId === driverId)) return false;
+    if (finalTypeIndex >= 0 && finalType && (row[finalTypeIndex] || '') !== finalType) return false;
+    if (raceNameIndex >= 0 && raceName && (row[raceNameIndex] || '') !== raceName) return false;
+    return true;
   });
   
   if (rowIndex === -1) return;
@@ -571,7 +614,62 @@ export async function deleteRaceResultsByRaceType(roundId: string, raceType: str
   const raceTypeResults = results.filter(r => r.roundId === roundId && r.raceType === raceType);
   
   for (const result of raceTypeResults) {
-    await deleteRaceResult(roundId, result.driverId, raceType);
+    await deleteRaceResult(roundId, result.driverId, raceType, (result as any).finalType, result.raceName);
+  }
+}
+
+export async function deleteRaceResultsByRaceName(roundId: string, raceName: string): Promise<void> {
+  const results = await getRaceResults();
+  // Match by exact raceName string for this round
+  const nameResults = results.filter(r => r.roundId === roundId && (r.raceName || '') === raceName);
+
+  for (const result of nameResults) {
+    // Need raceType to locate the exact row for this driver result
+    await deleteRaceResult(roundId, result.driverId, result.raceType, (result as any).finalType, result.raceName);
+  }
+}
+
+export async function updateRaceResultsByRaceName(
+  roundId: string,
+  oldRaceName: string,
+  updates: { raceName?: string; raceType?: string; finalType?: string }
+): Promise<void> {
+  const rows = await readSheet('Race Results');
+  if (rows.length < 2) return;
+
+  const headers = rows[0];
+  const roundIdIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'roundid');
+  const raceNameIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'racename');
+  const raceTypeIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'racetype');
+  const finalTypeIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'finaltype');
+
+  const { getSheetsClient, SPREADSHEET_ID } = await import('./googleSheets');
+  const sheets = await getSheetsClient();
+
+  // Iterate rows and update those matching roundId + oldRaceName
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row) continue;
+    const rowRoundId = row[roundIdIndex];
+    const rowRaceName = row[raceNameIndex] || '';
+    if (rowRoundId === roundId && rowRaceName === oldRaceName) {
+      const updatedRow = [...row];
+      if (updates.raceName !== undefined && raceNameIndex >= 0) {
+        updatedRow[raceNameIndex] = updates.raceName;
+      }
+      if (updates.raceType !== undefined && raceTypeIndex >= 0) {
+        updatedRow[raceTypeIndex] = updates.raceType;
+      }
+      if (finalTypeIndex >= 0) {
+        updatedRow[finalTypeIndex] = updates.finalType || '';
+      }
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `Race Results!A${i + 1}:Z${i + 1}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [updatedRow] },
+      });
+    }
   }
 }
 
@@ -729,6 +827,7 @@ export interface RaceResultRecord {
   roundId: string;
   division: Division;
   raceType: string;
+  finalType?: string;
   driverId: string;
   driverName: string;
   position: number;
@@ -751,6 +850,7 @@ export async function getRaceResultRecordsBySeason(seasonId: string): Promise<Ra
         roundId: record.roundId || '',
         division: (record.division || 'Division 1') as Division,
         raceType: record.raceType || 'final',
+        finalType: record.finalType || '',
         driverId: record.driverId || '',
         driverName: record.driverName || '',
         position: parseInt(record.position?.toString() || '0'),
@@ -784,6 +884,7 @@ export async function addRaceResultRecord(record: RaceResultRecord): Promise<voi
     record.roundId,
     record.division || 'Division 1',
     record.raceType || 'final',
+    record.finalType || '',
     record.driverId,
     record.driverName,
     record.position.toString(),

@@ -37,6 +37,7 @@ interface RaceResult {
   fastestLap: string;
   points: number;
   raceType?: string;
+  finalType?: string;
 }
 
 export default function ResultsPage() {
@@ -59,6 +60,7 @@ export default function ResultsPage() {
     raceType: 'final',
   });
   const [drivers, setDrivers] = useState<any[]>([]);
+  const openDivisionsSet: Division[] = ['Division 3', 'Division 4', 'New'];
   
   // Race Results Records state
   const [isSavingRecord, setIsSavingRecord] = useState(false);
@@ -69,6 +71,50 @@ export default function ResultsPage() {
     // Time is already a decimal number, just parse it
     const time = parseFloat(timeStr);
     return isNaN(time) ? Infinity : time;
+  };
+
+  // Badge color helper for race type/final type
+  const getRaceTypeBadgeClasses = (raceType?: string, finalType?: string) => {
+    const type = (raceType || '').toLowerCase();
+    const ft = (finalType || '').toUpperCase();
+    if (type === 'final') {
+      // Different color per Final tier A..F
+      const map: Record<string, string> = {
+        A: 'bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200',
+        B: 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200',
+        C: 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200',
+        D: 'bg-lime-100 dark:bg-lime-900 text-lime-800 dark:text-lime-200',
+        E: 'bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200',
+        F: 'bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200',
+      };
+      return `px-2 py-1 text-xs font-semibold rounded-full ${map[ft] || map['A']}`;
+    }
+    if (type === 'heat') {
+      // Vary blues per A..F
+      const map: Record<string, string> = {
+        A: 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200',
+        B: 'bg-sky-100 dark:bg-sky-900 text-sky-800 dark:text-sky-200',
+        C: 'bg-cyan-100 dark:bg-cyan-900 text-cyan-800 dark:text-cyan-200',
+        D: 'bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200',
+        E: 'bg-violet-100 dark:bg-violet-900 text-violet-800 dark:text-violet-200',
+        F: 'bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200',
+      };
+      return `px-2 py-1 text-xs font-semibold rounded-full ${map[ft] || map['A']}`;
+    }
+    // Qualification groups get purple hues
+    if (type === 'qualification') {
+      const map: Record<string, string> = {
+        'GROUP 1': 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200',
+        'GROUP 2': 'bg-fuchsia-100 dark:bg-fuchsia-900 text-fuchsia-800 dark:text-fuchsia-200',
+        'GROUP 3': 'bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200',
+        'GROUP 4': 'bg-rose-100 dark:bg-rose-900 text-rose-800 dark:text-rose-200',
+        'GROUP 5': 'bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-200',
+        'GROUP 6': 'bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200',
+      };
+      return `px-2 py-1 text-xs font-semibold rounded-full ${map[(finalType || '').toUpperCase()] || map['GROUP 1']}`;
+    }
+    // Fallback
+    return 'px-2 py-1 text-xs font-semibold rounded-full bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
   };
 
   // Fetch rounds and race results
@@ -124,6 +170,7 @@ export default function ResultsPage() {
                       fastestLap: result.fastestLap || '',
                       points: 0, // Will be calculated dynamically
                       raceType: result.raceType || 'qualification',
+                      finalType: result.finalType || '',
                     });
                   });
                 });
@@ -177,7 +224,7 @@ export default function ResultsPage() {
     // Keep the result with the best (lowest) position
     const uniqueResultsMap = new Map<string, RaceResult>();
     filtered.forEach(result => {
-      const key = `${result.roundId}-${result.driverId}-${result.division}-${result.raceType}`;
+      const key = `${result.roundId}-${result.driverId}-${result.division}-${result.raceType}-${result.finalType || ''}`;
       const existing = uniqueResultsMap.get(key);
       if (!existing || result.position < existing.position || (result.position === existing.position && parseTime(result.fastestLap) < parseTime(existing.fastestLap))) {
         uniqueResultsMap.set(key, result);
@@ -194,6 +241,17 @@ export default function ResultsPage() {
     
     // Sort all filtered results globally based on sortBy
     const sorted = [...filteredResultsWithDuplicates].sort((a, b) => {
+      // For finals, prioritize by Final Type tier (A highest → F)
+      const isFinalA = (a.raceType || '').toLowerCase() === 'final';
+      const isFinalB = (b.raceType || '').toLowerCase() === 'final';
+      if (isFinalA && isFinalB) {
+        const finalOrder = ['A', 'B', 'C', 'D', 'E', 'F'];
+        const aIdx = finalOrder.indexOf((a.finalType || '').toUpperCase());
+        const bIdx = finalOrder.indexOf((b.finalType || '').toUpperCase());
+        const normA = aIdx === -1 ? Infinity : aIdx;
+        const normB = bIdx === -1 ? Infinity : bIdx;
+        if (normA !== normB) return normA - normB;
+      }
       if (sortBy === 'time') {
         const timeA = parseTime(a.fastestLap);
         const timeB = parseTime(b.fastestLap);
@@ -276,6 +334,19 @@ export default function ResultsPage() {
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
       if (dateA !== dateB) return dateA - dateB;
+      
+      // If comparing multiple finals, order by final type A..F first
+      const finalOrder = ['A', 'B', 'C', 'D', 'E', 'F'];
+      if ((a.raceType === 'final') && (b.raceType === 'final')) {
+        const aIdx = finalOrder.indexOf((a.finalType || '').toUpperCase());
+        const bIdx = finalOrder.indexOf((b.finalType || '').toUpperCase());
+        if (aIdx !== bIdx) {
+          // Unknown types go last
+          const normA = aIdx === -1 ? Infinity : aIdx;
+          const normB = bIdx === -1 ? Infinity : bIdx;
+          if (normA !== normB) return normA - normB;
+        }
+      }
       
       // Then by selected sort option
       if (sortBy === 'time') {
@@ -383,13 +454,13 @@ export default function ResultsPage() {
       <Header hideSearch />
       <div className="p-4 md:p-6">
         <div className="max-w-[95%] mx-auto">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
               Race Results
             </h1>
             <button
               onClick={() => setIsCreatingRecord(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-md"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-md"
             >
               <Plus className="w-5 h-5" />
               Create Race Result
@@ -634,12 +705,32 @@ export default function ResultsPage() {
                 </select>
               </div>
 
-              {/* Division Filter - Multiple */}
+              {/* Division Filter - Multiple (includes 'Open' aggregate) */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Divisions (Multiple)
                 </label>
-                <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-300 dark:border-slate-600 rounded-lg p-2">
+                <div className="space-y-2 max-h-48 overflow-y-auto border border-slate-300 dark:border-slate-600 rounded-lg p-2">
+                  {/* Open aggregate option */}
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={openDivisionsSet.every(d => selectedDivisions.includes(d))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          // Add all open divisions if not already present
+                          const toAdd = openDivisionsSet.filter(d => !selectedDivisions.includes(d));
+                          setSelectedDivisions([...selectedDivisions, ...toAdd]);
+                        } else {
+                          // Remove all open divisions
+                          setSelectedDivisions(selectedDivisions.filter(d => !openDivisionsSet.includes(d)));
+                        }
+                      }}
+                      className="rounded border-slate-300 dark:border-slate-600"
+                    />
+                    <span className="text-sm text-slate-700 dark:text-slate-300">Open (Division 3, Division 4, New)</span>
+                  </label>
+                  <div className="h-px bg-slate-200 dark:bg-slate-700 my-1" />
                   {['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'].map(division => (
                     <label key={division} className="flex items-center gap-2">
                       <input
@@ -691,7 +782,6 @@ export default function ResultsPage() {
                 >
                   <option value="position">By Grid Finish</option>
                   <option value="time">By Time</option>
-                  <option value="points">By Points</option>
                 </select>
               </div>
             </div>
@@ -700,7 +790,7 @@ export default function ResultsPage() {
           {/* Race Results Records Section */}
           {selectedRound && selectedDivisions.length === 1 && selectedRaceType && (
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6 mb-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2">
                   <Trophy className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Race Results Records</h2>
@@ -842,7 +932,7 @@ export default function ResultsPage() {
           {/* Save Race Records Button - Always visible when filters are applied */}
           {filteredResults.length > 0 && (
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-4 mb-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
                     Save Race Results Records
@@ -1010,7 +1100,7 @@ export default function ResultsPage() {
                           {result.driverName || 'Unknown Driver'}
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getDivisionColor(result.division)}`}>
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(result.division)}`}>
                             {result.division}
                           </span>
                         </td>
@@ -1018,14 +1108,12 @@ export default function ResultsPage() {
                           Round {result.roundNumber}: {result.roundName}
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full capitalize ${
-                            result.raceType === 'final' 
-                              ? 'bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200'
-                              : result.raceType === 'heat'
-                              ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
-                              : 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
-                          }`}>
-                            {result.raceType || 'N/A'}
+                          <span className={`whitespace-nowrap ${getRaceTypeBadgeClasses(result.raceType, (result as any).finalType)} capitalize`}>
+                            {result.raceType === 'final' && result.finalType
+                              ? `Final ${result.finalType.toUpperCase()}`
+                              : result.raceType
+                              ? result.raceType
+                              : 'N/A'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm font-mono text-slate-600 dark:text-slate-400">

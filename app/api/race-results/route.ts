@@ -31,6 +31,28 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function PATCH(request: NextRequest) {
+  try {
+    const payload = await request.json();
+    const { roundId, oldRaceName, newRaceName, raceType, finalType } = payload || {};
+    if (!roundId || !oldRaceName || !newRaceName) {
+      return NextResponse.json({ error: 'roundId, oldRaceName and newRaceName are required' }, { status: 400 });
+    }
+    const { updateRaceResultsByRaceName } = await import('@/lib/sheetsDataService');
+    await updateRaceResultsByRaceName(roundId, oldRaceName, {
+      raceName: newRaceName,
+      raceType,
+      finalType,
+    });
+    cache.invalidate(`race-results:${roundId}`);
+    cache.invalidate(`round-results:${roundId}`);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error in PATCH /api/race-results:', error);
+    return NextResponse.json({ error: 'Failed to update race name' }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const result = await request.json();
@@ -56,16 +78,22 @@ export async function PUT(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const roundId = searchParams.get('roundId');
     const driverId = searchParams.get('driverId');
+    const raceType = searchParams.get('raceType');
+    const finalType = searchParams.get('finalType');
     
     if (!roundId || !driverId) {
       return NextResponse.json({ error: 'roundId and driverId required' }, { status: 400 });
     }
     
     const result = await request.json();
-    // Ensure raceType is included in the result for proper matching
-    if (!result.raceType) {
+    // Use raceType from URL params if provided, otherwise from body
+    if (!result.raceType && !raceType) {
       return NextResponse.json({ error: 'raceType is required' }, { status: 400 });
     }
+    // Ensure the body has raceType and finalType for proper matching
+    if (raceType) result.raceType = raceType;
+    if (finalType) result.finalType = finalType;
+    
     await updateRaceResult(roundId, driverId, result);
     
     // Invalidate cache for this round and related caches
@@ -85,12 +113,19 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const roundId = searchParams.get('roundId');
     const raceType = searchParams.get('raceType');
+    const raceName = searchParams.get('raceName');
     
-    if (!roundId || !raceType) {
-      return NextResponse.json({ error: 'roundId and raceType required' }, { status: 400 });
+    if (!roundId || (!raceType && !raceName)) {
+      return NextResponse.json({ error: 'roundId and raceType or raceName required' }, { status: 400 });
     }
     
-    await deleteRaceResultsByRaceType(roundId, raceType);
+    if (raceName) {
+      // Prefer precise deletion by raceName when provided
+      const { deleteRaceResultsByRaceName } = await import('@/lib/sheetsDataService');
+      await deleteRaceResultsByRaceName(roundId, raceName);
+    } else if (raceType) {
+      await deleteRaceResultsByRaceType(roundId, raceType);
+    }
     
     // Invalidate cache for this round and related caches
     cache.invalidate(`race-results:${roundId}`);

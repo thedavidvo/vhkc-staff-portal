@@ -450,7 +450,7 @@ export default function DriversPage() {
                             {driver.name}
                           </td>
                           <td className="px-4 py-3 text-sm">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getDivisionColor(driver.division)}`}>
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(driver.division)}`}>
                               {driver.division}
                             </span>
                           </td>
@@ -621,7 +621,7 @@ export default function DriversPage() {
                           Division
                         </label>
                         <div className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-900">
-                          <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${getDivisionColor(selectedDriver.division)}`}>
+                          <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(selectedDriver.division)}`}>
                             {selectedDriver.division}
                           </span>
                         </div>
@@ -793,7 +793,7 @@ export default function DriversPage() {
                       </div>
                       <div>
                         <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Division</p>
-                        <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${getDivisionColor(selectedDriver.division)}`}>
+                        <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(selectedDriver.division)}`}>
                           {selectedDriver.division}
                         </span>
                       </div>

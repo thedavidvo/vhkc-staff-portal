@@ -31,6 +31,8 @@ export default function Dashboard() {
       if (isAuthenticated !== 'true') {
         // User is not authenticated, redirect to login
         router.replace('/login');
+        // Ensure we don't get stuck in a perpetual loading state if navigation is delayed
+        setIsCheckingAuth(false);
       } else {
         setIsCheckingAuth(false);
       }

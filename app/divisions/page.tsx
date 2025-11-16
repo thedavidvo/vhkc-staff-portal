@@ -323,7 +323,7 @@ export default function DivisionsPage() {
                               {driver.name}
                             </td>
                             <td className="px-2 py-3 text-sm sticky left-[200px] bg-white dark:bg-slate-800 z-10 w-32">
-                              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getDivisionColor(driver.division)}`}>
+                              <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(driver.division)}`}>
                                 {driver.division}
                               </span>
                             </td>

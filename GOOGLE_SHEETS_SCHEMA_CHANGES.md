@@ -20,21 +20,28 @@ roundId | driverId | division | kartNumber | position | fastestLap | points | ra
 
 **Current Schema:**
 ```
-roundId | driverId | division | kartNumber | position | fastestLap | raceType | raceName | confirmed
+roundId | driverId | division | kartNumber | position | fastestLap | raceType | finalType | raceName | confirmed
 ```
 
 **Changes:**
 - ❌ **Removed**: `points` column (points are calculated dynamically, not stored)
+- ✅ **Added**: `finalType` column — optional, used when `raceType` is `heat` or `final`
 - ✅ **Kept**: All other columns remain the same
 
 **Migration Steps:**
 1. Open the "Race Results" sheet
-2. Find the "points" column
-3. Delete the entire column (right-click on column header > Delete column)
-4. No data migration needed - points will be calculated automatically
+2. Find the "points" column and delete it (right-click on column header > Delete column)
+3. Insert a new column named `finalType` immediately after `raceType`
+4. Apply Data validation to `finalType`:
+   - Criteria: List of items
+   - Values: `A,B,C,D,E,F`
+   - Show warning (do not reject input) — optional
+5. Usage rule: Leave `finalType` blank unless `raceType` is `heat` or `final` (then choose A–F)
+6. No data migration needed for `finalType` unless you already track it elsewhere
 
 **Default Values:**
 - `raceType` defaults to `final` when creating new records
+- `finalType` has no default; choose A–F only when `raceType` is `heat` or `final`
 
 ---
 
@@ -65,7 +72,7 @@ id | seasonId | name | email | division | teamName | status | lastRacePosition |
 
 **Schema:**
 ```
-id | seasonId | roundId | division | raceType | driverId | driverName | position | fastestLap | points | rank | createdAt
+id | seasonId | roundId | division | raceType | finalType | driverId | driverName | position | fastestLap | points | rank | createdAt
 ```
 
 **Purpose:**
@@ -79,6 +86,7 @@ id | seasonId | roundId | division | raceType | driverId | driverName | position
 - `roundId`: Round this record is from
 - `division`: Division the driver was racing in
 - `raceType`: Type of race (`qualification`, `heat`, or `final`)
+- `finalType`: Only when `raceType` is `heat` or `final`; one of `A`–`F`
 - `driverId`: Driver ID
 - `driverName`: Driver name (for easy reference)
 - `position`: Finishing position in the race
@@ -91,6 +99,7 @@ id | seasonId | roundId | division | raceType | driverId | driverName | position
 1. Create a new sheet named "Race Results Records" (exact name, case-sensitive)
 2. Add the header row (row 1) with all column names listed above
 3. The sheet will be automatically populated when records are saved in the Results tab
+4. Apply Data validation to `finalType` as a list: `A,B,C,D,E,F` (optional warning)
 
 ---
 
@@ -108,13 +117,16 @@ Your Google Spreadsheet should have these sheets:
 
 **Note:** 
 - In the Results tab, "Create Race Result" creates a race result entry in the "Race Results" sheet
-- "Race Results Records" stores snapshots of standings for a specific race (round + division + race type)
+- "Race Results Records" stores snapshots of standings for a specific race (round + division + race type + optional final type)
 
 ---
 
 ## Quick Migration Checklist
 
 - [ ] Delete `points` column from "Race Results" sheet
+- [ ] Add `finalType` column after `raceType` in "Race Results" sheet
+- [ ] Add `finalType` column after `raceType` in "Race Results Records" sheet
+- [ ] Set Data validation for `finalType` to `A,B,C,D,E,F` (both sheets)
 - [ ] Update existing drivers to use `aliases` column (optional - backwards compatible)
 - [ ] Create new "Race Results Records" sheet with headers
 - [ ] Verify all sheet names match exactly (case-sensitive)
@@ -131,6 +143,8 @@ When creating new entries:
 - **Race Type**: Defaults to `final` in:
   - Results tab (Create Record modal)
   - Races page (Add Race Name modal)
+
+- **Final Type**: Only select (A–F) when `raceType` is `heat` or `final`
   
 - **Aliases**: Start with empty array, add aliases one at a time using Enter key
 
