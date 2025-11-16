@@ -34,7 +34,21 @@ function StatCard({ title, value, icon: Icon, gradient, onClick }: StatCardProps
   );
 }
 
-export default function StatsCards({ stats, onPromotedClick }: { stats: Stats; onPromotedClick?: () => void }) {
+interface StatsCardsProps {
+  stats: Stats;
+  onPromotedClick?: () => void;
+  onDemotedClick?: () => void;
+  onDriversClick?: () => void;
+  onDivisionsClick?: () => void;
+}
+
+export default function StatsCards({
+  stats,
+  onPromotedClick,
+  onDemotedClick,
+  onDriversClick,
+  onDivisionsClick,
+}: StatsCardsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
       <StatCard
@@ -42,6 +56,7 @@ export default function StatsCards({ stats, onPromotedClick }: { stats: Stats; o
         value={stats.totalDrivers}
         icon={Users}
         gradient="bg-gradient-to-br from-primary-500 to-primary-600"
+        onClick={onDriversClick}
       />
       <StatCard
         title="Drivers Promoted"
@@ -55,12 +70,14 @@ export default function StatsCards({ stats, onPromotedClick }: { stats: Stats; o
         value={stats.driversDemoted}
         icon={TrendingDown}
         gradient="bg-gradient-to-br from-red-500 to-red-600"
+        onClick={onDemotedClick}
       />
       <StatCard
         title="Active Divisions"
         value={stats.activeDivisions}
         icon={Trophy}
         gradient="bg-gradient-to-br from-amber-500 to-amber-600"
+        onClick={onDivisionsClick}
       />
     </div>
   );
