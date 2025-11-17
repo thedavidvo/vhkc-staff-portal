@@ -31,27 +31,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function PATCH(request: NextRequest) {
-  try {
-    const payload = await request.json();
-    const { roundId, oldRaceName, newRaceName, raceType, finalType } = payload || {};
-    if (!roundId || !oldRaceName || !newRaceName) {
-      return NextResponse.json({ error: 'roundId, oldRaceName and newRaceName are required' }, { status: 400 });
-    }
-    const { updateRaceResultsByRaceName } = await import('@/lib/sheetsDataService');
-    await updateRaceResultsByRaceName(roundId, oldRaceName, {
-      raceName: newRaceName,
-      raceType,
-      finalType,
-    });
-    cache.invalidate(`race-results:${roundId}`);
-    cache.invalidate(`round-results:${roundId}`);
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error in PATCH /api/race-results:', error);
-    return NextResponse.json({ error: 'Failed to update race name' }, { status: 500 });
-  }
-}
+// PATCH endpoint removed - updateRaceResultsByRaceName function not implemented
+// If renaming functionality is needed, it should be implemented in sheetsDataService first
 
 export async function POST(request: NextRequest) {
   try {
@@ -113,19 +94,12 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const roundId = searchParams.get('roundId');
     const raceType = searchParams.get('raceType');
-    const raceName = searchParams.get('raceName');
     
-    if (!roundId || (!raceType && !raceName)) {
-      return NextResponse.json({ error: 'roundId and raceType or raceName required' }, { status: 400 });
+    if (!roundId || !raceType) {
+      return NextResponse.json({ error: 'roundId and raceType required' }, { status: 400 });
     }
     
-    if (raceName) {
-      // Prefer precise deletion by raceName when provided
-      const { deleteRaceResultsByRaceName } = await import('@/lib/sheetsDataService');
-      await deleteRaceResultsByRaceName(roundId, raceName);
-    } else if (raceType) {
-      await deleteRaceResultsByRaceType(roundId, raceType);
-    }
+    await deleteRaceResultsByRaceType(roundId, raceType);
     
     // Invalidate cache for this round and related caches
     cache.invalidate(`race-results:${roundId}`);

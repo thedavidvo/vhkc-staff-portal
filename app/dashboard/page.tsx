@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import StatsCards from '@/components/StatsCards';
 import RaceHistory from '@/components/RaceHistory';
-import PromotionsModal from '@/components/PromotionsModal';
-import DemotionsModal from '@/components/DemotionsModal';
 import { useSeason } from '@/components/SeasonContext';
 import { Calendar, MapPin, Flag, Trophy, Medal, Award, Loader2 } from 'lucide-react';
 import { Division } from '@/types';
@@ -14,13 +12,8 @@ import { Division } from '@/types';
 export default function Dashboard() {
   const router = useRouter();
   const { selectedSeason } = useSeason();
-  const [isPromotionsModalOpen, setIsPromotionsModalOpen] = useState(false);
-  const [isDemotionsModalOpen, setIsDemotionsModalOpen] = useState(false);
-  const [promotions, setPromotions] = useState<any[]>([]);
-  const [demotions, setDemotions] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
   const [rounds, setRounds] = useState<any[]>([]);
-  const [raceResults, setRaceResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
@@ -31,8 +24,6 @@ export default function Dashboard() {
       if (isAuthenticated !== 'true') {
         // User is not authenticated, redirect to login
         router.replace('/login');
-        // Ensure we don't get stuck in a perpetual loading state if navigation is delayed
-        setIsCheckingAuth(false);
       } else {
         setIsCheckingAuth(false);
       }
@@ -47,7 +38,6 @@ export default function Dashboard() {
       if (!selectedSeason) {
         setDrivers([]);
         setRounds([]);
-        setRaceResults([]);
         setLoading(false);
         return;
       }
@@ -64,40 +54,15 @@ export default function Dashboard() {
           setDrivers(driversData);
         }
 
-        if (roundsResponse.ok) {
+          if (roundsResponse.ok) {
           const roundsData = await roundsResponse.json();
-          // Sort rounds by date
+          // Sort rounds by round number
           const sortedRounds = roundsData.sort((a: any, b: any) => {
-            const dateA = new Date(a.date || 0).getTime();
-            const dateB = new Date(b.date || 0).getTime();
-            return dateA - dateB;
+            const roundA = a.roundNumber || 0;
+            const roundB = b.roundNumber || 0;
+            return roundA - roundB;
           });
           setRounds(sortedRounds);
-
-          // Fetch race results for all rounds to track promotions/demotions
-          const allResults: any[] = [];
-          for (const round of sortedRounds) {
-            try {
-              const resultsResponse = await fetch(`/api/race-results?roundId=${round.id}`);
-              if (resultsResponse.ok) {
-                const resultsData = await resultsResponse.json();
-                resultsData.forEach((divisionResult: any) => {
-                  divisionResult.results?.forEach((result: any) => {
-                    allResults.push({
-                      ...result,
-                      roundId: round.id,
-                      roundName: round.name,
-                      roundDate: round.date,
-                      division: divisionResult.division,
-                    });
-                  });
-                });
-              }
-            } catch (error) {
-              console.error(`Error fetching results for round ${round.id}:`, error);
-            }
-          }
-          setRaceResults(allResults);
         }
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
@@ -109,109 +74,6 @@ export default function Dashboard() {
     fetchData();
   }, [selectedSeason]);
 
-  // Calculate promotions and demotions based on race results
-  useEffect(() => {
-    if (!selectedSeason || drivers.length === 0 || raceResults.length === 0) {
-      setPromotions([]);
-      setDemotions([]);
-      return;
-    }
-
-    // Track driver divisions by round
-    const driverDivisionsByRound: Record<string, Record<string, Division>> = {};
-    const roundsByDate = [...rounds].sort((a, b) => {
-      const dateA = new Date(a.date || 0).getTime();
-      const dateB = new Date(b.date || 0).getTime();
-      return dateA - dateB;
-    });
-
-    // Get current divisions for all drivers
-    const currentDivisions: Record<string, Division> = {};
-    drivers.forEach(driver => {
-      currentDivisions[driver.id] = driver.division;
-    });
-
-    // Process race results chronologically to track division changes
-    const promotionsList: any[] = [];
-    const demotionsList: any[] = [];
-    const divisionOrder: Division[] = ['New', 'Division 4', 'Division 3', 'Division 2', 'Division 1'];
-
-    roundsByDate.forEach(round => {
-      const roundResults = raceResults.filter(r => r.roundId === round.id);
-      
-      // Group results by division and calculate standings
-      const divisionStandings: Record<Division, any[]> = {
-        'Division 1': [],
-        'Division 2': [],
-        'Division 3': [],
-        'Division 4': [],
-        'New': [],
-      };
-
-      roundResults.forEach(result => {
-        const division = result.division as Division;
-        if (divisionStandings[division]) {
-          divisionStandings[division].push(result);
-        }
-      });
-
-      // Check for promotions/demotions after this round
-      Object.keys(divisionStandings).forEach(division => {
-        const standings = divisionStandings[division as Division]
-          .sort((a, b) => (a.position || 0) - (b.position || 0));
-        
-        // Top performers might be promoted, bottom performers might be demoted
-        // This is a simplified logic - you may want to adjust based on your rules
-        standings.forEach((result, index) => {
-          const driverId = result.driverId;
-          const previousDivision = currentDivisions[driverId] || 'New';
-          
-          // Check if driver should be promoted (top 3 in lower division)
-          if (index < 3 && division !== 'Division 1') {
-            const currentIndex = divisionOrder.indexOf(division as Division);
-            const nextDivision = divisionOrder[currentIndex + 1];
-            if (nextDivision && previousDivision === division) {
-              promotionsList.push({
-                driverId,
-                driverName: result.driverName || 'Unknown Driver',
-                fromDivision: division,
-                toDivision: nextDivision,
-                date: round.date || new Date().toISOString(),
-                roundName: round.name,
-              });
-            }
-          }
-          
-          // Check if driver should be demoted (bottom 3 in higher division)
-          if (index >= standings.length - 3 && division !== 'New') {
-            const currentIndex = divisionOrder.indexOf(division as Division);
-            const prevDivision = divisionOrder[currentIndex - 1];
-            if (prevDivision && previousDivision === division) {
-              demotionsList.push({
-                driverId,
-                driverName: result.driverName || 'Unknown Driver',
-                fromDivision: division,
-                toDivision: prevDivision,
-                date: round.date || new Date().toISOString(),
-                roundName: round.name,
-              });
-            }
-          }
-        });
-      });
-    });
-
-    // Remove duplicates and sort by date
-    const uniquePromotions = promotionsList.filter((p, index, self) =>
-      index === self.findIndex((t) => t.driverId === p.driverId && t.date === p.date)
-    );
-    const uniqueDemotions = demotionsList.filter((d, index, self) =>
-      index === self.findIndex((t) => t.driverId === d.driverId && t.date === d.date)
-    );
-
-    setPromotions(uniquePromotions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-    setDemotions(uniqueDemotions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-  }, [drivers, rounds, raceResults, selectedSeason]);
 
   // Calculate dynamic stats
   const stats = useMemo(() => {
@@ -219,11 +81,9 @@ export default function Dashboard() {
     const uniqueDivisions = new Set(drivers.map((d) => d.division));
     return {
       totalDrivers: activeDrivers.length,
-      driversPromoted: promotions.length,
-      driversDemoted: demotions.length,
       activeDivisions: uniqueDivisions.size,
     };
-  }, [promotions, demotions, drivers]);
+  }, [drivers]);
 
   // Convert rounds to races format for compatibility
   const races = useMemo(() => {
@@ -239,9 +99,13 @@ export default function Dashboard() {
     }));
   }, [rounds, selectedSeason]);
 
-  // Filter races by selected season
+  // Filter races by selected season and sort by round number
   const filteredRaces = useMemo(() => {
-    return races;
+    return [...races].sort((a, b) => {
+      const roundA = a.round || 0;
+      const roundB = b.round || 0;
+      return roundA - roundB;
+    });
   }, [races]);
 
   // Check if season has ended
@@ -327,25 +191,6 @@ export default function Dashboard() {
     return null;
   };
 
-  const handlePromotionConfirm = (driverId: string) => {
-    // In a real app, this would make an API call to confirm the promotion
-    setPromotions(promotions.filter((p) => p.driverId !== driverId));
-  };
-
-  const handlePromotionDecline = (driverId: string) => {
-    // In a real app, this would make an API call to decline the promotion
-    setPromotions(promotions.filter((p) => p.driverId !== driverId));
-  };
-
-  const handleDemotionConfirm = (driverId: string) => {
-    // In a real app, this would make an API call to confirm the demotion
-    setDemotions(demotions.filter((d) => d.driverId !== driverId));
-  };
-
-  const handleDemotionDecline = (driverId: string) => {
-    // In a real app, this would make an API call to decline the demotion
-    setDemotions(demotions.filter((d) => d.driverId !== driverId));
-  };
 
   // Show loading state while checking auth or loading data
   if (isCheckingAuth || loading) {
@@ -441,8 +286,6 @@ export default function Dashboard() {
 
           <StatsCards 
             stats={stats} 
-            onPromotedClick={() => setIsPromotionsModalOpen(true)}
-            onDemotedClick={() => setIsDemotionsModalOpen(true)}
             onDriversClick={() => router.push('/drivers')}
             onDivisionsClick={() => router.push('/divisions')}
           />
@@ -514,22 +357,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-
-      <PromotionsModal
-        isOpen={isPromotionsModalOpen}
-        onClose={() => setIsPromotionsModalOpen(false)}
-        promotions={promotions}
-        onConfirm={handlePromotionConfirm}
-        onDecline={handlePromotionDecline}
-      />
-
-      <DemotionsModal
-        isOpen={isDemotionsModalOpen}
-        onClose={() => setIsDemotionsModalOpen(false)}
-        demotions={demotions}
-        onConfirm={handleDemotionConfirm}
-        onDecline={handleDemotionDecline}
-      />
     </>
   );
 }

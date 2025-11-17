@@ -1,6 +1,6 @@
 'use client';
 
-import { Users, TrendingUp, TrendingDown, Trophy } from 'lucide-react';
+import { Users, Trophy } from 'lucide-react';
 import { Stats } from '@/types';
 
 interface StatCardProps {
@@ -36,41 +36,23 @@ function StatCard({ title, value, icon: Icon, gradient, onClick }: StatCardProps
 
 interface StatsCardsProps {
   stats: Stats;
-  onPromotedClick?: () => void;
-  onDemotedClick?: () => void;
   onDriversClick?: () => void;
   onDivisionsClick?: () => void;
 }
 
 export default function StatsCards({
   stats,
-  onPromotedClick,
-  onDemotedClick,
   onDriversClick,
   onDivisionsClick,
 }: StatsCardsProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
       <StatCard
         title="Total Registered Drivers"
         value={stats.totalDrivers}
         icon={Users}
         gradient="bg-gradient-to-br from-primary-500 to-primary-600"
         onClick={onDriversClick}
-      />
-      <StatCard
-        title="Drivers Promoted"
-        value={stats.driversPromoted}
-        icon={TrendingUp}
-        gradient="bg-gradient-to-br from-emerald-500 to-emerald-600"
-        onClick={onPromotedClick}
-      />
-      <StatCard
-        title="Drivers Demoted"
-        value={stats.driversDemoted}
-        icon={TrendingDown}
-        gradient="bg-gradient-to-br from-red-500 to-red-600"
-        onClick={onDemotedClick}
       />
       <StatCard
         title="Active Divisions"

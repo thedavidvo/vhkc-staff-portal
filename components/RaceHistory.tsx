@@ -12,9 +12,13 @@ export default function RaceHistory({ races }: RaceHistoryProps) {
   const [selectedRace, setSelectedRace] = useState<Race | null>(null);
   const [selectedDivision, setSelectedDivision] = useState<Division>('Division 1');
 
-  // Show all races sorted by date (first race at top)
+  // Show all races sorted by round number (first race at top)
   const sortedRaces = [...races].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    (a, b) => {
+      const roundA = a.round || a.roundNumber || 0;
+      const roundB = b.round || b.roundNumber || 0;
+      return roundA - roundB;
+    }
   );
 
   // Set default race to most recent if available

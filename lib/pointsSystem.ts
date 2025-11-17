@@ -76,10 +76,9 @@ export function getPointsForPosition(
     return 0;
   }
 
-  // Final races ALWAYS use standard points (highest points, e.g., 75 for position 1)
-  // This is the most important race type, so it should award the most points
+  // Final races: use major points (60 for 1st) if heat race exists, otherwise standard points (75 for 1st)
   if (raceType === 'final') {
-    return pointsEntry.standard;
+    return hasHeatRace ? pointsEntry.major : pointsEntry.standard;
   }
 
   // Heat races always use minor points

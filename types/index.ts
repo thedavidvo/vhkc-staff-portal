@@ -84,8 +84,6 @@ export interface Promotion {
 
 export interface Stats {
   totalDrivers: number;
-  driversPromoted: number;
-  driversDemoted: number;
   activeDivisions: number;
 }
 
@@ -106,5 +104,13 @@ export interface Season {
   endDate: string;
   numberOfRounds: number;
   rounds: Round[];
+}
+
+export interface CheckIn {
+  id: string;
+  roundId: string;
+  driverId: string;
+  checkedIn: boolean;
+  createdAt?: string;
 }
 

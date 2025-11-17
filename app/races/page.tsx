@@ -25,6 +25,59 @@ const getDivisionColor = (division: Division) => {
   }
 };
 
+// Helper function to parse race name for sorting
+// Returns { type: 'qual'|'heat'|'final', order: number }
+const parseRaceNameForSorting = (raceName: string): { type: string; order: number } => {
+  const upperName = raceName.toUpperCase();
+  
+  // Determine race type order: Qual = 1, Heat = 2, Final = 3
+  let typeOrder = 0;
+  let groupOrder = 0;
+  
+  if (upperName.startsWith('QUAL')) {
+    typeOrder = 1;
+    // Extract group number (e.g., "Qual Group 1" -> 1)
+    const groupMatch = raceName.match(/Group\s+(\d+)/i);
+    if (groupMatch) {
+      groupOrder = parseInt(groupMatch[1], 10);
+    }
+  } else if (upperName.startsWith('HEAT')) {
+    typeOrder = 2;
+    // Extract final type letter (e.g., "Heat A" -> 1 for A)
+    const letterMatch = raceName.match(/\s+([A-F])$/i);
+    if (letterMatch) {
+      const letter = letterMatch[1].toUpperCase();
+      groupOrder = letter.charCodeAt(0) - 64; // A=1, B=2, etc.
+    }
+  } else if (upperName.startsWith('FINAL')) {
+    typeOrder = 3;
+    // Extract final type letter (e.g., "Final A" -> 1 for A)
+    const letterMatch = raceName.match(/\s+([A-F])$/i);
+    if (letterMatch) {
+      const letter = letterMatch[1].toUpperCase();
+      groupOrder = letter.charCodeAt(0) - 64; // A=1, B=2, etc.
+    }
+  }
+  
+  return { type: typeOrder.toString(), order: groupOrder };
+};
+
+// Helper function to sort race names
+const sortRaceNames = (raceNames: string[]): string[] => {
+  return [...raceNames].sort((a, b) => {
+    const aParsed = parseRaceNameForSorting(a);
+    const bParsed = parseRaceNameForSorting(b);
+    
+    // First sort by race type (Qual, Heat, Final)
+    if (aParsed.type !== bParsed.type) {
+      return parseInt(aParsed.type, 10) - parseInt(bParsed.type, 10);
+    }
+    
+    // Then sort by group/letter order (1-6 for Qual, A-F for Heat/Final)
+    return aParsed.order - bParsed.order;
+  });
+};
+
 export default function RacesPage() {
   const { selectedSeason } = useSeason();
   const [rounds, setRounds] = useState<any[]>([]);
@@ -95,13 +148,9 @@ export default function RacesPage() {
   const [types, setTypes] = useState<string[]>([]);
   const [driverResults, setDriverResults] = useState<DriverRaceResult[]>([]);
   const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
-  const [isOpenView, setIsOpenView] = useState(false);
-  const [newTypeName, setNewTypeName] = useState('');
   const [selectedRaceType, setSelectedRaceType] = useState<'qualification' | 'heat' | 'final'>('final');
-  const [selectedFinalType, setSelectedFinalType] = useState<'A' | 'B' | 'C' | 'D' | 'E' | 'F'>('A');
-  const [selectedQualGroup, setSelectedQualGroup] = useState<'Group 1' | 'Group 2' | 'Group 3' | 'Group 4' | 'Group 5' | 'Group 6'>('Group 1');
-  const [isEditTypeMode, setIsEditTypeMode] = useState(false);
-  const [originalRaceName, setOriginalRaceName] = useState<string | null>(null);
+  const [selectedFinalType, setSelectedFinalType] = useState<string>('A');
+  const [selectedGroup, setSelectedGroup] = useState<string>('1');
   const shouldLoadResultsRef = useRef(true); // Track if we should load results from saved data
 
   // Fetch race results for a specific round
@@ -148,18 +197,10 @@ export default function RacesPage() {
 
   // Load division results when division is set and extract race types
   useEffect(() => {
-    if (selectedEvent && selectedEvent.results && (selectedDivision || isOpenView)) {
-      // When in "Open" view, aggregate Division 3, 4, and New
-      let divisionResults: any[] = [];
-      if (isOpenView) {
-        divisionResults = selectedEvent.results
-          .filter((r: any) => openDivisions.includes(r.division))
-          .flatMap((r: any) => r.results || []);
-      } else {
-        const divisionResult = selectedEvent.results.find((r: any) => r.division === selectedDivision);
-        divisionResults = (divisionResult && divisionResult.results) ? divisionResult.results : [];
-      }
-      if (divisionResults && divisionResults.length >= 0) {
+    if (selectedEvent && selectedDivision && selectedEvent.results) {
+      const divisionResult = selectedEvent.results.find((r: any) => r.division === selectedDivision);
+      if (divisionResult && divisionResult.results) {
+        const divisionResults = divisionResult.results || [];
         
         // Extract unique race types from saved results and populate types array
         // Use functional update to ensure we work with the latest types value
@@ -169,18 +210,37 @@ export default function RacesPage() {
           // First, collect all race types from saved results
           const savedRaceTypes = new Set<string>();
           divisionResults.forEach((result: any) => {
-            if (result.raceName && result.raceName.trim()) {
-              // Preserve the exact saved raceName for identity
-              savedRaceTypes.add(result.raceName);
-              uniqueRaceTypes.add(result.raceName);
-            } else if (result.raceType) {
-              // Fallback: construct from raceType if raceName not available
-              const raceTypeName = result.raceType.charAt(0).toUpperCase() + result.raceType.slice(1);
-              const raceName = `${raceTypeName} (${result.raceType})`;
+            if (result.raceName) {
+              // Use the saved raceName directly
+              let raceName = result.raceName;
+              
+              // Skip invalid race name patterns (e.g., "Qualification (qualification)", "Heat (heat)", "Final (final)")
+              const invalidPattern = /^(\w+)\s*\((\1)\)$/i;
+              if (invalidPattern.test(raceName)) {
+                // Skip invalid names like "Qualification (qualification)"
+                return;
+              }
+              
+              // Handle both old format "(qualification)" and new format "- qualification"
+              // Convert old format to new format if needed
+              const oldFormatMatch = raceName.match(/^(.+)\s*\((\w+)\)$/);
+              if (oldFormatMatch) {
+                const capitalizedRaceType = oldFormatMatch[2].charAt(0).toUpperCase() + oldFormatMatch[2].slice(1);
+                raceName = `${oldFormatMatch[1]} - ${capitalizedRaceType}`;
+              } else {
+                // Capitalize race type in new format "Name - type"
+                const newFormatMatch = raceName.match(/^(.+)\s*-\s*(\w+)$/);
+                if (newFormatMatch) {
+                  const capitalizedRaceType = newFormatMatch[2].charAt(0).toUpperCase() + newFormatMatch[2].slice(1);
+                  raceName = `${newFormatMatch[1]} - ${capitalizedRaceType}`;
+                }
+              }
               
               savedRaceTypes.add(raceName);
               uniqueRaceTypes.add(raceName);
             }
+            // Removed fallback logic that creates invalid names like "Qualification - Qualification"
+            // Only use raceName if it exists - skip results without valid raceName
           });
           
           // Only preserve manually added types that DON'T exist in saved results
@@ -210,11 +270,15 @@ export default function RacesPage() {
         const uniqueRaceTypesForSelection = new Set<string>();
         types.forEach(type => uniqueRaceTypesForSelection.add(type));
         divisionResults.forEach((result: any) => {
-          if (result.raceType) {
+          // Only use raceName if it exists and is not empty
+          // Skip fallback logic that creates invalid names like "Qualification (qualification)"
+          if (result.raceName && result.raceName.trim() !== '') {
             let raceName = result.raceName;
-            if (!raceName || raceName.trim() === '') {
-              const raceTypeName = result.raceType.charAt(0).toUpperCase() + result.raceType.slice(1);
-              raceName = `${raceTypeName} (${result.raceType})`;
+            // Clean up invalid race name patterns (e.g., "Qualification (qualification)", "Heat (heat)", "Final (final)")
+            const invalidPattern = /^(\w+)\s*\((\1)\)$/i;
+            if (invalidPattern.test(raceName)) {
+              // Skip invalid names like "Qualification (qualification)"
+              return;
             }
             if (!uniqueRaceTypesForSelection.has(raceName)) {
               uniqueRaceTypesForSelection.add(raceName);
@@ -230,23 +294,52 @@ export default function RacesPage() {
           setSelectedType(existingTypes[existingTypes.length - 1] || existingTypes[0] || null);
         }
         
-        // Update driver results when selectedType changes
+        // Only update driver results if we should load them (not when user is typing)
         // Use the first type if selectedType is null (it will be set above)
         const typeToUse = selectedType || existingTypes[0];
-        if (typeToUse) {
-          // Prefer exact raceName match; fall back to raceType if needed (legacy)
-          let filteredResults = divisionResults.filter((r: any) => (r.raceName || '').trim() === typeToUse);
-          if (filteredResults.length === 0) {
-            const match = typeToUse.match(/\((\w+)\)$/) || typeToUse.match(/- (\w+)$/);
-            const typeRaceType = match ? match[1] : null;
-            if (typeRaceType) {
-              filteredResults = divisionResults.filter((r: any) => (r.raceType || '').toLowerCase() === typeRaceType.toLowerCase());
+        if (shouldLoadResultsRef.current && typeToUse) {
+          // Extract race type from selectedType
+          // Handle new format: "Race Name - Qualification" -> "qualification"
+          // Handle old format: "Race Name (qualification)" -> "qualification"
+          let typeRaceType: string | null = null;
+          
+          // Try new format first (e.g., "Name - Type")
+          const newFormatMatch = typeToUse.match(/-\s*(\w+)$/);
+          if (newFormatMatch) {
+            typeRaceType = newFormatMatch[1].toLowerCase();
+          } else {
+            // Try old format (e.g., "Name (type)")
+            const oldFormatMatch = typeToUse.match(/\((\w+)\)$/);
+            if (oldFormatMatch) {
+              typeRaceType = oldFormatMatch[1].toLowerCase();
             }
           }
-          // Always update when selectedType changes to ensure UI displays correct data
-          setDriverResults([...filteredResults]);
-          shouldLoadResultsRef.current = false; // Reset flag after loading
-        } else {
+          
+          if (typeRaceType) {
+            const filteredResults = divisionResults.filter((r: any) => {
+              // Compare raceType in lowercase for case-insensitive matching
+              return r.raceType?.toLowerCase() === typeRaceType;
+            });
+            setDriverResults([...filteredResults]);
+          } else {
+            // If no race type match, try to match by exact raceName
+            const filteredResults = divisionResults.filter((r: any) => {
+              // Normalize raceName formats for comparison
+              let normalizedRaceName = r.raceName || '';
+              
+              // Convert old format to new format for comparison
+              const oldFormatMatch = normalizedRaceName.match(/^(.+)\s*\((\w+)\)$/);
+              if (oldFormatMatch) {
+                const capitalizedRaceType = oldFormatMatch[2].charAt(0).toUpperCase() + oldFormatMatch[2].slice(1);
+                normalizedRaceName = `${oldFormatMatch[1]} - ${capitalizedRaceType}`;
+              }
+              
+              return normalizedRaceName === typeToUse;
+            });
+            setDriverResults([...filteredResults]);
+          }
+          shouldLoadResultsRef.current = false; // Don't auto-load again until type/division changes
+        } else if (shouldLoadResultsRef.current && !typeToUse) {
           // If no type selected, show empty
           setDriverResults([]);
           shouldLoadResultsRef.current = false;
@@ -305,111 +398,52 @@ export default function RacesPage() {
     if (!selectedEvent) return;
     const newDivision: Division = 'New';
     setSelectedDivision(newDivision);
-    setIsOpenView(false);
     setSelectedType(null);
     setDriverResults([]);
   };
 
   const handleAddType = () => {
-    setIsEditTypeMode(false);
-    setOriginalRaceName(null);
-    setNewTypeName('');
-    setSelectedRaceType('qualification');
-    setSelectedFinalType('A');
-    setSelectedQualGroup('Group 1');
     setIsTypeModalOpen(true);
   };
 
-  const handleTypeModalSubmit = async () => {
-    const capitalizedRaceType = selectedRaceType.charAt(0).toUpperCase() + selectedRaceType.slice(1);
-    // Auto-generate the race name from type and final/group (no manual name input)
-    const composedRaceName =
-      selectedRaceType === 'final'
-        ? `${capitalizedRaceType} ${selectedFinalType}`
-        : selectedRaceType === 'heat'
-        ? `${capitalizedRaceType} ${selectedFinalType}`
-        : `Qualification ${selectedQualGroup}`;
-
-    // Duplicate Final Type check for Heat/Final
-    if (selectedRaceType === 'final' || selectedRaceType === 'heat') {
-      if (selectedEvent && selectedDivision) {
-        const divisionResult = selectedEvent.results?.find((r: any) => r.division === selectedDivision);
-        const existsSameFinalType = divisionResult?.results?.some((r: any) => {
-          const sameType = (r.raceType || '').toLowerCase() === selectedRaceType.toLowerCase();
-          const sameFinal = ((r.finalType || '').toUpperCase()) === selectedFinalType.toUpperCase();
-          const isSameRaceName = (r.raceName || '') === (originalRaceName || '');
-          return sameType && sameFinal && !isSameRaceName;
-        });
-        if (existsSameFinalType) {
-          alert(`A ${selectedRaceType} with Final Type ${selectedFinalType} already exists for this division.`);
-          return;
-        }
+  const handleTypeModalSubmit = () => {
+    if (selectedRaceType) {
+      let raceName = '';
+      const capitalizedRaceType = selectedRaceType.charAt(0).toUpperCase() + selectedRaceType.slice(1);
+      
+      if (selectedRaceType === 'qualification') {
+        // Format: "Qual Group 1"
+        raceName = `${capitalizedRaceType === 'Qualification' ? 'Qual' : capitalizedRaceType} Group ${selectedGroup}`;
+      } else if (selectedRaceType === 'heat') {
+        // Format: "Heat A"
+        raceName = `${capitalizedRaceType} ${selectedFinalType}`;
+      } else if (selectedRaceType === 'final') {
+        // Format: "Final A"
+        raceName = `${capitalizedRaceType} ${selectedFinalType}`;
       }
+      
+      // Use functional update to ensure we're working with the latest types value
+      setTypes((prevTypes) => {
+        // Check if this race name already exists
+        if (prevTypes.includes(raceName)) {
+          return prevTypes; // Don't add duplicates
+        }
+        return [...prevTypes, raceName];
+      });
+      setSelectedType(raceName);
+      setSelectedRaceType('final');
+      setSelectedFinalType('A');
+      setSelectedGroup('1');
+      setIsTypeModalOpen(false);
+      // Reset the load flag so empty spreadsheet will be shown
+      shouldLoadResultsRef.current = true;
     }
-
-    if (isEditTypeMode && originalRaceName && selectedEvent) {
-      // Rename existing race (and optionally update type/finalType)
-      try {
-        const payload: any = {
-          roundId: selectedEvent.id,
-          oldRaceName: originalRaceName,
-          newRaceName: composedRaceName,
-        };
-        if (selectedRaceType) payload.raceType = selectedRaceType;
-        if (selectedRaceType === 'final' || selectedRaceType === 'heat') {
-          payload.finalType = selectedFinalType;
-        } else if (selectedRaceType === 'qualification') {
-          payload.finalType = selectedQualGroup;
-        } else {
-          payload.finalType = '';
-        }
-        const response = await fetch('/api/race-results', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!response.ok) {
-          throw new Error('Failed to update race name');
-        }
-        // Update types list locally
-        setTypes((prev) => {
-          const next = prev.map((t) => (t === originalRaceName ? composedRaceName : t));
-          // Ensure uniqueness
-          return Array.from(new Set(next));
-        });
-        setSelectedType(composedRaceName);
-        setIsTypeModalOpen(false);
-        setIsEditTypeMode(false);
-        setOriginalRaceName(null);
-        // Refresh event results
-        const refreshedResults = await fetchRaceResults(selectedEvent.id);
-        setSelectedEvent({ ...selectedEvent, results: refreshedResults });
-        shouldLoadResultsRef.current = true;
-      } catch (e) {
-        console.error(e);
-        alert('Failed to update race name. Please try again.');
-      }
-      return;
-    }
-
-    // Create new race name
-    setTypes((prevTypes) => {
-      if (prevTypes.includes(composedRaceName)) {
-        return prevTypes; // Don't add duplicates
-      }
-      return [...prevTypes, composedRaceName];
-    });
-    setSelectedType(composedRaceName);
-    setNewTypeName('');
-    setSelectedRaceType('qualification');
-    setSelectedFinalType('A');
-    setIsTypeModalOpen(false);
-    // Reset the load flag so empty spreadsheet will be shown
-    shouldLoadResultsRef.current = true;
   };
 
   const handleTypeModalCancel = () => {
-    setNewTypeName('');
+    setSelectedRaceType('final');
+    setSelectedFinalType('A');
+    setSelectedGroup('1');
     setIsTypeModalOpen(false);
   };
 
@@ -420,11 +454,38 @@ export default function RacesPage() {
     
     if (!selectedEvent) return;
     
-    // Prefer precise deletion by exact raceName
-    if (selectedEvent) {
+    // Extract race type from typeName
+    // New format: "Qual Group 1", "Heat A", "Final A"
+    // Old format: "Race Name - qualification"
+    let raceType: string | null = null;
+    const upperType = typeName.toUpperCase();
+    
+    // Check for new format (no hyphen)
+    if (upperType.startsWith('QUAL')) {
+      raceType = 'qualification';
+    } else if (upperType.startsWith('HEAT')) {
+      raceType = 'heat';
+    } else if (upperType.startsWith('FINAL')) {
+      raceType = 'final';
+    } else {
+      // Fallback to old format with hyphen (e.g., "Race Name - Qualification" -> "qualification")
+      const match = typeName.match(/-?\s*(\w+)$/);
+      if (match) {
+        const typeStr = match[1].toLowerCase();
+        if (typeStr.includes('qual')) {
+          raceType = 'qualification';
+        } else if (typeStr.includes('heat')) {
+          raceType = 'heat';
+        } else if (typeStr.includes('final')) {
+          raceType = 'final';
+        }
+      }
+    }
+    
+    if (raceType && selectedEvent) {
       try {
-        // Delete race results for this specific race name from Google Sheets
-        const response = await fetch(`/api/race-results?roundId=${selectedEvent.id}&raceName=${encodeURIComponent(typeName)}`, {
+        // Delete race results from Google Sheets
+        const response = await fetch(`/api/race-results?roundId=${selectedEvent.id}&raceType=${raceType}`, {
           method: 'DELETE',
         });
         
@@ -438,7 +499,11 @@ export default function RacesPage() {
       }
     }
     
-    setTypes(types.filter((t) => t !== typeName));
+    // Update UI immediately: remove from types list
+    const updatedTypes = types.filter((t) => t !== typeName);
+    setTypes(updatedTypes);
+    
+    // Clear selected type if it was the deleted one
     if (selectedType === typeName) {
       setSelectedType(null);
       setDriverResults([]);
@@ -448,6 +513,41 @@ export default function RacesPage() {
     if (selectedEvent) {
       const refreshedResults = await fetchRaceResults(selectedEvent.id);
       setSelectedEvent({ ...selectedEvent, results: refreshedResults });
+      
+      // Force re-extraction of types from refreshed results
+      // This ensures the UI is in sync with the database
+      if (selectedDivision) {
+        const divisionResult = refreshedResults.find((r: any) => r.division === selectedDivision);
+        if (divisionResult && divisionResult.results) {
+          const divisionResults = divisionResult.results || [];
+          const uniqueRaceTypes = new Set<string>();
+          
+          // Collect race names from refreshed results
+          divisionResults.forEach((result: any) => {
+            if (result.raceName && result.raceName.trim() !== '') {
+              let raceName = result.raceName;
+              // Skip invalid race name patterns
+              const invalidPattern = /^(\w+)\s*\((\1)\)$/i;
+              if (invalidPattern.test(raceName)) {
+                return;
+              }
+              uniqueRaceTypes.add(raceName);
+            }
+          });
+          
+          // Update types list with fresh data from database
+          const freshTypes = Array.from(uniqueRaceTypes);
+          setTypes(freshTypes);
+          
+          // Auto-select a type if none is selected and types are available
+          if (!selectedType && freshTypes.length > 0) {
+            setSelectedType(freshTypes[0]);
+          }
+        } else {
+          // No results for this division, clear types
+          setTypes([]);
+        }
+      }
     }
   };
 
@@ -557,24 +657,6 @@ export default function RacesPage() {
     const validResults = driverResults.filter(
       (result) => (result.driverName?.trim() || result.driverAlias?.trim())
     );
-    // Check for partially filled rows (ignore gridPosition and overallPosition)
-    const partiallyFilledRowIndex = driverResults.findIndex((r) => {
-      const hasAny =
-        (r.driverName && r.driverName.trim().length > 0) ||
-        (r.driverAlias && r.driverAlias.trim().length > 0) ||
-        (r.kartNumber && r.kartNumber.toString().trim().length > 0) ||
-        (r.fastestLap && r.fastestLap.toString().trim().length > 0);
-      if (!hasAny) return false;
-      const hasDriver = (r.driverName && r.driverName.trim().length > 0) || (r.driverAlias && r.driverAlias.trim().length > 0);
-      const hasKart = r.kartNumber && r.kartNumber.toString().trim().length > 0;
-      const hasTime = r.fastestLap && r.fastestLap.toString().trim().length > 0;
-      // Require at minimum: a driver (name or alias). If a driver is present but missing kart or time, consider partial.
-      return (!hasDriver) || (hasDriver && (!hasKart || !hasTime));
-    });
-    if (partiallyFilledRowIndex !== -1) {
-      alert('Some rows are partially filled. Please complete all driver rows (Driver Name/Alias, Kart #, Best Time). You can ignore Grid/Overall.');
-      return;
-    }
     
     if (validResults.length === 0) {
       alert('No valid results to save. Please add at least one driver result.');
@@ -582,29 +664,55 @@ export default function RacesPage() {
     }
     
     try {
-      // Extract raceType from selectedType (e.g., "Race 1 (qualification)" -> "qualification")
+      // Extract raceType and finalType from selectedType
+      // New format: "Qual Group 1", "Heat A", "Final A"
+      // Old format: "Race Name - Type"
       if (!selectedType) {
         alert('Please select a race type before saving.');
         return;
       }
       
-      // Determine raceType from selectedType label (supports " - Final A", " - Heat B", " - Qualification")
-      const lower = selectedType.toLowerCase();
-      const raceType: 'qualification' | 'heat' | 'final' =
-        lower.includes('final') ? 'final' : lower.includes('heat') ? 'heat' : 'qualification';
-      // Derive finalType from the selected race name label when possible.
-      // Support formats like "Final B", "Heat C", with or without hyphen.
-      let parsedFinalType = '';
-      if (raceType === 'final' || raceType === 'heat') {
-        const m = selectedType.match(/(?:^|\s)(?:final|heat)\s+([A-F])$/i);
-        if (m && m[1]) {
-          parsedFinalType = m[1].toUpperCase();
+      let raceType = 'qualification';
+      let finalType = '';
+      const upperType = selectedType.toUpperCase();
+      
+      // Check for new format (no hyphen)
+      if (upperType.startsWith('QUAL')) {
+        raceType = 'qualification';
+        // Extract group number for qual (e.g., "Qual Group 1" -> group is "1")
+        // Store group number in finalType for qualification races
+        const groupMatch = selectedType.match(/Group\s+(\d+)/i);
+        if (groupMatch) {
+          finalType = groupMatch[1]; // Store group number in finalType
+        }
+      } else if (upperType.startsWith('HEAT')) {
+        raceType = 'heat';
+        // Extract final type letter (e.g., "Heat A" -> "A")
+        const letterMatch = selectedType.match(/\s+([A-F])$/i);
+        if (letterMatch) {
+          finalType = letterMatch[1].toUpperCase();
+        }
+      } else if (upperType.startsWith('FINAL')) {
+        raceType = 'final';
+        // Extract final type letter (e.g., "Final A" -> "A")
+        const letterMatch = selectedType.match(/\s+([A-F])$/i);
+        if (letterMatch) {
+          finalType = letterMatch[1].toUpperCase();
+        }
+      } else {
+        // Fallback to old format with hyphen (e.g., "Race Name - Qualification" -> "qualification")
+        const match = selectedType.match(/-?\s*(\w+)$/);
+        if (match) {
+          const typeStr = match[1].toLowerCase();
+          if (typeStr.includes('qual')) {
+            raceType = 'qualification';
+          } else if (typeStr.includes('heat')) {
+            raceType = 'heat';
+          } else if (typeStr.includes('final')) {
+            raceType = 'final';
+          }
         }
       }
-      const finalType =
-        raceType === 'final' || raceType === 'heat'
-          ? (parsedFinalType || selectedFinalType)
-          : selectedQualGroup;
       
       // Determine if there's a heat race (check if there are multiple race types for this round)
       const hasHeatRace = types.length > 1 || raceType === 'heat';
@@ -681,76 +789,66 @@ export default function RacesPage() {
           }
           
           // Points are calculated dynamically in results tab, not stored
-          const position = result.position || 0;
-          // Persist the row/UI division (do not override with driver profile division)
-          const divisionToSave = (result.division as Division) || selectedDivision;
+          // Qualification races don't have gridPosition or overallPosition
+          // Only set these for heat and final races
+          const isQualification = raceType === 'qualification';
+          
+          // For qualification races, use 0 for gridPosition and overallPosition
+          // For heat/final races, use the actual values or 0 as fallback
+          const gridPosition = isQualification ? 0 : (result.gridPosition || result.position || 0);
+          const overallPosition = isQualification ? 0 : (result.overallPosition || result.gridPosition || result.position || 0);
+          
+          // For qualification races, position might be calculated from fastest lap later
+          // For now, use 0 or the existing position if available
+          const position = isQualification ? (result.position || 0) : (result.overallPosition || result.gridPosition || result.position || 0);
           
           return {
             roundId: selectedEvent.id,
             driverId: driverId,
             driverAlias: result.driverAlias || '',
-            division: divisionToSave as Division,
-            kartNumber: result.kartNumber || '',
-            position: position,
-            gridPosition: result.gridPosition || 0,
-            overallPosition: result.overallPosition || 0,
+            division: selectedDivision,
+            position: position, // Include position for compatibility
+            gridPosition: gridPosition,
+            overallPosition: overallPosition,
             fastestLap: result.fastestLap || '',
             points: 0, // Points are calculated dynamically, not stored
             raceType: raceType,
-            finalType: finalType,
-            raceName: selectedType, // Save the full race name label
-            confirmed: false,
+            raceName: selectedType, // Save the full race name (e.g., "Qual Group 1", "Heat A", "Final A")
+            finalType: finalType, // Save the group number (1-6) for Qualification races, or final type (A-F) for Heat and Final races
           };
         })
       );
       
-      // Refresh latest results to avoid acting on stale cache and causing duplicates
-      const latestResults = await fetchRaceResults(selectedEvent.id);
-      const latestAll = (latestResults || []).flatMap((r: any) => r.results || []);
-      
-      // Check if any driver exists in a different final/heat type for this race type
-      if (raceType === 'final' || raceType === 'heat') {
-        const conflictingDrivers: string[] = [];
-        for (const result of resultsToSave) {
-          const existingInOtherFinal = latestAll.find((r: any) =>
-            r.driverId === result.driverId &&
-            (r.raceType || '') === (result.raceType || '') &&
-            ((r.finalType || '') !== ((result as any).finalType || '')) &&
-            (r.finalType || '') !== '' // Ignore if existing has no finalType
-          );
-          if (existingInOtherFinal) {
-            const driverName = drivers.find(d => d.id === result.driverId)?.name || result.driverId;
-            conflictingDrivers.push(`${driverName} (already in ${raceType === 'final' ? 'Final' : 'Heat'} ${existingInOtherFinal.finalType})`);
-          }
-        }
-        if (conflictingDrivers.length > 0) {
-          alert(`Cannot save: The following drivers are already in a different ${raceType}:\n${conflictingDrivers.join('\n')}\n\nPlease remove them from the other ${raceType} first, or remove them from this race.`);
-          return;
-        }
-      }
-      
       // Save each result to the API - use PUT if result already exists, POST if new
       const savePromises = resultsToSave.map(async (result) => {
-        const already = latestAll.find((r: any) =>
-          r.driverId === result.driverId &&
-          (r.raceType || '') === (result.raceType || '') &&
-          ((r.finalType || '') === ((result as any).finalType || ''))
-        );
-        if (already && result.driverId && !result.driverId.startsWith('temp-')) {
-          // Include raceType and finalType in URL for proper row identification
-          const raceTypeParam = encodeURIComponent(result.raceType || 'qualification');
-          const finalTypeParam = encodeURIComponent((result as any).finalType || '');
-          return fetch(`/api/race-results?roundId=${result.roundId}&driverId=${result.driverId}&raceType=${raceTypeParam}&finalType=${finalTypeParam}`, {
+        // Check if this result already exists in the saved results from the event
+        // We need to check by roundId, driverId, division, and raceType
+        let existingResult = null;
+        if (selectedEvent?.results) {
+          const divisionResult = selectedEvent.results.find((r: any) => r.division === selectedDivision);
+          if (divisionResult && divisionResult.results) {
+            existingResult = divisionResult.results.find((r: any) => 
+              r.driverId === result.driverId && 
+              r.raceType === result.raceType
+            );
+          }
+        }
+        
+        if (existingResult && result.driverId && !result.driverId.startsWith('temp-')) {
+          // Update existing result
+          return fetch(`/api/race-results?roundId=${result.roundId}&driverId=${result.driverId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(result),
           });
+        } else {
+          // Create new result
+          return fetch('/api/race-results', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(result),
+          });
         }
-        return fetch('/api/race-results', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(result),
-        });
       });
       
       const responses = await Promise.all(savePromises);
@@ -778,10 +876,20 @@ export default function RacesPage() {
               
               // Then, add race types from saved results
               divisionResult.results.forEach((result: any) => {
-                const raceName = (result.raceName && result.raceName.trim())
-                  ? result.raceName
-                  : `${result.raceType?.charAt(0).toUpperCase()}${result.raceType?.slice(1)} (${result.raceType})`;
-                uniqueRaceTypes.add(raceName);
+                // Only use raceName if it exists and is not empty
+                // Skip fallback logic that creates invalid names like "Qualification (qualification)"
+                if (result.raceName && result.raceName.trim() !== '') {
+                  let raceName = result.raceName;
+                  // Clean up invalid race name patterns (e.g., "Qualification (qualification)", "Heat (heat)", "Final (final)")
+                  const invalidPattern = /^(\w+)\s*\((\1)\)$/i;
+                  if (invalidPattern.test(raceName)) {
+                    // Skip invalid names like "Qualification (qualification)"
+                    return;
+                  }
+                  if (!uniqueRaceTypes.has(raceName)) {
+                    uniqueRaceTypes.add(raceName);
+                  }
+                }
               });
               
               // Update types array with unique race types found in results
@@ -802,14 +910,11 @@ export default function RacesPage() {
             // Filter by selected type if one is selected
             let filteredResults = divisionResults;
             if (selectedType) {
-              // Prefer exact raceName match; fall back to raceType if needed
-              filteredResults = divisionResults.filter((r: any) => (r.raceName || '').trim() === selectedType);
-              if (filteredResults.length === 0) {
-                const match = selectedType.match(/\((\w+)\)$/) || selectedType.match(/- (\w+)$/);
-                const typeRaceType = match ? match[1] : null;
-                if (typeRaceType) {
-                  filteredResults = divisionResults.filter((r: any) => (r.raceType || '').toLowerCase() === typeRaceType.toLowerCase());
-                }
+              // Extract race type from selectedType (e.g., "Race Name (qualification)" -> "qualification")
+              const match = selectedType.match(/\((\w+)\)$/);
+              const typeRaceType = match ? match[1] : null;
+              if (typeRaceType) {
+                filteredResults = divisionResults.filter((r: any) => r.raceType === typeRaceType);
               }
             }
             
@@ -849,9 +954,9 @@ export default function RacesPage() {
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-6">
           Races Management
         </h1>
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-6 flex-shrink-0">
+        <div className="grid grid-cols-12 gap-6 mb-6 flex-shrink-0">
           {/* Panel 1: Event */}
-          <div className="col-span-12 md:col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="p-2 border-b border-slate-200 dark:border-slate-700">
               <h2 className="text-base font-bold text-slate-900 dark:text-white">Event</h2>
             </div>
@@ -901,7 +1006,7 @@ export default function RacesPage() {
           </div>
 
           {/* Panel 2: Division */}
-          <div className="col-span-12 md:col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="p-2 border-b border-slate-200 dark:border-slate-700">
               <h2 className="text-base font-bold text-slate-900 dark:text-white">Division</h2>
             </div>
@@ -934,17 +1039,12 @@ export default function RacesPage() {
                             // For "Open", select Division 3 by default (or first available)
                             const firstOpenDiv = openDivisions[0];
                             setSelectedDivision(firstOpenDiv);
-                            setIsOpenView(true);
                             setSelectedType(null);
-                            // Aggregate results across open divisions
-                            const aggregated = (selectedEvent.results || [])
-                              .filter((r: any) => openDivisions.includes(r.division))
-                              .flatMap((r: any) => r.results || []);
-                            setDriverResults([...aggregated]);
+                            const divisionResults = selectedEvent.results?.find((r) => r.division === firstOpenDiv)?.results || [];
+                            setDriverResults([...divisionResults]);
                             setTypes([]);
                           } else {
                             setSelectedDivision(division as Division);
-                            setIsOpenView(false);
                             setSelectedType(null);
                             const divisionResults = selectedEvent.results?.find((r) => r.division === division)?.results || [];
                             setDriverResults([...divisionResults]);
@@ -976,7 +1076,7 @@ export default function RacesPage() {
           </div>
 
           {/* Panel 3: Race Name */}
-          <div className="col-span-12 md:col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="p-2 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
               <h2 className="text-base font-bold text-slate-900 dark:text-white">Race Name</h2>
               <button
@@ -991,7 +1091,7 @@ export default function RacesPage() {
               {selectedEvent && selectedDivision ? (
                 <div className="space-y-1">
                   {types.length > 0 ? (
-                    types.map((type) => (
+                    sortRaceNames(types).map((type) => (
                       <div
                         key={type}
                         onClick={(e) => {
@@ -1009,47 +1109,16 @@ export default function RacesPage() {
                         <span className="flex-1 font-medium">
                           {type}
                         </span>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Enter edit mode
-                              setIsEditTypeMode(true);
-                              setOriginalRaceName(type);
-                              // Prefill modal values based on saved results (if available)
-                              const divisionResult = selectedEvent?.results?.find((r: any) => r.division === selectedDivision);
-                              const match = divisionResult?.results?.find((r: any) => (r.raceName || '') === type);
-                              // No manual name; we only infer type/final/group
-                              setSelectedRaceType((((match as any)?.raceType) || 'qualification') as 'qualification' | 'heat' | 'final');
-                              const ft = ((((match as any)?.finalType) || 'A') as string).toUpperCase() as 'A'|'B'|'C'|'D'|'E'|'F';
-                              setSelectedFinalType(ft);
-                              // Qualification group default if editing a qualification
-                              if ((((match as any)?.raceType) || 'qualification') === 'qualification') {
-                                const grp = (((match as any)?.finalType) as any) || 'Group 1';
-                                setSelectedQualGroup(
-                                  (['Group 1','Group 2','Group 3','Group 4','Group 5','Group 6'].includes(grp) ? grp : 'Group 1') as any
-                                );
-                              } else {
-                                setSelectedQualGroup('Group 1');
-                              }
-                              setIsTypeModalOpen(true);
-                            }}
-                            className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-600"
-                            aria-label="Edit race name"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM12.172 5l-8.586 8.586V16h2.414L14.586 7.414 12.172 5z" /></svg>
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteType(type);
-                            }}
-                            className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-600"
-                            aria-label="Delete race name"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteType(type);
+                          }}
+                          className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="Delete race name"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     ))
                   ) : (
@@ -1118,17 +1187,17 @@ export default function RacesPage() {
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
           <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-            {isEditTypeMode ? 'Edit Race Name' : 'Add Race Name'}
+            Add Race Name
           </h3>
           <div className="mb-4">
-            {/* Removed manual Race Name input as it's redundant; name is auto-generated from type/final/group */}
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               Race Type
             </label>
             <select
               value={selectedRaceType}
               onChange={(e) => setSelectedRaceType(e.target.value as 'qualification' | 'heat' | 'final')}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary mb-3"
+              autoFocus
             >
               <option value="qualification">Qual</option>
               <option value="heat">Heat</option>
@@ -1136,32 +1205,46 @@ export default function RacesPage() {
             </select>
             {selectedRaceType === 'qualification' && (
               <>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 mt-3">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Group
                 </label>
                 <select
-                  value={selectedQualGroup}
-                  onChange={(e) => setSelectedQualGroup(e.target.value as any)}
+                  value={selectedGroup}
+                  onChange={(e) => setSelectedGroup(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleTypeModalSubmit();
+                    } else if (e.key === 'Escape') {
+                      handleTypeModalCancel();
+                    }
+                  }}
                 >
-                  <option value="Group 1">Group 1</option>
-                  <option value="Group 2">Group 2</option>
-                  <option value="Group 3">Group 3</option>
-                  <option value="Group 4">Group 4</option>
-                  <option value="Group 5">Group 5</option>
-                  <option value="Group 6">Group 6</option>
+                  <option value="1">Group 1</option>
+                  <option value="2">Group 2</option>
+                  <option value="3">Group 3</option>
+                  <option value="4">Group 4</option>
+                  <option value="5">Group 5</option>
+                  <option value="6">Group 6</option>
                 </select>
               </>
             )}
-            {(selectedRaceType === 'final' || selectedRaceType === 'heat') && (
+            {(selectedRaceType === 'heat' || selectedRaceType === 'final') && (
               <>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 mt-3">
-                  Final Type
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  {selectedRaceType === 'heat' ? 'Final Type' : 'Final Type'}
                 </label>
                 <select
                   value={selectedFinalType}
-                  onChange={(e) => setSelectedFinalType(e.target.value as 'A' | 'B' | 'C' | 'D' | 'E' | 'F')}
+                  onChange={(e) => setSelectedFinalType(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleTypeModalSubmit();
+                    } else if (e.key === 'Escape') {
+                      handleTypeModalCancel();
+                    }
+                  }}
                 >
                   <option value="A">A</option>
                   <option value="B">B</option>
@@ -1170,9 +1253,6 @@ export default function RacesPage() {
                   <option value="E">E</option>
                   <option value="F">F</option>
                 </select>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Choose a Final Type when Race Type is Heat or Final.
-                </p>
               </>
             )}
           </div>
@@ -1187,7 +1267,7 @@ export default function RacesPage() {
               onClick={handleTypeModalSubmit}
               className="px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all shadow-md"
             >
-              {isEditTypeMode ? 'Save' : 'Add'}
+              Add
             </button>
           </div>
         </div>
@@ -1216,6 +1296,8 @@ function SpreadsheetTable({
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<Record<number, number>>({});
   const [showSuggestions, setShowSuggestions] = useState<Record<number, boolean>>({});
   const [dropdownPosition, setDropdownPosition] = useState<Record<number, { top: number; left: number; width: number }>>({});
+  const blurTimeoutRef = useRef<Record<number, NodeJS.Timeout>>({});
+  const inputRef = useRef<Record<number, HTMLInputElement | null>>({});
   
   // Determine if this is a qualification race
   const isQualification = type?.toLowerCase().includes('qual') || type?.toLowerCase().includes('qualification');
@@ -1238,13 +1320,13 @@ function SpreadsheetTable({
     ? ['driverName', 'driverAlias', 'division', 'kartNumber', 'fastestLap']
     : ['driverName', 'driverAlias', 'division', 'kartNumber', 'gridPosition', 'overallPosition', 'fastestLap'];
 
-  // Merge saved/working results with defaults:
-  // - If we have 3+ working rows, show them all (enables adding more entries)
-  // - Otherwise, show at least 3 default rows with any existing results overlaid
-  const rowsToDisplay: DriverRaceResult[] =
-    results.length >= 3
-      ? results
-      : defaultRows.map((row, i) => (typeof results[i] !== 'undefined' ? results[i] : row));
+  // Merge saved results with default rows
+  const rowsToDisplay = [...defaultRows];
+  results.forEach((result, index) => {
+    if (index < 3) {
+      rowsToDisplay[index] = result;
+    }
+  });
 
   // Function to get matching drivers based on input
   const getMatchingDrivers = (input: string): any[] => {
@@ -1266,11 +1348,24 @@ function SpreadsheetTable({
   const handleDriverNameChange = (index: number, value: string) => {
     onUpdate(index, 'driverName', value);
     
+    // Clear any pending blur timeout to prevent suggestions from hiding while typing
+    if (blurTimeoutRef.current[index]) {
+      clearTimeout(blurTimeoutRef.current[index]);
+    }
+    
     // Get matching drivers for suggestions
     const matches = getMatchingDrivers(value);
     setSuggestions(prev => ({ ...prev, [index]: matches }));
     setShowSuggestions(prev => ({ ...prev, [index]: matches.length > 0 && value.trim().length > 0 }));
     setActiveSuggestionIndex(prev => ({ ...prev, [index]: -1 }));
+    
+    // Ensure input stays focused
+    setTimeout(() => {
+      const input = inputRef.current[index];
+      if (input && document.activeElement !== input) {
+        input.focus();
+      }
+    }, 0);
     
     // Don't auto-fill - let user choose from dropdown
   };
@@ -1298,9 +1393,8 @@ function SpreadsheetTable({
         updates.driverAlias = aliasToUse;
       }
       
-      // Auto-populate the driver's division from their profile for convenience
       if (driver.division) {
-        updates.division = driver.division as Division;
+        updates.division = driver.division;
       }
       
       if (driver.id) {
@@ -1314,9 +1408,8 @@ function SpreadsheetTable({
       if (aliasToUse) {
         onUpdate(index, 'driverAlias', aliasToUse);
       }
-      // Auto-populate division when selecting a driver
       if (driver.division) {
-        onUpdate(index, 'division', driver.division as Division);
+        onUpdate(index, 'division', driver.division);
       }
       if (driver.id) {
         onUpdate(index, 'driverId', driver.id);
@@ -1408,11 +1501,26 @@ function SpreadsheetTable({
                           setSuggestions(prev => ({ ...prev, [index]: matches }));
                         }
                       }}
-                      onBlur={() => {
+                      onBlur={(e) => {
+                        // Clear any existing timeout
+                        if (blurTimeoutRef.current[index]) {
+                          clearTimeout(blurTimeoutRef.current[index]);
+                        }
+                        
                         // Delay hiding suggestions to allow clicking on them
-                        setTimeout(() => {
-                          setShowSuggestions(prev => ({ ...prev, [index]: false }));
+                        // Only hide if focus is not moving to the dropdown
+                        blurTimeoutRef.current[index] = setTimeout(() => {
+                          // Check if the newly focused element is within the dropdown
+                          const activeElement = document.activeElement;
+                          const dropdown = document.querySelector(`[data-dropdown-index="${index}"]`);
+                          
+                          if (!dropdown?.contains(activeElement)) {
+                            setShowSuggestions(prev => ({ ...prev, [index]: false }));
+                          }
                         }, 200);
+                      }}
+                      ref={(el) => {
+                        inputRef.current[index] = el;
                       }}
                       onKeyDown={(e) => {
                         const currentSuggestions = suggestions[index] || [];
@@ -1456,20 +1564,7 @@ function SpreadsheetTable({
                           }
                         } else if (e.key === 'Enter' && !currentSuggestions.length) {
                           e.preventDefault();
-                          const isLastRow = index === rowsToDisplay.length - 1;
-                          if (isLastRow) {
-                            // Force add a new row and focus next row alias field
-                            const currentValue = (e.currentTarget as HTMLInputElement).value || '';
-                            onUpdate(index, 'driverName', currentValue, true);
-                            setTimeout(() => {
-                              const nextRowAlias = document.querySelector(
-                                `input[data-row="${index + 1}"][data-field="driverAlias"]`
-                              ) as HTMLInputElement;
-                              (nextRowAlias || document.querySelector(
-                                `input[data-row="${index + 1}"][data-field="driverName"]`
-                              ) as HTMLInputElement)?.focus();
-                            }, 0);
-                          } else {
+                          if (index < rowsToDisplay.length - 1) {
                             const nextRowInput = document.querySelector(
                               `input[data-row="${index + 1}"][data-field="driverName"]`
                             ) as HTMLInputElement;
@@ -1483,13 +1578,21 @@ function SpreadsheetTable({
                       placeholder="Name"
                     />
                     {showSuggestions[index] && (suggestions[index] || []).length > 0 && dropdownPosition[index] && (
-                      <div className="fixed bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl shadow-2xl overflow-y-auto" style={{ 
-                        zIndex: 1000, 
-                        maxHeight: '400px',
-                        minWidth: '300px',
-                        top: `${dropdownPosition[index].top}px`,
-                        left: `${dropdownPosition[index].left}px`
-                      }}>
+                      <div 
+                        data-dropdown-index={index}
+                        className="fixed bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl shadow-2xl overflow-y-auto" 
+                        style={{ 
+                          zIndex: 1000, 
+                          maxHeight: '400px',
+                          minWidth: '300px',
+                          top: `${dropdownPosition[index].top}px`,
+                          left: `${dropdownPosition[index].left}px`
+                        }}
+                        onMouseDown={(e) => {
+                          // Prevent blur when clicking on dropdown
+                          e.preventDefault();
+                        }}
+                      >
                         {(suggestions[index] || []).map((driver, suggestionIndex) => {
                           const driverAliases = driver.aliases || [];
                           const hasMultipleAliases = driverAliases.length > 1;
@@ -1518,7 +1621,7 @@ function SpreadsheetTable({
                                       </div>
                                     )}
                                   </div>
-                                  <div className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${getDivisionColor(driver.division)}`}>
+                                  <div className={`px-3 py-1 rounded-full text-xs font-semibold ${getDivisionColor(driver.division)}`}>
                                     {driver.division}
                                   </div>
                                 </div>
@@ -1586,21 +1689,12 @@ function SpreadsheetTable({
                         }
                       } else if (e.key === 'Enter') {
                         e.preventDefault();
-                      const isLastRow = index === rowsToDisplay.length - 1;
-                      if (isLastRow) {
-                        onUpdate(index, 'driverAlias', (e.currentTarget as HTMLInputElement).value || '', true);
-                        setTimeout(() => {
-                          const nextRowName = document.querySelector(
-                            `input[data-row="${index + 1}"][data-field="driverName"]`
+                        if (index < rowsToDisplay.length - 1) {
+                          const nextRowInput = document.querySelector(
+                            `input[data-row="${index + 1}"][data-field="driverAlias"]`
                           ) as HTMLInputElement;
-                          nextRowName?.focus();
-                        }, 0);
-                      } else {
-                        const nextRowInput = document.querySelector(
-                          `input[data-row="${index + 1}"][data-field="driverAlias"]`
-                        ) as HTMLInputElement;
-                        nextRowInput?.focus();
-                      }
+                          nextRowInput?.focus();
+                        }
                       }
                     }}
                     data-row={index}

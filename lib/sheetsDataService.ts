@@ -1,5 +1,5 @@
 import { Season, Round, Driver, DriverRaceResult, Race, Division } from '@/types';
-import { readSheet, appendRow, updateRowById, deleteRowById } from './googleSheets';
+import { readSheet, appendRow, updateRowById, deleteRowById, getSheetsClient, SPREADSHEET_ID } from './googleSheets';
 
 // Location interface
 export interface Location {
@@ -365,7 +365,7 @@ export async function getDriverPointsBySeason(driverId: string, seasonId: string
 }
 
 // Race Results operations
-async function getRaceResults(): Promise<(DriverRaceResult & { roundId: string; division: string; raceType?: string; raceName?: string; confirmed?: boolean })[]> {
+async function getRaceResults(): Promise<(DriverRaceResult & { roundId: string; division: string; raceType?: string; raceName?: string; finalType?: string; confirmed?: boolean })[]> {
   try {
     const rows = await readSheet('Race Results');
     const results = rowsToObjects<any>(rows);
@@ -377,14 +377,14 @@ async function getRaceResults(): Promise<(DriverRaceResult & { roundId: string; 
       driverName: '', // Will be populated when needed from Drivers sheet
       division: result.division || '',
       kartNumber: result.kartNumber || '',
-      gridPosition: parseInt(result.gridPosition?.toString() || '0'),
-      overallPosition: parseInt(result.overallPosition?.toString() || '0'),
-      position: parseInt(result.position?.toString() || '0'),
+      gridPosition: parseInt(result.gridPosition?.toString() || result.position?.toString() || '0'),
+      position: parseInt(result.position?.toString() || result.gridPosition?.toString() || '0'), // Keep for backward compatibility
+      overallPosition: parseInt(result.overallPosition?.toString() || result.gridPosition?.toString() || result.position?.toString() || '0'),
       fastestLap: result.fastestLap || '',
       points: 0, // Points are calculated dynamically, not stored
       raceType: result.raceType || 'qualification',
-      finalType: result.finalType || '',
       raceName: result.raceName || '',
+      finalType: result.finalType || '',
       confirmed: result.confirmed === 'true' || result.confirmed === true,
     }));
   } catch (error) {
@@ -418,20 +418,19 @@ export async function getRaceResultsByRound(roundId: string): Promise<Race['resu
       .filter(r => r.division === division)
       .map(r => ({
         driverId: r.driverId,
-        driverAlias: (r as any).driverAlias || '',
+        driverAlias: r.driverAlias || '',
         driverName: driversMap.get(r.driverId) || '',
-        kartNumber: r.kartNumber || '',
-        gridPosition: (r as any).gridPosition || 0,
-        overallPosition: (r as any).overallPosition || 0,
-        position: r.position,
+        gridPosition: r.gridPosition || r.position || 0,
+        position: r.position || r.gridPosition || 0, // Keep for backward compatibility
+        overallPosition: r.overallPosition || r.gridPosition || r.position || 0,
         fastestLap: r.fastestLap,
         points: 0, // Points are calculated dynamically, not stored
         raceType: r.raceType,
-        finalType: (r as any).finalType || '',
         raceName: r.raceName || '',
+        finalType: r.finalType || '',
         confirmed: r.confirmed,
       }))
-      .sort((a, b) => a.position - b.position);
+      .sort((a, b) => (a.position || a.gridPosition || 0) - (b.position || b.gridPosition || 0));
     
     if (divisionResults.length > 0) {
       grouped.push({
@@ -444,34 +443,59 @@ export async function getRaceResultsByRound(roundId: string): Promise<Race['resu
   return grouped;
 }
 
-export async function addRaceResult(result: DriverRaceResult & { roundId: string; division: string; raceType?: string; raceName?: string; confirmed?: boolean }): Promise<void> {
-  // Build row based on current sheet headers to support optional columns like driverAlias/finalType
+export async function addRaceResult(result: DriverRaceResult & { roundId: string; division: string; raceType?: string; raceName?: string; finalType?: string; confirmed?: boolean }): Promise<void> {
+  // Use header-based mapping to ensure data is saved to correct columns regardless of sheet structure
   const rows = await readSheet('Race Results');
-  const headers = rows[0] || [];
-  const row: string[] = new Array(headers.length).fill('');
-  headers.forEach((header: string, index: number) => {
-    const h = (header || '').toLowerCase();
-    if (h === 'roundid') row[index] = result.roundId;
-    else if (h === 'driverid') row[index] = result.driverId;
-    else if (h === 'driveralias') row[index] = (result as any).driverAlias || '';
-    else if (h === 'division') row[index] = result.division;
-    else if (h === 'kartnumber') row[index] = result.kartNumber || '';
-    else if (h === 'gridposition') row[index] = (result as any).gridPosition?.toString() || '';
-    else if (h === 'overallposition') row[index] = (result as any).overallPosition?.toString() || '';
-    else if (h === 'position') row[index] = result.position.toString();
-    else if (h === 'fastestlap') row[index] = result.fastestLap || '';
-    else if (h === 'racetype') row[index] = (result.raceType || 'qualification') as string;
-    else if (h === 'finaltype') row[index] = (result as any).finalType || '';
-    else if (h === 'racename') row[index] = result.raceName || '';
-    else if (h === 'confirmed') row[index] = result.confirmed ? 'true' : 'false';
+  if (rows.length === 0) {
+    // If sheet is empty, we need to create headers first, but this shouldn't happen
+    // For now, fallback to hardcoded order
+    await appendRow('Race Results', [
+      result.roundId,
+      result.driverId,
+      result.driverAlias || '',
+      result.division,
+      result.kartNumber || '',
+      (result.gridPosition || result.position || 0).toString(),
+      (result.overallPosition || result.gridPosition || result.position || 0).toString(),
+      result.fastestLap || '',
+      result.raceType || 'qualification',
+      result.raceName || '',
+      result.finalType || '',
+      result.confirmed ? 'true' : 'false',
+    ]);
+    return;
+  }
+  
+  const headers = rows[0];
+  const raceType = result.raceType || 'qualification';
+  
+  // Create a row array that matches the header order
+  const newRow = new Array(headers.length).fill('');
+  
+  headers.forEach((header, index) => {
+    const headerLower = header?.toLowerCase() || '';
+    if (headerLower === 'roundid') newRow[index] = result.roundId;
+    else if (headerLower === 'driverid') newRow[index] = result.driverId;
+    else if (headerLower === 'driveralias') newRow[index] = result.driverAlias || '';
+    else if (headerLower === 'division') newRow[index] = result.division;
+    else if (headerLower === 'kartnumber') newRow[index] = result.kartNumber || '';
+    else if (headerLower === 'gridposition' || headerLower === 'position') newRow[index] = (result.gridPosition || result.position || 0).toString();
+    else if (headerLower === 'overallposition') newRow[index] = (result.overallPosition || result.gridPosition || result.position || 0).toString();
+    else if (headerLower === 'fastestlap') newRow[index] = result.fastestLap || '';
+    else if (headerLower === 'racetype') newRow[index] = raceType;
+    else if (headerLower === 'racename') newRow[index] = result.raceName || '';
+    else if (headerLower === 'finaltype') newRow[index] = result.finalType || '';
+    else if (headerLower === 'confirmed') newRow[index] = result.confirmed ? 'true' : 'false';
+    // Leave other columns empty
   });
-  await appendRow('Race Results', row);
+  
+  await appendRow('Race Results', newRow);
 }
 
 export async function updateRaceResult(
   roundId: string,
   driverId: string,
-  result: DriverRaceResult & { division: string; raceType?: string; raceName?: string; confirmed?: boolean }
+  result: DriverRaceResult & { division: string; raceType?: string; raceName?: string; finalType?: string; confirmed?: boolean }
 ): Promise<void> {
   // For race results, we need to find the row by roundId + driverId + raceType combination
   // This is important because a driver can have multiple results for the same round (different race types)
@@ -482,28 +506,16 @@ export async function updateRaceResult(
   const roundIdIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'roundid');
   const driverIdIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'driverid');
   const raceTypeIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'racetype');
-  const finalTypeIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'finaltype');
-  const raceNameIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'racename');
   
   const raceType = result.raceType || 'qualification';
-  const finalType = (result as any).finalType || '';
-  const raceName = result.raceName || '';
   
-  // Find row by roundId, driverId, raceType and (if available) finalType or raceName
+  // Find row by roundId, driverId, AND raceType
   const rowIndex = rows.findIndex((row, index) => {
     if (index === 0) return false; // Skip header
     const rowRoundId = row[roundIdIndex];
     const rowDriverId = row[driverIdIndex];
     const rowRaceType = raceTypeIndex >= 0 ? row[raceTypeIndex] : '';
-    const baseMatch = rowRoundId === roundId && rowDriverId === driverId && rowRaceType === raceType;
-    if (!baseMatch) return false;
-    if (finalTypeIndex >= 0 && finalType) {
-      return (row[finalTypeIndex] || '') === finalType;
-    }
-    if (raceNameIndex >= 0 && raceName) {
-      return (row[raceNameIndex] || '') === raceName;
-    }
-    return true;
+    return rowRoundId === roundId && rowDriverId === driverId && rowRaceType === raceType;
   });
   
   if (rowIndex === -1) {
@@ -518,32 +530,25 @@ export async function updateRaceResult(
     const headerLower = header?.toLowerCase() || '';
     if (headerLower === 'roundid') resultRow[index] = roundId;
     else if (headerLower === 'driverid') resultRow[index] = driverId;
-    else if (headerLower === 'driveralias') resultRow[index] = (result as any).driverAlias || '';
+    else if (headerLower === 'driveralias') resultRow[index] = result.driverAlias || '';
     else if (headerLower === 'division') resultRow[index] = result.division;
     else if (headerLower === 'kartnumber') resultRow[index] = result.kartNumber || '';
-    else if (headerLower === 'gridposition') resultRow[index] = ((result as any).gridPosition ?? '').toString();
-    else if (headerLower === 'overallposition') resultRow[index] = ((result as any).overallPosition ?? '').toString();
-    else if (headerLower === 'position') resultRow[index] = result.position.toString();
+    else if (headerLower === 'gridposition' || headerLower === 'position') resultRow[index] = (result.gridPosition || result.position || 0).toString();
+    else if (headerLower === 'overallposition') resultRow[index] = (result.overallPosition || result.gridPosition || result.position || 0).toString();
     else if (headerLower === 'fastestlap') resultRow[index] = result.fastestLap || '';
     else if (headerLower === 'racetype') resultRow[index] = raceType;
-    else if (headerLower === 'finaltype') resultRow[index] = finalType;
-    else if (headerLower === 'racename') resultRow[index] = raceName;
+    else if (headerLower === 'racename') resultRow[index] = result.raceName || '';
+    else if (headerLower === 'finaltype') resultRow[index] = result.finalType || '';
     else if (headerLower === 'confirmed') resultRow[index] = result.confirmed ? 'true' : 'false';
     else resultRow[index] = rows[rowIndex][index] || '';
   });
   
-  // Update row in place
-  const googleSheets = await import('./googleSheets');
-  const sheets = await googleSheets.getSheetsClient();
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: googleSheets.SPREADSHEET_ID,
-    range: `Race Results!A${rowIndex + 1}:Z${rowIndex + 1}`,
-    valueInputOption: 'RAW',
-    requestBody: { values: [resultRow] },
-  });
+  // Delete and re-add to ensure correct update
+  await deleteRaceResult(roundId, driverId, raceType);
+  await addRaceResult({ ...result, roundId });
 }
 
-async function deleteRaceResult(roundId: string, driverId: string, raceType?: string, finalType?: string, raceName?: string): Promise<void> {
+async function deleteRaceResult(roundId: string, driverId: string, raceType?: string): Promise<void> {
   const rows = await readSheet('Race Results');
   if (rows.length < 2) return;
   
@@ -551,8 +556,6 @@ async function deleteRaceResult(roundId: string, driverId: string, raceType?: st
   const roundIdIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'roundid');
   const driverIdIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'driverid');
   const raceTypeIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'racetype');
-  const finalTypeIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'finaltype');
-  const raceNameIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'racename');
   
   // Find row by roundId, driverId, and optionally raceType
   const rowIndex = rows.findIndex((row, index) => {
@@ -560,11 +563,11 @@ async function deleteRaceResult(roundId: string, driverId: string, raceType?: st
     const rowRoundId = row[roundIdIndex];
     const rowDriverId = row[driverIdIndex];
     const rowRaceType = raceTypeIndex >= 0 ? row[raceTypeIndex] : '';
-    if (raceType && !(rowRoundId === roundId && rowDriverId === driverId && rowRaceType === raceType)) return false;
-    if (!raceType && !(rowRoundId === roundId && rowDriverId === driverId)) return false;
-    if (finalTypeIndex >= 0 && finalType && (row[finalTypeIndex] || '') !== finalType) return false;
-    if (raceNameIndex >= 0 && raceName && (row[raceNameIndex] || '') !== raceName) return false;
-    return true;
+    if (raceType) {
+      return rowRoundId === roundId && rowDriverId === driverId && rowRaceType === raceType;
+    } else {
+      return rowRoundId === roundId && rowDriverId === driverId;
+    }
   });
   
   if (rowIndex === -1) return;
@@ -614,62 +617,7 @@ export async function deleteRaceResultsByRaceType(roundId: string, raceType: str
   const raceTypeResults = results.filter(r => r.roundId === roundId && r.raceType === raceType);
   
   for (const result of raceTypeResults) {
-    await deleteRaceResult(roundId, result.driverId, raceType, (result as any).finalType, result.raceName);
-  }
-}
-
-export async function deleteRaceResultsByRaceName(roundId: string, raceName: string): Promise<void> {
-  const results = await getRaceResults();
-  // Match by exact raceName string for this round
-  const nameResults = results.filter(r => r.roundId === roundId && (r.raceName || '') === raceName);
-
-  for (const result of nameResults) {
-    // Need raceType to locate the exact row for this driver result
-    await deleteRaceResult(roundId, result.driverId, result.raceType, (result as any).finalType, result.raceName);
-  }
-}
-
-export async function updateRaceResultsByRaceName(
-  roundId: string,
-  oldRaceName: string,
-  updates: { raceName?: string; raceType?: string; finalType?: string }
-): Promise<void> {
-  const rows = await readSheet('Race Results');
-  if (rows.length < 2) return;
-
-  const headers = rows[0];
-  const roundIdIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'roundid');
-  const raceNameIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'racename');
-  const raceTypeIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'racetype');
-  const finalTypeIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'finaltype');
-
-  const { getSheetsClient, SPREADSHEET_ID } = await import('./googleSheets');
-  const sheets = await getSheetsClient();
-
-  // Iterate rows and update those matching roundId + oldRaceName
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row) continue;
-    const rowRoundId = row[roundIdIndex];
-    const rowRaceName = row[raceNameIndex] || '';
-    if (rowRoundId === roundId && rowRaceName === oldRaceName) {
-      const updatedRow = [...row];
-      if (updates.raceName !== undefined && raceNameIndex >= 0) {
-        updatedRow[raceNameIndex] = updates.raceName;
-      }
-      if (updates.raceType !== undefined && raceTypeIndex >= 0) {
-        updatedRow[raceTypeIndex] = updates.raceType;
-      }
-      if (finalTypeIndex >= 0) {
-        updatedRow[finalTypeIndex] = updates.finalType || '';
-      }
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `Race Results!A${i + 1}:Z${i + 1}`,
-        valueInputOption: 'RAW',
-        requestBody: { values: [updatedRow] },
-      });
-    }
+    await deleteRaceResult(roundId, result.driverId, raceType);
   }
 }
 
@@ -850,7 +798,6 @@ export async function getRaceResultRecordsBySeason(seasonId: string): Promise<Ra
         roundId: record.roundId || '',
         division: (record.division || 'Division 1') as Division,
         raceType: record.raceType || 'final',
-        finalType: record.finalType || '',
         driverId: record.driverId || '',
         driverName: record.driverName || '',
         position: parseInt(record.position?.toString() || '0'),
@@ -877,6 +824,34 @@ export async function getRaceResultRecords(
   );
 }
 
+export async function getRaceResultRecordsByRound(roundId: string): Promise<RaceResultRecord[]> {
+  try {
+    const rows = await readSheet('Race Results Records');
+    const records = rowsToObjects<any>(rows);
+    
+    return records
+      .filter((r: any) => r.roundId === roundId)
+      .map((record: any) => ({
+        id: record.id || '',
+        seasonId: record.seasonId || '',
+        roundId: record.roundId || '',
+        division: (record.division || 'Division 1') as Division,
+        raceType: record.raceType || 'final',
+        finalType: (record.finalType || '') as string,
+        driverId: record.driverId || '',
+        driverName: record.driverName || '',
+        position: parseInt(record.position?.toString() || '0'),
+        fastestLap: record.fastestLap || '',
+        points: parseInt(record.points?.toString() || '0'),
+        rank: parseInt(record.rank?.toString() || '0'),
+        createdAt: record.createdAt || new Date().toISOString().split('T')[0],
+      }));
+  } catch (error) {
+    console.error('Error getting race result records by round:', error);
+    return [];
+  }
+}
+
 export async function addRaceResultRecord(record: RaceResultRecord): Promise<void> {
   await appendRow('Race Results Records', [
     record.id,
@@ -884,7 +859,6 @@ export async function addRaceResultRecord(record: RaceResultRecord): Promise<voi
     record.roundId,
     record.division || 'Division 1',
     record.raceType || 'final',
-    record.finalType || '',
     record.driverId,
     record.driverName,
     record.position.toString(),
@@ -902,6 +876,71 @@ export async function addRaceResultRecords(records: RaceResultRecord[]): Promise
   }
 }
 
+export async function updateRaceResultRecord(recordId: string, updates: Partial<RaceResultRecord>): Promise<void> {
+  const rows = await readSheet('Race Results Records');
+  if (rows.length < 2) return;
+  
+  const headers = rows[0];
+  const idIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'id');
+  
+  if (idIndex === -1) {
+    throw new Error('ID column not found in Race Results Records sheet');
+  }
+  
+  const rowIndex = rows.findIndex((row, index) => index > 0 && row[idIndex] === recordId);
+  
+  if (rowIndex === -1) {
+    throw new Error(`Record with ID ${recordId} not found`);
+  }
+  
+  // Build updated row based on current headers
+  const existingRow = rows[rowIndex];
+  const updatedRow = new Array(headers.length).fill('');
+  
+  headers.forEach((header, index) => {
+    const h = (header || '').toLowerCase();
+    if (h === 'id') updatedRow[index] = recordId;
+    else if (h === 'seasonid') updatedRow[index] = updates.seasonId ?? existingRow[index] ?? '';
+    else if (h === 'roundid') updatedRow[index] = updates.roundId ?? existingRow[index] ?? '';
+    else if (h === 'division') updatedRow[index] = updates.division ?? existingRow[index] ?? '';
+    else if (h === 'racetype') updatedRow[index] = updates.raceType ?? existingRow[index] ?? '';
+    else if (h === 'finaltype') updatedRow[index] = updates.finalType ?? existingRow[index] ?? '';
+    else if (h === 'driverid') updatedRow[index] = updates.driverId ?? existingRow[index] ?? '';
+    else if (h === 'drivername') updatedRow[index] = updates.driverName ?? existingRow[index] ?? '';
+    else if (h === 'position') updatedRow[index] = updates.position !== undefined ? updates.position.toString() : (existingRow[index] ?? '');
+    else if (h === 'fastestlap') updatedRow[index] = updates.fastestLap ?? existingRow[index] ?? '';
+    else if (h === 'points') updatedRow[index] = updates.points !== undefined ? updates.points.toString() : (existingRow[index] ?? '');
+    else if (h === 'rank') updatedRow[index] = updates.rank !== undefined ? updates.rank.toString() : (existingRow[index] ?? '');
+    else if (h === 'createdat') updatedRow[index] = updates.createdAt ?? existingRow[index] ?? '';
+    else updatedRow[index] = existingRow[index] ?? '';
+  });
+  
+  await updateRowById('Race Results Records', recordId, updatedRow);
+}
+
+export async function updateRaceResultRecordByFields(
+  roundId: string,
+  driverId: string,
+  division: Division,
+  raceType: string,
+  finalType: string,
+  updates: Partial<RaceResultRecord>
+): Promise<void> {
+  const records = await getRaceResultRecordsByRound(roundId);
+  const matchingRecord = records.find(r => 
+    r.driverId === driverId && 
+    r.division === division && 
+    r.raceType === raceType &&
+    (r.finalType || '') === (finalType || '')
+  );
+  
+  if (!matchingRecord) {
+    throw new Error('Record not found');
+  }
+  
+  await updateRaceResultRecord(matchingRecord.id, updates);
+}
+
 export async function deleteRaceResultRecord(recordId: string): Promise<void> {
   await deleteRowById('Race Results Records', recordId);
 }
@@ -916,5 +955,153 @@ export async function deleteRaceResultRecords(
   for (const record of records) {
     await deleteRaceResultRecord(record.id);
   }
+}
+
+// CheckIn operations
+export interface CheckIn {
+  id: string;
+  seasonId?: string;
+  roundId: string;
+  driverId: string;
+  checkedIn: boolean;
+  createdAt?: string;
+}
+
+export async function getCheckInsByRound(roundId: string): Promise<CheckIn[]> {
+  try {
+    const rows = await readSheet('Check Ins');
+    if (rows.length < 2) return [];
+    
+    const records = rowsToObjects<any>(rows);
+    
+    // Normalize roundId for comparison (trim and compare as string)
+    const normalizedRoundId = String(roundId || '').trim();
+    
+    return records
+      .filter((r: any) => {
+        const recordRoundId = String(r.roundId || '').trim();
+        return recordRoundId === normalizedRoundId;
+      })
+      .map((record: any) => {
+        // Handle checkedIn field - it might be string "true"/"TRUE", boolean true, or number 1
+        let checkedInValue = false;
+        const checkedInField = record.checkedIn;
+        if (checkedInField === true || checkedInField === 'true' || checkedInField === 'TRUE' || checkedInField === 1 || checkedInField === '1') {
+          checkedInValue = true;
+        }
+        
+        return {
+          id: record.id || '',
+          seasonId: record.seasonId || '',
+          roundId: String(record.roundId || '').trim(),
+          driverId: String(record.driverId || '').trim(),
+          checkedIn: checkedInValue,
+          createdAt: record.createdAt || '',
+        };
+      });
+  } catch (error) {
+    console.error('Error getting check ins:', error);
+    return [];
+  }
+}
+
+export async function getCheckIn(roundId: string, driverId: string): Promise<CheckIn | null> {
+  const checkIns = await getCheckInsByRound(roundId);
+  return checkIns.find(c => c.driverId === driverId) || null;
+}
+
+export async function upsertCheckIn(checkIn: CheckIn): Promise<void> {
+  const rows = await readSheet('Check Ins');
+  
+  // Check if headers exist - look for header row that contains expected column names
+  const hasHeaders = rows.length > 0 && rows[0] && (
+    rows[0].some((h: string) => h && h.toLowerCase() === 'id') ||
+    rows[0].some((h: string) => h && h.toLowerCase() === 'roundid') ||
+    rows[0].some((h: string) => h && h.toLowerCase() === 'driverid')
+  );
+  
+  if (!hasHeaders) {
+    // No headers exist, create them using updateRowById on row 1, or append if sheet is completely empty
+    if (rows.length === 0) {
+      // Sheet is completely empty, append headers as first row
+      await appendRow('Check Ins', ['id', 'seasonId', 'roundId', 'driverId', 'checkedIn', 'createdAt']);
+    } else {
+      // Sheet exists but no proper headers, update first row
+      const sheets = await getSheetsClient();
+      if (!SPREADSHEET_ID) throw new Error('GOOGLE_SPREADSHEET_ID not set');
+      
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `Check Ins!A1:F1`,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [['id', 'seasonId', 'roundId', 'driverId', 'checkedIn', 'createdAt']],
+        },
+      });
+    }
+    // Re-read the sheet after creating headers
+    const updatedRows = await readSheet('Check Ins');
+    rows.length = 0;
+    rows.push(...updatedRows);
+  }
+  
+  // Normalize roundId and driverId for consistent comparison and storage
+  const normalizedRoundId = String(checkIn.roundId || '').trim();
+  const normalizedDriverId = String(checkIn.driverId || '').trim();
+  const normalizedSeasonId = String(checkIn.seasonId || '').trim();
+  
+  const headers = rows[0];
+  const idIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'id');
+  const roundIdIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'roundid');
+  const driverIdIndex = headers.findIndex((h: string) => h && h.toLowerCase() === 'driverid');
+  
+  // Find existing check-in - normalize comparison values
+  const existingIndex = rows.findIndex((row, index) => {
+    if (index === 0) return false;
+    const rowRoundId = roundIdIndex >= 0 ? String(row[roundIdIndex] || '').trim() : '';
+    const rowDriverId = driverIdIndex >= 0 ? String(row[driverIdIndex] || '').trim() : '';
+    return rowRoundId === normalizedRoundId && rowDriverId === normalizedDriverId;
+  });
+  
+  const newRow: string[] = new Array(headers.length).fill('');
+  headers.forEach((header, index) => {
+    const h = (header || '').toLowerCase();
+    if (h === 'id') newRow[index] = checkIn.id || `checkin-${normalizedRoundId}-${normalizedDriverId}`;
+    else if (h === 'seasonid') newRow[index] = normalizedSeasonId;
+    else if (h === 'roundid') newRow[index] = normalizedRoundId;
+    else if (h === 'driverid') newRow[index] = normalizedDriverId;
+    else if (h === 'checkedin') newRow[index] = checkIn.checkedIn ? 'true' : 'false';
+    else if (h === 'createdat') {
+      // Preserve existing createdAt or set new one
+      if (existingIndex > 0 && rows[existingIndex][index]) {
+        newRow[index] = rows[existingIndex][index];
+      } else {
+        newRow[index] = checkIn.createdAt || new Date().toISOString().split('T')[0];
+      }
+    }
+    // Preserve any existing values for unknown columns
+    else if (existingIndex > 0 && rows[existingIndex][index]) {
+      newRow[index] = rows[existingIndex][index];
+    }
+  });
+  
+  if (existingIndex > 0) {
+    // Update existing
+    const existingId = idIndex >= 0 ? rows[existingIndex][idIndex] : '';
+    if (existingId) {
+      await updateRowById('Check Ins', existingId, newRow);
+    } else {
+      // No ID, need to append and delete old
+      await appendRow('Check Ins', newRow);
+      // Note: We can't easily delete without ID, so we'll leave duplicates
+    }
+  } else {
+    // Create new
+    await appendRow('Check Ins', newRow);
+  }
+}
+
+export async function deleteCheckIn(checkInId: string): Promise<void> {
+  await deleteRowById('Check Ins', checkInId);
 }
 

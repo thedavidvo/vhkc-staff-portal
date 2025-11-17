@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Menu,
   X,
+  ClipboardCheck,
 } from 'lucide-react';
 
 interface NavItem {
@@ -32,6 +33,7 @@ const navItems: NavItem[] = [
   { name: 'Season', href: '/season', icon: Calendar },
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Drivers', href: '/drivers', icon: Users },
+  { name: 'Check In', href: '/checkin', icon: ClipboardCheck },
   { name: 'Races', href: '/races', icon: Flag },
   { name: 'Results', href: '/results', icon: FileText },
   { name: 'Points', href: '/points', icon: Trophy },
