@@ -567,42 +567,44 @@ export default function TeamsPage() {
                   key={team.id}
                   className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6 w-full max-w-xl"
                 >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2 mb-4">
+                    <div className="flex items-center justify-between">
                       <h2 className="text-xl font-bold text-slate-900 dark:text-white">
                         {team.name}
                       </h2>
                       {team.division && (
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full w-fit ${getDivisionColor(team.division)}`}>
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getDivisionColor(team.division)}`}>
                           {team.division}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-slate-500 dark:text-slate-400">
-                        {teamDrivers.length} drivers
-                      </span>
-                      <button
-                        onClick={() => handleEditTeam(team)}
-                        className="p-1.5 text-primary hover:bg-primary-100 dark:hover:bg-primary-900 rounded transition-colors"
-                        title="Edit team"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTeam(team.id)}
-                        className="p-1.5 text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded transition-colors"
-                        title="Delete team"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
                   </div>
 
                   <div className="space-y-3 mb-4">
-                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                      Team Members
-                    </h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        Team Members
+                      </h3>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-slate-500 dark:text-slate-400">
+                          {teamDrivers.length} drivers
+                        </span>
+                        <button
+                          onClick={() => handleEditTeam(team)}
+                          className="p-1.5 text-primary hover:bg-primary-100 dark:hover:bg-primary-900 rounded transition-colors"
+                          title="Edit team"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTeam(team.id)}
+                          className="p-1.5 text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded transition-colors"
+                          title="Delete team"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
                     {teamDrivers.length > 0 ? (
                       <div className="space-y-2">
                         {teamDrivers.map((driver) => (

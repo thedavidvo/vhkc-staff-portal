@@ -12,6 +12,9 @@ interface PendingDivisionChange {
   currentDivision: Division;
   newDivision: Division;
   type: 'promotion' | 'demotion';
+  currentLatestPoints?: number;
+  adjustedPoints?: number;
+  latestRoundName?: string;
 }
 
 // Helper function to get division color
@@ -128,7 +131,7 @@ export default function DivisionsPage() {
     return filtered;
   }, [drivers, searchQuery, divisionFilter]);
 
-  const handleDivisionChange = (driverId: string, newDiv: Division) => {
+  const handleDivisionChange = async (driverId: string, newDiv: Division) => {
     const driver = drivers.find((d) => d.id === driverId);
     if (!driver) return;
 
@@ -145,32 +148,80 @@ export default function DivisionsPage() {
     const newIndex = divisionOrder.indexOf(newDiv);
     const type = newIndex > currentIndex ? 'promotion' : 'demotion';
 
+    // Calculate the adjusted points for the latest round
+    let currentLatestPoints: number | undefined;
+    let adjustedPoints: number | undefined;
+    let latestRoundName: string | undefined;
+
+    if (selectedSeason) {
+      try {
+        // Fetch driver's points
+        const pointsResponse = await fetch(
+          `/api/points?driverId=${driverId}&seasonId=${selectedSeason.id}`
+        );
+        
+        if (pointsResponse.ok) {
+          const driverPoints = await pointsResponse.json();
+          
+          if (driverPoints && driverPoints.length > 0) {
+            // Fetch rounds to find the latest round
+            const roundsResponse = await fetch(`/api/rounds?seasonId=${selectedSeason.id}`);
+            if (roundsResponse.ok) {
+              const rounds = await roundsResponse.json();
+              const roundMap = new Map<string, { number: number; name: string }>(
+                rounds.map((r: any) => [r.id, { number: r.roundNumber, name: r.name }])
+              );
+
+              // Sort to find latest round
+              const sortedPoints = [...driverPoints].sort((a: any, b: any) => {
+                const aRoundNum = Number(roundMap.get(a.roundId)?.number || 0);
+                const bRoundNum = Number(roundMap.get(b.roundId)?.number || 0);
+                return bRoundNum - aRoundNum;
+              });
+
+              const latestPoint = sortedPoints[0];
+              currentLatestPoints = latestPoint.points;
+              latestRoundName = roundMap.get(latestPoint.roundId)?.name;
+
+              // Find the previous round (second latest)
+              if (sortedPoints.length > 1) {
+                const previousPoint = sortedPoints[1];
+                const multiplier = type === 'promotion' ? 0.66 : 1.66;
+                adjustedPoints = Math.min(previousPoint.points * multiplier, 75);
+              } else {
+                // If only one round, keep the points the same
+                adjustedPoints = currentLatestPoints;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to calculate adjusted points:', error);
+      }
+    }
+
     // Check if this driver already has a pending change
     const existingIndex = pendingChanges.findIndex((p) => p.driverId === driverId);
+    
+    const change: PendingDivisionChange = {
+      driverId,
+      driverName: driver.name,
+      currentDivision: driver.division,
+      newDivision: newDiv,
+      type,
+      currentLatestPoints,
+      adjustedPoints,
+      latestRoundName,
+    };
     
     if (existingIndex >= 0) {
       // Update existing pending change
       const updated = [...pendingChanges];
-      updated[existingIndex] = {
-        driverId,
-        driverName: driver.name,
-        currentDivision: driver.division,
-        newDivision: newDiv,
-        type,
-      };
+      updated[existingIndex] = change;
       setPendingChanges(updated);
     } else {
       // Add new pending change
-      setPendingChanges([
-        ...pendingChanges,
-        {
-          driverId,
-          driverName: driver.name,
-          currentDivision: driver.division,
-          newDivision: newDiv,
-          type,
-        },
-      ]);
+      setPendingChanges([...pendingChanges, change]);
     }
   };
 
@@ -196,6 +247,9 @@ export default function DivisionsPage() {
       });
 
       if (response.ok) {
+        // Recalculate points based on promotion/demotion
+        await recalculateDriverPoints(pendingChange);
+
         // Update local state
         setDrivers(
           drivers.map((d) =>
@@ -210,6 +264,81 @@ export default function DivisionsPage() {
     } catch (error) {
       console.error('Failed to update driver division:', error);
       alert('Failed to update driver division. Please try again.');
+    }
+  };
+
+  const recalculateDriverPoints = async (pendingChange: PendingDivisionChange) => {
+    if (!selectedSeason) return;
+
+    try {
+      // Fetch driver's points for this season
+      const pointsResponse = await fetch(
+        `/api/points?driverId=${pendingChange.driverId}&seasonId=${selectedSeason.id}`
+      );
+      
+      if (!pointsResponse.ok) return;
+      
+      const driverPoints = await pointsResponse.json();
+      if (!driverPoints || driverPoints.length === 0) return;
+
+      // Fetch rounds to get round numbers for sorting
+      const roundsResponse = await fetch(`/api/rounds?seasonId=${selectedSeason.id}`);
+      if (!roundsResponse.ok) return;
+      
+      const rounds = await roundsResponse.json();
+      const roundMap = new Map(rounds.map((r: any) => [r.id, r.roundNumber]));
+
+      // Sort points by round number (descending to get latest first)
+      const sortedPoints = driverPoints.sort((a: any, b: any) => {
+        const aRoundNum = Number(roundMap.get(a.roundId) || 0);
+        const bRoundNum = Number(roundMap.get(b.roundId) || 0);
+        return bRoundNum - aRoundNum;
+      });
+
+      // Only recalculate the latest round (first in sorted array)
+      if (sortedPoints.length > 1) {
+        const latestPoint = sortedPoints[0];
+        const previousPoint = sortedPoints[1];
+
+        // Calculate multiplier based on promotion/demotion
+        const multiplier = pendingChange.type === 'promotion' ? 0.66 : 1.66;
+        const maxPoints = 75;
+
+        // Calculate new points based on previous round
+        const calculatedPoints = Math.min(previousPoint.points * multiplier, maxPoints);
+
+        // Update the points record for the latest round only
+        const updatedPoint = {
+          ...latestPoint,
+          points: calculatedPoints,
+          division: pendingChange.newDivision,
+        };
+
+        await fetch('/api/points', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedPoint),
+        });
+
+        console.log(`Points recalculated for latest round: ${previousPoint.points} × ${multiplier} = ${calculatedPoints}`);
+      } else {
+        // If only one round exists, just update the division
+        const latestPoint = sortedPoints[0];
+        const updatedPoint = {
+          ...latestPoint,
+          division: pendingChange.newDivision,
+        };
+
+        await fetch('/api/points', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedPoint),
+        });
+
+        console.log('Only one round exists, division updated without point recalculation');
+      }
+    } catch (error) {
+      console.error('Failed to recalculate points:', error);
     }
   };
 
@@ -346,7 +475,7 @@ export default function DivisionsPage() {
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase sticky left-[200px] bg-slate-50 dark:bg-slate-900 z-20 w-40">
                           Current Division
                         </th>
-                        <th className="px-12 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                        <th className="px-12 py-3 text-center text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                           Change To
                         </th>
                       </tr>
@@ -369,7 +498,7 @@ export default function DivisionsPage() {
                                 {driver.division}
                               </span>
                             </td>
-                            <td className="px-12 py-3 text-sm">
+                            <td className="px-12 py-3 text-sm text-center">
                               {(() => {
                                 const selectedDivision = pendingChange?.newDivision || driver.division;
                                 return (
@@ -380,7 +509,7 @@ export default function DivisionsPage() {
                                         const newDiv = e.target.value as Division;
                                         handleDivisionChange(driver.id, newDiv);
                                       }}
-                                      className={`px-3 py-1.5 pr-8 text-xs font-semibold rounded-full whitespace-nowrap inline-block border-0 appearance-none cursor-pointer ${getDivisionColor(selectedDivision)} focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1`}
+                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                     >
                                       <option value="Division 1">Division 1</option>
                                       <option value="Division 2">Division 2</option>
@@ -388,7 +517,10 @@ export default function DivisionsPage() {
                                       <option value="Division 4">Division 4</option>
                                       <option value="New">New</option>
                                     </select>
-                                    <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: 'inherit' }} />
+                                    <div className={`px-3 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap inline-flex items-center gap-1 ${getDivisionColor(selectedDivision)} pointer-events-none`}>
+                                      <span>{selectedDivision}</span>
+                                      <ChevronDown className="w-3 h-3" style={{ color: 'inherit' }} />
+                                    </div>
                                   </div>
                                 );
                               })()}
@@ -431,6 +563,18 @@ export default function DivisionsPage() {
                                 <p className="text-xs text-slate-600 dark:text-slate-400">
                                   {change.currentDivision} → {change.newDivision}
                                 </p>
+                                {change.latestRoundName && change.currentLatestPoints !== undefined && change.adjustedPoints !== undefined && (
+                                  <div className="mt-1 text-xs text-slate-700 dark:text-slate-300">
+                                    <p className="font-semibold">{change.latestRoundName}:</p>
+                                    <p>
+                                      <span className="text-slate-500 dark:text-slate-400">Current:</span> {change.currentLatestPoints.toFixed(2)} pts
+                                      {' → '}
+                                      <span className="text-green-600 dark:text-green-400 font-semibold">
+                                        Adjusted: {change.adjustedPoints.toFixed(2)} pts
+                                      </span>
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                               <div className="flex gap-1.5 flex-shrink-0">
                                 <button
@@ -475,6 +619,18 @@ export default function DivisionsPage() {
                                 <p className="text-xs text-slate-600 dark:text-slate-400">
                                   {change.currentDivision} → {change.newDivision}
                                 </p>
+                                {change.latestRoundName && change.currentLatestPoints !== undefined && change.adjustedPoints !== undefined && (
+                                  <div className="mt-1 text-xs text-slate-700 dark:text-slate-300">
+                                    <p className="font-semibold">{change.latestRoundName}:</p>
+                                    <p>
+                                      <span className="text-slate-500 dark:text-slate-400">Current:</span> {change.currentLatestPoints.toFixed(2)} pts
+                                      {' → '}
+                                      <span className="text-red-600 dark:text-red-400 font-semibold">
+                                        Adjusted: {change.adjustedPoints.toFixed(2)} pts
+                                      </span>
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                               <div className="flex gap-1.5 flex-shrink-0">
                                 <button
