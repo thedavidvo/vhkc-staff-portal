@@ -11,7 +11,7 @@ import { Division } from '@/types';
 
 export default function Dashboard() {
   const router = useRouter();
-  const { selectedSeason } = useSeason();
+  const { selectedSeason, loading: seasonsLoading } = useSeason();
   const [drivers, setDrivers] = useState<any[]>([]);
   const [rounds, setRounds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,8 +32,8 @@ export default function Dashboard() {
 
   // Fetch drivers, rounds, and race results from API
   useEffect(() => {
-    // Don't fetch data if still checking auth
-    if (isCheckingAuth) return;
+    // Don't fetch data if still checking auth or seasons are loading
+    if (isCheckingAuth || seasonsLoading) return;
     const fetchData = async () => {
       if (!selectedSeason) {
         setDrivers([]);
@@ -52,17 +52,24 @@ export default function Dashboard() {
         if (driversResponse.ok) {
           const driversData = await driversResponse.json();
           setDrivers(driversData);
+        } else {
+          console.error('Failed to fetch drivers:', driversResponse.status, driversResponse.statusText);
         }
 
-          if (roundsResponse.ok) {
+        if (roundsResponse.ok) {
           const roundsData = await roundsResponse.json();
           // Sort rounds by round number
-          const sortedRounds = roundsData.sort((a: any, b: any) => {
+          const sortedRounds = (roundsData || []).sort((a: any, b: any) => {
             const roundA = a.roundNumber || 0;
             const roundB = b.roundNumber || 0;
             return roundA - roundB;
           });
           setRounds(sortedRounds);
+        } else {
+          console.error('Failed to fetch rounds:', roundsResponse.status, roundsResponse.statusText);
+          const errorData = await roundsResponse.json().catch(() => ({}));
+          console.error('Error details:', errorData);
+          setRounds([]); // Set empty array on error
         }
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
@@ -72,7 +79,7 @@ export default function Dashboard() {
     };
 
     fetchData();
-  }, [selectedSeason]);
+  }, [selectedSeason, isCheckingAuth, seasonsLoading]);
 
 
   // Calculate dynamic stats
@@ -87,15 +94,16 @@ export default function Dashboard() {
 
   // Convert rounds to races format for compatibility
   const races = useMemo(() => {
+    if (!rounds || rounds.length === 0) return [];
     return rounds.map((round) => ({
       id: round.id,
       name: round.name,
       season: selectedSeason?.name || '',
-      round: round.roundNumber,
-      date: round.date,
-      location: round.location,
-      address: round.address,
-      status: round.status,
+      round: round.roundNumber || 0,
+      date: round.date || '',
+      location: round.location || '',
+      address: round.address || '',
+      status: round.status || 'upcoming',
     }));
   }, [rounds, selectedSeason]);
 
@@ -122,20 +130,27 @@ export default function Dashboard() {
 
   // Find next upcoming race - sorted by date
   const nextUpcomingRace = useMemo(() => {
+    if (!rounds || rounds.length === 0) return null;
+    
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
     const upcomingRounds = rounds
-      .filter((round) => round.status === 'upcoming' && round.date)
+      .filter((round) => round && round.status === 'upcoming' && round.date)
       .map((round) => {
-        const raceDate = new Date(round.date);
-        raceDate.setHours(0, 0, 0, 0);
-        return {
-          ...round,
-          raceDate,
-        };
+        try {
+          const raceDate = new Date(round.date);
+          raceDate.setHours(0, 0, 0, 0);
+          return {
+            ...round,
+            raceDate,
+          };
+        } catch (e) {
+          return null;
+        }
       })
-      .filter((round) => {
+      .filter((round): round is NonNullable<typeof round> => {
+        if (!round) return false;
         // Show upcoming races that are today or in the future
         return round.raceDate >= today;
       })
@@ -148,11 +163,11 @@ export default function Dashboard() {
       id: nextRound.id,
       name: nextRound.name,
       season: selectedSeason?.name || '',
-      round: nextRound.roundNumber,
-      date: nextRound.date,
-      location: nextRound.location,
-      address: nextRound.address,
-      status: nextRound.status,
+      round: nextRound.roundNumber || 0,
+      date: nextRound.date || '',
+      location: nextRound.location || '',
+      address: nextRound.address || '',
+      status: nextRound.status || 'upcoming',
     };
   }, [rounds, selectedSeason]);
 
@@ -193,7 +208,7 @@ export default function Dashboard() {
 
 
   // Show loading state while checking auth or loading data
-  if (isCheckingAuth || loading) {
+  if (isCheckingAuth || seasonsLoading || loading) {
     return (
       <>
         <Header hideSearch />
@@ -203,7 +218,7 @@ export default function Dashboard() {
               <div className="flex flex-col items-center gap-4">
                 <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
                 <p className="text-slate-600 dark:text-slate-400">
-                  {isCheckingAuth ? 'Checking authentication...' : 'Loading dashboard data...'}
+                  {isCheckingAuth ? 'Checking authentication...' : seasonsLoading ? 'Loading seasons...' : 'Loading dashboard data...'}
                 </p>
               </div>
             </div>

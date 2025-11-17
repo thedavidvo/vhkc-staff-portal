@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSeasons, addSeason, updateSeason, deleteSeason } from '@/lib/sheetsDataService';
+import { getSeasons, addSeason, updateSeason, deleteSeason } from '@/lib/dbService';
 import { cache } from '@/lib/cache';
 
 const CACHE_KEY = 'seasons';
@@ -12,7 +12,7 @@ export async function GET() {
       return NextResponse.json(cached);
     }
 
-    // If not cached, fetch from Google Sheets
+    // If not cached, fetch from database
     const seasons = await getSeasons();
     
     // Cache the result for 5 minutes
@@ -22,7 +22,7 @@ export async function GET() {
   } catch (error: any) {
     console.error('Error in GET /api/seasons:', error);
     // Return empty array instead of error to allow app to start
-    // This is important when Google Sheets is not yet configured
+    // This is important when database is not yet configured
     return NextResponse.json([]);
   }
 }
@@ -49,6 +49,7 @@ export async function PUT(request: NextRequest) {
     
     // Invalidate cache
     cache.invalidate(CACHE_KEY);
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in PUT /api/seasons:', error);

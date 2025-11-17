@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRaceResultsByRound, addRaceResult, updateRaceResult, deleteRaceResultsByRaceType } from '@/lib/sheetsDataService';
+import { getRaceResultsByRound, addRaceResult, updateRaceResult, deleteRaceResultsByRaceType } from '@/lib/dbService';
 import { cache } from '@/lib/cache';
 
 export async function GET(request: NextRequest) {

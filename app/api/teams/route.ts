@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTeamsBySeason, addTeam, updateTeam, deleteTeam } from '@/lib/sheetsDataService';
+import { getTeamsBySeason, addTeam, updateTeam, deleteTeam } from '@/lib/dbService';
+import { cache } from '@/lib/cache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,7 +11,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'seasonId required' }, { status: 400 });
     }
     
+    const cacheKey = `teams:${seasonId}`;
+    
+    // Try to get from cache first
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
+    }
+    
     const teams = await getTeamsBySeason(seasonId);
+    
+    // Cache for 3 minutes
+    cache.set(cacheKey, teams, 3 * 60 * 1000);
+    
     return NextResponse.json(teams);
   } catch (error) {
     console.error('Error in GET /api/teams:', error);
@@ -28,9 +41,12 @@ export async function POST(request: NextRequest) {
     }
     
     const team = await request.json();
-    // Ensure seasonId matches
-    team.seasonId = seasonId;
-    await addTeam(team);
+    await addTeam(team, seasonId);
+    
+    // Invalidate cache
+    cache.invalidate(`teams:${seasonId}`);
+    cache.invalidatePattern('teams:');
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in POST /api/teams:', error);
@@ -48,9 +64,14 @@ export async function PUT(request: NextRequest) {
     }
     
     const team = await request.json();
-    // Ensure seasonId matches
-    team.seasonId = seasonId;
     await updateTeam(team);
+    
+    // Invalidate cache
+    if (seasonId) {
+      cache.invalidate(`teams:${seasonId}`);
+    }
+    cache.invalidatePattern('teams:');
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in PUT /api/teams:', error);
@@ -68,6 +89,10 @@ export async function DELETE(request: NextRequest) {
     }
     
     await deleteTeam(teamId);
+    
+    // Invalidate cache
+    cache.invalidatePattern('teams:');
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in DELETE /api/teams:', error);

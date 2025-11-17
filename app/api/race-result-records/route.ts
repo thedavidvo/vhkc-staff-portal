@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { addRaceResultRecords, getRaceResultRecordsByRound, updateRaceResultRecordByFields, RaceResultRecord } from '@/lib/sheetsDataService';
+import { addRaceResultRecords, getRaceResultRecordsByRound, getRaceResultRecordsBySeason, updateRaceResultRecordByFields, RaceResultRecord } from '@/lib/dbService';
 import { cache } from '@/lib/cache';
 import { Division } from '@/types';
 
@@ -11,7 +11,6 @@ export async function GET(request: NextRequest) {
     
     // If seasonId is provided, fetch all records for that season
     if (seasonId) {
-      const { getRaceResultRecordsBySeason } = await import('@/lib/sheetsDataService');
       const cacheKey = `race-result-records:season:${seasonId}`;
       
       // Try to get from cache first

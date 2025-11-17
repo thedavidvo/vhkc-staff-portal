@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCheckInsByRound, getCheckIn, upsertCheckIn, deleteCheckIn } from '@/lib/sheetsDataService';
+import { getCheckInsByRound, addCheckIn, deleteCheckIn } from '@/lib/dbService';
 import { cache } from '@/lib/cache';
 
 export async function GET(request: NextRequest) {
@@ -9,8 +9,9 @@ export async function GET(request: NextRequest) {
     const driverId = searchParams.get('driverId');
     
     if (roundId && driverId) {
-      const checkIn = await getCheckIn(roundId, driverId);
-      return NextResponse.json(checkIn);
+      const checkIns = await getCheckInsByRound(roundId);
+      const checkIn = checkIns.find(c => c.driverId === driverId);
+      return NextResponse.json(checkIn || null);
     } else if (roundId) {
       const cacheKey = `checkins:${roundId}`;
       const cached = cache.get(cacheKey);
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
       checkIn.id = `checkin-${checkIn.roundId}-${checkIn.driverId}`;
     }
     
-    await upsertCheckIn(checkIn);
+    await addCheckIn(checkIn);
     
     // Invalidate cache
     cache.invalidate(`checkins:${checkIn.roundId}`);
@@ -67,7 +68,8 @@ export async function PUT(request: NextRequest) {
       checkIn.id = `checkin-${checkIn.roundId}-${checkIn.driverId}`;
     }
     
-    await upsertCheckIn(checkIn);
+    // Use addCheckIn which handles both insert and update via ON CONFLICT
+    await addCheckIn(checkIn);
     
     // Invalidate cache
     cache.invalidate(`checkins:${checkIn.roundId}`);
@@ -100,4 +102,3 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to delete check in' }, { status: 500 });
   }
 }
-

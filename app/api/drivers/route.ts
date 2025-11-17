@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDriversBySeason, getDriverPointsBySeason, addDriver, updateDriver } from '@/lib/sheetsDataService';
+import { getDriversBySeason, addDriver, updateDriver } from '@/lib/dbService';
 import { cache } from '@/lib/cache';
 
 export async function GET(request: NextRequest) {
@@ -21,18 +21,10 @@ export async function GET(request: NextRequest) {
     
     const drivers = await getDriversBySeason(seasonId);
     
-    // Calculate points for each driver from race results
-    const driversWithPoints = await Promise.all(
-      drivers.map(async driver => ({
-        ...driver,
-        pointsTotal: await getDriverPointsBySeason(driver.id, seasonId),
-      }))
-    );
-    
     // Cache the result for 3 minutes (drivers change more frequently)
-    cache.set(cacheKey, driversWithPoints, 3 * 60 * 1000);
+    cache.set(cacheKey, drivers, 3 * 60 * 1000);
     
-    return NextResponse.json(driversWithPoints);
+    return NextResponse.json(drivers);
   } catch (error) {
     console.error('Error in GET /api/drivers:', error);
     return NextResponse.json({ error: 'Failed to fetch drivers' }, { status: 500 });
@@ -51,8 +43,9 @@ export async function POST(request: NextRequest) {
     const driver = await request.json();
     await addDriver(driver, seasonId);
     
-    // Invalidate driver cache for this season
+    // Invalidate cache
     cache.invalidate(`drivers:${seasonId}`);
+    cache.invalidatePattern('drivers:');
     
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -71,10 +64,11 @@ export async function PUT(request: NextRequest) {
     }
     
     const driver = await request.json();
-    await updateDriver(driver, seasonId);
+    await updateDriver(driver);
     
-    // Invalidate driver cache for this season
+    // Invalidate cache
     cache.invalidate(`drivers:${seasonId}`);
+    cache.invalidatePattern('drivers:');
     
     return NextResponse.json({ success: true });
   } catch (error) {

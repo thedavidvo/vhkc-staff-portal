@@ -70,11 +70,17 @@ export function SeasonProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify(season),
       });
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to update season:', response.status, errorData);
         throw new Error('Failed to update season');
       }
+      // Refresh seasons to get updated data from database
       await refreshSeasons();
-      if (selectedSeason?.id === season.id) {
-        setSelectedSeason(season);
+      // Update selected season with fresh data from the refreshed seasons
+      const refreshedSeasons = await fetch('/api/seasons').then(r => r.json());
+      const updatedSeason = refreshedSeasons.find((s: Season) => s.id === season.id);
+      if (updatedSeason && selectedSeason?.id === season.id) {
+        setSelectedSeason(updatedSeason);
       }
     } catch (error) {
       console.error('Failed to update season:', error);
