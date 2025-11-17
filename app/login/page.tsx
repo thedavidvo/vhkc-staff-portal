@@ -6,7 +6,7 @@ import { LogIn, Mail, Lock } from 'lucide-react';
 
 export default function LoginPage() {
   const { login, isLoading: isCheckingAuth } = useAuth();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -16,18 +16,30 @@ export default function LoginPage() {
     setError('');
     setIsLoading(true);
 
-    // Simulate login process
-    // In a real app, you would make an API call here
-    setTimeout(() => {
-      // For demo purposes, accept any non-empty credentials
-      if (email.trim() && password.trim()) {
-        // Call the login function from AuthProvider
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Login successful
         login();
       } else {
-        setError('Please enter both email and password');
+        // Login failed
+        setError(data.error || 'Invalid username or password');
         setIsLoading(false);
       }
-    }, 500);
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('An error occurred during login. Please try again.');
+      setIsLoading(false);
+    }
   };
 
   // Show loading state while checking authentication
@@ -67,20 +79,21 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Field */}
+            {/* Username Field */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Email Address
+              <label htmlFor="username" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Username
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter your username"
                   required
+                  autoComplete="username"
                   className="w-full pl-10 pr-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 />
               </div>
@@ -100,6 +113,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
                   required
+                  autoComplete="current-password"
                   className="w-full pl-10 pr-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 />
               </div>
@@ -132,12 +146,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Demo Credentials Hint */}
-          <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700">
-            <p className="text-xs text-slate-600 dark:text-slate-400 text-center">
-              <strong className="text-slate-900 dark:text-white">Demo:</strong> Enter any email and password to continue
-            </p>
-          </div>
         </div>
 
         {/* Footer */}
