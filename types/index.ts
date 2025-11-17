@@ -13,9 +13,6 @@ export interface Driver {
   email: string;
   teamName?: string;
   status: DriverStatus;
-  lastRacePosition: number;
-  fastestLap: string;
-  pointsTotal: number;
   lastUpdated: string;
   avatar?: string;
   raceHistory?: RaceResult[];

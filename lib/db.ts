@@ -61,9 +61,6 @@ export async function initializeDatabase() {
         division TEXT,
         team_name TEXT,
         status TEXT DEFAULT 'active',
-        last_race_position INTEGER,
-        fastest_lap TEXT,
-        points_total DECIMAL(10,2) DEFAULT 0,
         last_updated TEXT,
         first_name TEXT,
         last_name TEXT,
@@ -157,6 +154,27 @@ export async function initializeDatabase() {
 
     await sql`CREATE INDEX IF NOT EXISTS idx_check_ins_round_id ON check_ins(round_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_check_ins_driver_id ON check_ins(driver_id)`;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS points (
+        id TEXT PRIMARY KEY,
+        season_id TEXT NOT NULL,
+        round_id TEXT NOT NULL,
+        driver_id TEXT NOT NULL,
+        division TEXT NOT NULL,
+        race_type TEXT DEFAULT 'qualification',
+        final_type TEXT,
+        overall_position INTEGER,
+        points DECIMAL(10,2) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(round_id, driver_id, race_type, final_type)
+      )
+    `;
+
+    await sql`CREATE INDEX IF NOT EXISTS idx_points_season_id ON points(season_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_points_round_id ON points(round_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_points_driver_id ON points(driver_id)`;
 
     console.log('✓ Database tables initialized successfully');
   } catch (error) {

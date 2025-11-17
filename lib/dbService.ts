@@ -197,9 +197,6 @@ export async function getDrivers(seasonId?: string): Promise<Driver[]> {
     division: d.division as Division,
     teamName: d.team_name || '',
     status: d.status || 'ACTIVE',
-    lastRacePosition: d.last_race_position || undefined,
-    fastestLap: d.fastest_lap || '',
-    pointsTotal: parseFloat(d.points_total) || 0,
     lastUpdated: d.last_updated || '',
     firstName: d.first_name || '',
     lastName: d.last_name || '',
@@ -224,9 +221,6 @@ export async function getDriverById(driverId: string): Promise<Driver | null> {
     division: d.division as Division,
     teamName: d.team_name || '',
     status: d.status || 'ACTIVE',
-    lastRacePosition: d.last_race_position || undefined,
-    fastestLap: d.fastest_lap || '',
-    pointsTotal: parseFloat(d.points_total) || 0,
     lastUpdated: d.last_updated || '',
     firstName: d.first_name || '',
     lastName: d.last_name || '',
@@ -242,14 +236,11 @@ export async function addDriver(driver: Driver, seasonId: string): Promise<void>
   await sql`
     INSERT INTO drivers (
       id, season_id, name, email, division, team_name, status,
-      last_race_position, fastest_lap, points_total, last_updated,
-      first_name, last_name, date_of_birth, home_track, aliases
+      last_updated, first_name, last_name, date_of_birth, home_track, aliases
     ) VALUES (
       ${driver.id}, ${seasonId}, ${driver.name}, ${driver.email || ''},
       ${driver.division}, ${driver.teamName || ''}, ${driver.status || 'ACTIVE'},
-      ${driver.lastRacePosition || null}, ${driver.fastestLap || ''},
-      ${driver.pointsTotal || 0}, ${driver.lastUpdated || ''},
-      ${driver.firstName || ''}, ${driver.lastName || ''},
+      ${driver.lastUpdated || ''}, ${driver.firstName || ''}, ${driver.lastName || ''},
       ${driver.dateOfBirth || ''}, ${driver.homeTrack || ''}, ${aliases}
     )
   `;
@@ -265,9 +256,6 @@ export async function updateDriver(driver: Driver, seasonId?: string): Promise<v
         division = ${driver.division},
         team_name = ${driver.teamName || ''},
         status = ${driver.status || 'ACTIVE'},
-        last_race_position = ${driver.lastRacePosition || null},
-        fastest_lap = ${driver.fastestLap || ''},
-        points_total = ${driver.pointsTotal || 0},
         last_updated = ${driver.lastUpdated || ''},
         first_name = ${driver.firstName || ''},
         last_name = ${driver.lastName || ''},
@@ -465,13 +453,25 @@ export async function getTeams(seasonId?: string): Promise<Team[]> {
     ? await sql`SELECT * FROM teams WHERE season_id = ${seasonId} ORDER BY name`
     : await sql`SELECT * FROM teams ORDER BY name`) as any[];
   
-  return teams.map((t: any) => ({
-    id: t.id,
-    name: t.name,
-    driverIds: [], // Would need to be populated from drivers table
-    division: t.division as Division | undefined,
-    createdAt: t.created_at || '',
-  }));
+  // Get all drivers to populate driverIds
+  const allDrivers = (seasonId
+    ? await sql`SELECT id, team_name FROM drivers WHERE season_id = ${seasonId}`
+    : await sql`SELECT id, team_name FROM drivers`) as any[];
+  
+  return teams.map((t: any) => {
+    // Find all drivers that belong to this team (by team name)
+    const teamDriverIds = allDrivers
+      .filter((d: any) => d.team_name === t.name)
+      .map((d: any) => d.id);
+    
+    return {
+      id: t.id,
+      name: t.name,
+      driverIds: teamDriverIds,
+      division: t.division as Division | undefined,
+      createdAt: t.created_at || '',
+    };
+  });
 }
 
 // Alias for backwards compatibility
@@ -726,5 +726,117 @@ export async function deleteCheckIn(checkInId: string): Promise<void> {
 
 export async function deleteCheckInsByRound(roundId: string): Promise<void> {
   await sql`DELETE FROM check_ins WHERE round_id = ${roundId}`;
+}
+
+// ============================================================================
+// POINTS OPERATIONS
+// ============================================================================
+
+export interface Points {
+  id: string;
+  seasonId: string;
+  roundId: string;
+  driverId: string;
+  division: Division;
+  raceType: string;
+  finalType?: string;
+  overallPosition?: number;
+  points: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export async function getPointsByRound(roundId: string): Promise<Points[]> {
+  const points = await sql`SELECT * FROM points WHERE round_id = ${roundId} ORDER BY points DESC` as any[];
+  return points.map((p: any) => ({
+    id: p.id,
+    seasonId: p.season_id,
+    roundId: p.round_id,
+    driverId: p.driver_id,
+    division: p.division as Division,
+    raceType: p.race_type || 'qualification',
+    finalType: p.final_type || undefined,
+    overallPosition: p.overall_position || undefined,
+    points: parseFloat(p.points) || 0,
+    createdAt: p.created_at || '',
+    updatedAt: p.updated_at || '',
+  }));
+}
+
+export async function getPointsByDriver(driverId: string, seasonId?: string): Promise<Points[]> {
+  const points = seasonId
+    ? await sql`SELECT * FROM points WHERE driver_id = ${driverId} AND season_id = ${seasonId} ORDER BY created_at DESC` as any[]
+    : await sql`SELECT * FROM points WHERE driver_id = ${driverId} ORDER BY created_at DESC` as any[];
+  return points.map((p: any) => ({
+    id: p.id,
+    seasonId: p.season_id,
+    roundId: p.round_id,
+    driverId: p.driver_id,
+    division: p.division as Division,
+    raceType: p.race_type || 'qualification',
+    finalType: p.final_type || undefined,
+    overallPosition: p.overall_position || undefined,
+    points: parseFloat(p.points) || 0,
+    createdAt: p.created_at || '',
+    updatedAt: p.updated_at || '',
+  }));
+}
+
+export async function getPointsBySeason(seasonId: string): Promise<Points[]> {
+  const points = await sql`SELECT * FROM points WHERE season_id = ${seasonId} ORDER BY round_id, points DESC` as any[];
+  return points.map((p: any) => ({
+    id: p.id,
+    seasonId: p.season_id,
+    roundId: p.round_id,
+    driverId: p.driver_id,
+    division: p.division as Division,
+    raceType: p.race_type || 'qualification',
+    finalType: p.final_type || undefined,
+    overallPosition: p.overall_position || undefined,
+    points: parseFloat(p.points) || 0,
+    createdAt: p.created_at || '',
+    updatedAt: p.updated_at || '',
+  }));
+}
+
+export async function addPoints(points: Points): Promise<void> {
+  await sql`
+    INSERT INTO points (
+      id, season_id, round_id, driver_id, division, race_type, final_type,
+      overall_position, points, created_at, updated_at
+    ) VALUES (
+      ${points.id}, ${points.seasonId}, ${points.roundId}, ${points.driverId},
+      ${points.division}, ${points.raceType || 'qualification'}, ${points.finalType || null},
+      ${points.overallPosition || null}, ${points.points}, 
+      ${points.createdAt || new Date().toISOString()}, ${points.updatedAt || new Date().toISOString()}
+    )
+    ON CONFLICT (round_id, driver_id, race_type, final_type)
+    DO UPDATE SET
+      overall_position = EXCLUDED.overall_position,
+      points = EXCLUDED.points,
+      updated_at = CURRENT_TIMESTAMP
+  `;
+}
+
+export async function updatePoints(points: Points): Promise<void> {
+  await sql`
+    UPDATE points
+    SET overall_position = ${points.overallPosition || null},
+        points = ${points.points},
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${points.id}
+  `;
+}
+
+export async function deletePoints(pointsId: string): Promise<void> {
+  await sql`DELETE FROM points WHERE id = ${pointsId}`;
+}
+
+export async function deletePointsByRound(roundId: string): Promise<void> {
+  await sql`DELETE FROM points WHERE round_id = ${roundId}`;
+}
+
+export async function deletePointsByDriver(driverId: string): Promise<void> {
+  await sql`DELETE FROM points WHERE driver_id = ${driverId}`;
 }
 

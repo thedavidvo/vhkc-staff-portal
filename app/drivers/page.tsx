@@ -285,9 +285,6 @@ export default function DriversPage() {
         dateOfBirth: driverData.dateOfBirth,
         homeTrack: driverData.homeTrack,
         status: driverData.status,
-        lastRacePosition: 0,
-        fastestLap: '0:00.00',
-        pointsTotal: 0,
         lastUpdated: new Date().toISOString().split('T')[0],
       };
 

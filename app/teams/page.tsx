@@ -7,6 +7,18 @@ import { Division } from '@/types';
 import { Team } from '@/lib/sheetsDataService';
 import { Plus, X, Users, Edit, Trash2, Loader2 } from 'lucide-react';
 
+// Helper function to get division color
+const getDivisionColor = (division: Division) => {
+  switch (division) {
+    case 'Division 1':
+      return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
+    case 'Division 2':
+      return 'bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200';
+    default:
+      return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
+  }
+};
+
 export default function TeamsPage() {
   const { selectedSeason } = useSeason();
   const [teams, setTeams] = useState<any[]>([]);
@@ -556,9 +568,16 @@ export default function TeamsPage() {
                   className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6 w-full max-w-xl"
                 >
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                      {team.name}
-                    </h2>
+                    <div className="flex flex-col gap-1">
+                      <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                        {team.name}
+                      </h2>
+                      {team.division && (
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full w-fit ${getDivisionColor(team.division)}`}>
+                          {team.division}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-slate-500 dark:text-slate-400">
                         {teamDrivers.length} drivers

@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import Header from '@/components/Header';
 import { useSeason } from '@/components/SeasonContext';
 import { Driver, Division } from '@/types';
-import { Search, Check, X, Loader2 } from 'lucide-react';
+import { Search, Check, X, Loader2, ChevronDown } from 'lucide-react';
 
 interface PendingDivisionChange {
   driverId: string;
@@ -29,6 +29,48 @@ const getDivisionColor = (division: Division) => {
       return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
     default:
       return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
+  }
+};
+
+// Helper function to get division colors for select dropdown
+const getDivisionSelectColors = (division: Division) => {
+  switch (division) {
+    case 'Division 1':
+      return {
+        bg: 'bg-blue-100 dark:bg-blue-900',
+        text: 'text-blue-800 dark:text-blue-200',
+        border: 'border-blue-300 dark:border-blue-700'
+      };
+    case 'Division 2':
+      return {
+        bg: 'bg-pink-100 dark:bg-pink-900',
+        text: 'text-pink-800 dark:text-pink-200',
+        border: 'border-pink-300 dark:border-pink-700'
+      };
+    case 'Division 3':
+      return {
+        bg: 'bg-orange-100 dark:bg-orange-900',
+        text: 'text-orange-800 dark:text-orange-200',
+        border: 'border-orange-300 dark:border-orange-700'
+      };
+    case 'Division 4':
+      return {
+        bg: 'bg-yellow-100 dark:bg-yellow-900',
+        text: 'text-yellow-800 dark:text-yellow-200',
+        border: 'border-yellow-300 dark:border-yellow-700'
+      };
+    case 'New':
+      return {
+        bg: 'bg-purple-100 dark:bg-purple-900',
+        text: 'text-purple-800 dark:text-purple-200',
+        border: 'border-purple-300 dark:border-purple-700'
+      };
+    default:
+      return {
+        bg: 'bg-white dark:bg-slate-700',
+        text: 'text-slate-900 dark:text-white',
+        border: 'border-slate-300 dark:border-slate-600'
+      };
   }
 };
 
@@ -256,11 +298,11 @@ export default function DivisionsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Division Overview - Left Side (Thinner) */}
-            <div className="lg:col-span-1">
-              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-3 h-[calc(100vh-200px)] overflow-y-auto">
-                <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-3 sticky top-0 bg-white dark:bg-slate-800 pb-2 z-10">
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Division Overview - Left Side (Wider, auto-height) */}
+            <div className="flex-shrink-0 w-full lg:w-64">
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-4">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-3">
                   Divisions
                 </h2>
                 <div className="space-y-2">
@@ -269,15 +311,15 @@ export default function DivisionsPage() {
                       <div
                         key={division}
                         onClick={() => setDivisionFilter(divisionFilter === division ? 'all' : division)}
-                        className={`p-2 bg-slate-50 dark:bg-slate-900 rounded-lg cursor-pointer transition-all hover:shadow-md ${
+                        className={`p-3 bg-slate-50 dark:bg-slate-900 rounded-lg cursor-pointer transition-all hover:shadow-md ${
                           divisionFilter === division ? 'ring-2 ring-primary ring-offset-1' : ''
                         }`}
                       >
-                        <h3 className="font-semibold text-xs text-slate-900 dark:text-white mb-0.5">
+                        <h3 className="font-semibold text-sm text-slate-900 dark:text-white mb-1">
                           {division}
                         </h3>
-                        <p className="text-lg font-bold text-primary">
-                          {driversByDivision[division].length}
+                        <p className="text-xl font-bold text-primary">
+                          {driversByDivision[division].length} <span className="text-sm font-normal text-slate-600 dark:text-slate-400">drivers</span>
                         </p>
                       </div>
                     )
@@ -287,7 +329,7 @@ export default function DivisionsPage() {
             </div>
 
             {/* Driver Search Results - Middle */}
-            <div className="lg:col-span-8">
+            <div className="flex-1 min-w-0">
               <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[calc(100vh-200px)]">
                 <div className="p-4 border-b border-slate-200 dark:border-slate-700">
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
@@ -301,10 +343,10 @@ export default function DivisionsPage() {
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase sticky left-0 bg-slate-50 dark:bg-slate-900 z-20">
                           Name
                         </th>
-                        <th className="px-2 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase sticky left-[200px] bg-slate-50 dark:bg-slate-900 z-20 w-32">
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase sticky left-[200px] bg-slate-50 dark:bg-slate-900 z-20 w-40">
                           Current Division
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                        <th className="px-12 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                           Change To
                         </th>
                       </tr>
@@ -322,26 +364,34 @@ export default function DivisionsPage() {
                             <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white sticky left-0 bg-white dark:bg-slate-800 z-10">
                               {driver.name}
                             </td>
-                            <td className="px-2 py-3 text-sm sticky left-[200px] bg-white dark:bg-slate-800 z-10 w-32">
-                              <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(driver.division)}`}>
+                            <td className="px-4 py-3 text-sm sticky left-[200px] bg-white dark:bg-slate-800 z-10 w-40">
+                              <span className={`px-3 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap inline-block ${getDivisionColor(driver.division)}`}>
                                 {driver.division}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-sm">
-                              <select
-                                value={pendingChange?.newDivision || driver.division}
-                                onChange={(e) => {
-                                  const newDiv = e.target.value as Division;
-                                  handleDivisionChange(driver.id, newDiv);
-                                }}
-                                className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                              >
-                                <option value="Division 1">Division 1</option>
-                                <option value="Division 2">Division 2</option>
-                                <option value="Division 3">Division 3</option>
-                                <option value="Division 4">Division 4</option>
-                                <option value="New">New</option>
-                              </select>
+                            <td className="px-12 py-3 text-sm">
+                              {(() => {
+                                const selectedDivision = pendingChange?.newDivision || driver.division;
+                                return (
+                                  <div className="relative inline-block">
+                                    <select
+                                      value={selectedDivision}
+                                      onChange={(e) => {
+                                        const newDiv = e.target.value as Division;
+                                        handleDivisionChange(driver.id, newDiv);
+                                      }}
+                                      className={`px-3 py-1.5 pr-8 text-xs font-semibold rounded-full whitespace-nowrap inline-block border-0 appearance-none cursor-pointer ${getDivisionColor(selectedDivision)} focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1`}
+                                    >
+                                      <option value="Division 1">Division 1</option>
+                                      <option value="Division 2">Division 2</option>
+                                      <option value="Division 3">Division 3</option>
+                                      <option value="Division 4">Division 4</option>
+                                      <option value="New">New</option>
+                                    </select>
+                                    <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: 'inherit' }} />
+                                  </div>
+                                );
+                              })()}
                             </td>
                           </tr>
                         );
@@ -353,7 +403,7 @@ export default function DivisionsPage() {
             </div>
 
             {/* Confirm Division Change - Right Side */}
-            <div className="lg:col-span-3">
+            <div className="flex-shrink-0 w-full lg:w-80">
               <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[calc(100vh-200px)]">
                 <div className="p-4 border-b border-slate-200 dark:border-slate-700">
                   <h2 className="text-lg font-bold text-slate-900 dark:text-white">

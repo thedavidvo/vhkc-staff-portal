@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Header from '@/components/Header';
 import { useSeason } from '@/components/SeasonContext';
 import { Division } from '@/types';
-import { Loader2, Trophy, Save, Edit2, X, Check } from 'lucide-react';
+import { Loader2, Save, X, ArrowUp, ArrowDown } from 'lucide-react';
 import { getPointsForPosition } from '@/lib/pointsSystem';
 
 // Helper function to get division color
@@ -25,6 +25,39 @@ const getDivisionColor = (division: Division) => {
   }
 };
 
+// Helper function to get race type badge color
+const getRaceTypeBadgeColor = (raceType: string, finalType?: string) => {
+  if (raceType === 'final' && finalType) {
+    // Color code Final A, B, C, D, E, F
+    switch (finalType.toUpperCase()) {
+      case 'A':
+        return 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200';
+      case 'B':
+        return 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200';
+      case 'C':
+        return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
+      case 'D':
+        return 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200';
+      case 'E':
+        return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
+      case 'F':
+        return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
+      default:
+        return 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300';
+    }
+  }
+  
+  // Other race types
+  switch (raceType) {
+    case 'qualification':
+      return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
+    case 'heat':
+      return 'bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200';
+    default:
+      return 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300';
+  }
+};
+
 interface DriverPoints {
   driverId: string;
   driverName: string;
@@ -33,6 +66,7 @@ interface DriverPoints {
   roundName: string;
   roundNumber: number;
   position: number;
+  overallPosition: number;
   points: number;
   confirmed: boolean;
   raceType?: string;
@@ -44,16 +78,35 @@ export default function PointsPage() {
   const [rounds, setRounds] = useState<any[]>([]);
   const [driverPoints, setDriverPoints] = useState<DriverPoints[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRound, setSelectedRound] = useState<string>('all');
-  const [selectedDivision, setSelectedDivision] = useState<Division | 'all'>('all');
-  const [selectedRaceType, setSelectedRaceType] = useState<string>('all');
+  const [selectedRound, setSelectedRound] = useState<string>('');
+  const [selectedDivision, setSelectedDivision] = useState<Division>('Division 1');
+  const [selectedRaceType, setSelectedRaceType] = useState<string>('');
   const [drivers, setDrivers] = useState<any[]>([]);
   
   // Editing state
   const [editingPoints, setEditingPoints] = useState<Record<string, number>>({});
-  const [originalPoints, setOriginalPoints] = useState<DriverPoints[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [savedPoints, setSavedPoints] = useState<Record<string, number>>({});
+  
+  // Get available race types from current data
+  const availableRaceTypes = useMemo(() => {
+    const raceTypes = new Set<string>();
+    driverPoints.forEach(point => {
+      if (point.raceType) {
+        raceTypes.add(point.raceType);
+      }
+    });
+    const hasHeat = raceTypes.has('heat');
+    const types: string[] = [];
+    if (hasHeat) {
+      types.push('heat');
+    }
+    if (raceTypes.has('final')) {
+      types.push('final');
+    }
+    return types;
+  }, [driverPoints]);
 
   // Fetch rounds, drivers, and race results
   useEffect(() => {
@@ -96,13 +149,28 @@ export default function PointsPage() {
               if (resultsResponse.ok) {
                 const resultsData = await resultsResponse.json();
                 
+                // Results are grouped by division, so we need to flatten them
+                const allResults: any[] = [];
+                if (Array.isArray(resultsData)) {
+                  resultsData.forEach((divisionGroup: any) => {
+                    if (divisionGroup.results && Array.isArray(divisionGroup.results)) {
+                      divisionGroup.results.forEach((result: any) => {
+                        allResults.push({
+                          ...result,
+                          division: divisionGroup.division || result.division,
+                        });
+                      });
+                    }
+                  });
+                }
+                
                 // Check if round has heat races
-                const hasHeatRace = resultsData.some((r: any) => r.raceType === 'heat');
+                const hasHeatRace = allResults.some((r: any) => r.raceType === 'heat');
                 
                 // Group results by division and race type for points calculation
                 const resultsByDivisionAndType: Record<string, any[]> = {};
-                resultsData.forEach((result: any) => {
-                  const key = `${result.division}-${result.raceType}-${result.finalType || ''}`;
+                allResults.forEach((result: any) => {
+                  const key = `${result.division}-${result.raceType || 'qualification'}-${result.finalType || ''}`;
                   if (!resultsByDivisionAndType[key]) {
                     resultsByDivisionAndType[key] = [];
                   }
@@ -111,12 +179,17 @@ export default function PointsPage() {
                 
                 // Calculate points for each group
                 Object.values(resultsByDivisionAndType).forEach((groupResults: any[]) => {
-                  // Sort by position to calculate overall position
-                  const sortedResults = [...groupResults].sort((a, b) => a.position - b.position);
+                  // Sort by overallPosition if available, otherwise by position
+                  const sortedResults = [...groupResults].sort((a, b) => {
+                    if (a.overallPosition && b.overallPosition) {
+                      return a.overallPosition - b.overallPosition;
+                    }
+                    return (a.position || 0) - (b.position || 0);
+                  });
                   
                   sortedResults.forEach((result, index) => {
-                    const overallPosition = index + 1;
-                    const points = getPointsForPosition(
+                    const overallPosition = result.overallPosition || (index + 1);
+                    const points = result.points || getPointsForPosition(
                       overallPosition,
                       result.raceType || 'qualification',
                       hasHeatRace
@@ -131,9 +204,10 @@ export default function PointsPage() {
                       roundId: round.id,
                       roundName: round.name,
                       roundNumber: round.roundNumber || 0,
-                      position: result.position,
+                      position: result.position || result.gridPosition || 0,
+                      overallPosition: overallPosition,
                       points: points,
-                      confirmed: false,
+                      confirmed: result.confirmed || false,
                       raceType: result.raceType || 'qualification',
                       finalType: result.finalType || '',
                     });
@@ -145,7 +219,6 @@ export default function PointsPage() {
             }
           }
           setDriverPoints(allPoints);
-          setOriginalPoints(allPoints);
         }
       } catch (error) {
         console.error('Failed to fetch data:', error);
@@ -155,90 +228,150 @@ export default function PointsPage() {
     };
 
     fetchData();
-  }, [selectedSeason]);
+  }, [selectedSeason, drivers.length]);
 
   // Track changes in editing
   useEffect(() => {
     setHasUnsavedChanges(Object.keys(editingPoints).length > 0);
   }, [editingPoints]);
 
-  // Filter points
+  // Auto-select first round when rounds are loaded
+  useEffect(() => {
+    if (rounds.length > 0 && !selectedRound) {
+      setSelectedRound(rounds[0].id);
+    }
+  }, [rounds, selectedRound]);
+
+  // Auto-select first race type when available race types are loaded
+  useEffect(() => {
+    if (availableRaceTypes.length > 0 && !selectedRaceType) {
+      setSelectedRaceType(availableRaceTypes[0]);
+    }
+  }, [availableRaceTypes, selectedRaceType]);
+
+  // Filter points and calculate overall position based on filters
   const filteredPoints = useMemo(() => {
     let filtered = [...driverPoints];
 
-    if (selectedRound !== 'all') {
+    if (selectedRound) {
       filtered = filtered.filter(p => p.roundId === selectedRound);
     }
 
-    if (selectedDivision !== 'all') {
+    if (selectedDivision) {
       filtered = filtered.filter(p => p.division === selectedDivision);
     }
 
-    if (selectedRaceType !== 'all') {
+    if (selectedRaceType) {
       filtered = filtered.filter(p => p.raceType === selectedRaceType);
     }
 
-    // Sort by round (most recent first), then by points (highest first)
-    return filtered.sort((a, b) => {
+    // Group by division and round only (not by race type) to calculate overall position across all race types
+    const grouped: Record<string, DriverPoints[]> = {};
+    filtered.forEach(point => {
+      const key = `${point.division}-${point.roundId}`;
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push(point);
+    });
+
+    // Helper function to get race type priority for sorting (Final A > Final B > Final C, etc.)
+    const getRaceTypePriority = (raceType: string, finalType?: string): number => {
+      if (raceType === 'final' && finalType) {
+        // Final A = 1, Final B = 2, etc. (lower number = higher priority)
+        return finalType.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
+      }
+      if (raceType === 'heat') return 100; // Heat races come after finals
+      if (raceType === 'qualification') return 200; // Qualification comes last
+      return 300; // Unknown types
+    };
+
+    // Calculate overall position across all race types within each group
+    const pointsWithOverallPosition: DriverPoints[] = [];
+    Object.values(grouped).forEach(group => {
+      // Check if this group has heat races (for points calculation)
+      const hasHeatRace = group.some(p => p.raceType === 'heat');
+      
+      // Sort by points (considering edits) - this allows dynamic movement when editing
+      // Points take priority over race type when editing
+      const sorted = [...group].sort((a, b) => {
+        const aKey = `${a.driverId}-${a.roundId}-${a.raceType}-${a.finalType || ''}`;
+        const bKey = `${b.driverId}-${b.roundId}-${b.raceType}-${b.finalType || ''}`;
+        const aPoints = editingPoints[aKey] !== undefined ? editingPoints[aKey] : (savedPoints[aKey] || a.points);
+        const bPoints = editingPoints[bKey] !== undefined ? editingPoints[bKey] : (savedPoints[bKey] || b.points);
+        
+        // Primary sort: by points (higher first) - this enables dynamic movement
+        if (bPoints !== aPoints) {
+          return bPoints - aPoints;
+        }
+        
+        // Secondary sort: by race type priority (Final A > Final B > ...) when points are equal
+        const aPriority = getRaceTypePriority(a.raceType || 'qualification', a.finalType);
+        const bPriority = getRaceTypePriority(b.raceType || 'qualification', b.finalType);
+        if (aPriority !== bPriority) {
+          return aPriority - bPriority;
+        }
+        
+        // Tertiary sort: by driver name for consistency
+        return a.driverName.localeCompare(b.driverName);
+      });
+
+      // Assign overall positions sequentially across all race types
+      sorted.forEach((point, index) => {
+        const newOverallPosition = index + 1;
+        
+        const key = `${point.driverId}-${point.roundId}-${point.raceType}-${point.finalType || ''}`;
+        const hasEdit = editingPoints[key] !== undefined;
+        const hasSaved = savedPoints[key] !== undefined;
+        
+        let finalPoints: number;
+        
+        // If points are being edited, use the edited value (don't recalculate)
+        if (hasEdit) {
+          finalPoints = editingPoints[key];
+        } else if (hasSaved) {
+          // If points were previously saved, use saved value
+          finalPoints = savedPoints[key];
+        } else {
+          // Only recalculate if no edits or saved values exist
+          const raceType = point.raceType || 'qualification';
+          finalPoints = getPointsForPosition(
+            newOverallPosition,
+            raceType as 'qualification' | 'heat' | 'final',
+            hasHeatRace
+          );
+        }
+        
+        pointsWithOverallPosition.push({
+          ...point,
+          overallPosition: newOverallPosition,
+          points: finalPoints,
+        });
+      });
+    });
+
+    // Sort by round (most recent first), then by overall position
+    return pointsWithOverallPosition.sort((a, b) => {
       const roundCompare = b.roundNumber - a.roundNumber;
       if (roundCompare !== 0) return roundCompare;
-      return b.points - a.points;
+      return a.overallPosition - b.overallPosition;
     });
-  }, [driverPoints, selectedRound, selectedDivision, selectedRaceType]);
-
-  // Group by driver
-  const pointsByDriver = useMemo(() => {
-    const grouped: Record<string, DriverPoints[]> = {};
-    filteredPoints.forEach(point => {
-      if (!grouped[point.driverId]) {
-        grouped[point.driverId] = [];
-      }
-      grouped[point.driverId].push(point);
-    });
-    return grouped;
-  }, [filteredPoints]);
+  }, [driverPoints, selectedRound, selectedDivision, selectedRaceType, editingPoints, savedPoints]);
 
   // Calculate total points per driver
   const driverTotals = useMemo(() => {
     const totals: Record<string, number> = {};
-    Object.keys(pointsByDriver).forEach(driverId => {
-      totals[driverId] = pointsByDriver[driverId].reduce((sum, p) => sum + p.points, 0);
+    filteredPoints.forEach(point => {
+      const key = `${point.driverId}-${point.roundId}-${point.raceType}-${point.finalType || ''}`;
+      const points = editingPoints[key] !== undefined ? editingPoints[key] : (savedPoints[key] || point.points);
+      
+      if (!totals[point.driverId]) {
+        totals[point.driverId] = 0;
+      }
+      totals[point.driverId] += points;
     });
     return totals;
-  }, [pointsByDriver]);
-
-  // Calculate points per round per driver (when a specific round is selected)
-  const roundTotalsByDriver = useMemo(() => {
-    if (selectedRound === 'all') return {};
-    
-    const totals: Record<string, number> = {};
-    // Sum all points for each driver in the selected round
-    filteredPoints.forEach(point => {
-      if (point.roundId === selectedRound) {
-        const key = point.driverId;
-        if (!totals[key]) {
-          totals[key] = 0;
-        }
-        totals[key] += point.points || 0;
-      }
-    });
-    return totals;
-  }, [filteredPoints, selectedRound]);
-
-  // Group points by driver and round for display
-  const pointsByDriverAndRound = useMemo(() => {
-    const grouped: Record<string, Record<string, DriverPoints[]>> = {};
-    filteredPoints.forEach(point => {
-      if (!grouped[point.driverId]) {
-        grouped[point.driverId] = {};
-      }
-      if (!grouped[point.driverId][point.roundId]) {
-        grouped[point.driverId][point.roundId] = [];
-      }
-      grouped[point.driverId][point.roundId].push(point);
-    });
-    return grouped;
-  }, [filteredPoints]);
+  }, [filteredPoints, editingPoints, savedPoints]);
 
   // Handler to edit points
   const handleEditPoints = (point: DriverPoints, newPoints: number) => {
@@ -249,19 +382,20 @@ export default function PointsPage() {
     }));
   };
 
-  // Handler to save all changes to Google Sheets
+  // Handler to save all points (current state of the view)
   const handleSaveAllChanges = async () => {
     if (!selectedSeason) {
       alert('No season selected');
       return;
     }
 
-    if (Object.keys(editingPoints).length === 0) {
-      alert('No changes to save');
+    const pointsToSave = filteredPoints.length;
+    if (pointsToSave === 0) {
+      alert('No points to save');
       return;
     }
 
-    const confirmMsg = `Save ${Object.keys(editingPoints).length} point change(s) to Google Sheets?`;
+    const confirmMsg = `Save ${pointsToSave} point record(s) to the database?`;
     if (!confirm(confirmMsg)) {
       return;
     }
@@ -269,41 +403,42 @@ export default function PointsPage() {
     try {
       setIsSaving(true);
 
-      // Update each modified point
-      for (const [key, newPoints] of Object.entries(editingPoints)) {
-        // Parse the key to extract point details
-        const [driverId, roundId, raceType, finalType] = key.split('-');
+      // Save all current points from the filtered view
+      for (const point of filteredPoints) {
+        const key = `${point.driverId}-${point.roundId}-${point.raceType}-${point.finalType || ''}`;
+        const currentPoints = editingPoints[key] !== undefined 
+          ? editingPoints[key] 
+          : (savedPoints[key] || point.points);
         
-        // Find the original point
-        const originalPoint = driverPoints.find(p => 
-          p.driverId === driverId && 
-          p.roundId === roundId && 
-          p.raceType === raceType && 
-          (p.finalType || '') === finalType
-        );
-
-        if (!originalPoint) continue;
-
-        // Update the race result with new points via API
-        const response = await fetch('/api/race-results', {
-          method: 'PATCH',
+        const pointsId = `points-${point.roundId}-${point.driverId}-${point.raceType}-${point.finalType || ''}`;
+        
+        // Save to points table via API
+        const response = await fetch('/api/points', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            roundId,
-            driverId,
-            division: originalPoint.division,
-            raceType: raceType || 'qualification',
-            finalType: finalType || undefined,
-            points: newPoints,
+            id: pointsId,
+            seasonId: selectedSeason.id,
+            roundId: point.roundId,
+            driverId: point.driverId,
+            division: point.division,
+            raceType: point.raceType || 'qualification',
+            finalType: point.finalType || undefined,
+            overallPosition: point.overallPosition,
+            points: currentPoints,
           }),
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to update points for ${originalPoint.driverName}`);
+          throw new Error(`Failed to save points for ${point.driverName}`);
         }
       }
 
-      // Refresh data after saving
+      // Move edited points to saved points
+      setSavedPoints(prev => ({ ...prev, ...editingPoints }));
+      setEditingPoints({});
+      
+      // Refresh data
       const roundsResponse = await fetch(`/api/rounds?seasonId=${selectedSeason.id}`);
       if (roundsResponse.ok) {
         const roundsData = await roundsResponse.json();
@@ -316,26 +451,43 @@ export default function PointsPage() {
             if (resultsResponse.ok) {
               const resultsData = await resultsResponse.json();
               
-              // Check if round has heat races
-              const hasHeatRace = resultsData.some((r: any) => r.raceType === 'heat');
+              // Flatten results
+              const allResults: any[] = [];
+              if (Array.isArray(resultsData)) {
+                resultsData.forEach((divisionGroup: any) => {
+                  if (divisionGroup.results && Array.isArray(divisionGroup.results)) {
+                    divisionGroup.results.forEach((result: any) => {
+                      allResults.push({
+                        ...result,
+                        division: divisionGroup.division || result.division,
+                      });
+                    });
+                  }
+                });
+              }
               
-              // Group results by division and race type for points calculation
+              const hasHeatRace = allResults.some((r: any) => r.raceType === 'heat');
+              
               const resultsByDivisionAndType: Record<string, any[]> = {};
-              resultsData.forEach((result: any) => {
-                const key = `${result.division}-${result.raceType}-${result.finalType || ''}`;
+              allResults.forEach((result: any) => {
+                const key = `${result.division}-${result.raceType || 'qualification'}-${result.finalType || ''}`;
                 if (!resultsByDivisionAndType[key]) {
                   resultsByDivisionAndType[key] = [];
                 }
                 resultsByDivisionAndType[key].push(result);
               });
               
-              // Calculate points for each group
               Object.values(resultsByDivisionAndType).forEach((groupResults: any[]) => {
-                const sortedResults = [...groupResults].sort((a, b) => a.position - b.position);
+                const sortedResults = [...groupResults].sort((a, b) => {
+                  if (a.overallPosition && b.overallPosition) {
+                    return a.overallPosition - b.overallPosition;
+                  }
+                  return (a.position || 0) - (b.position || 0);
+                });
                 
                 sortedResults.forEach((result, index) => {
-                  const overallPosition = index + 1;
-                  const points = getPointsForPosition(
+                  const overallPosition = result.overallPosition || (index + 1);
+                  const points = result.points || getPointsForPosition(
                     overallPosition,
                     result.raceType || 'qualification',
                     hasHeatRace
@@ -350,9 +502,10 @@ export default function PointsPage() {
                     roundId: round.id,
                     roundName: round.name,
                     roundNumber: round.roundNumber || 0,
-                    position: result.position,
-                    points: result.points || points,
-                    confirmed: false,
+                    position: result.position || result.gridPosition || 0,
+                    overallPosition: overallPosition,
+                    points: points,
+                    confirmed: result.confirmed || false,
                     raceType: result.raceType || 'qualification',
                     finalType: result.finalType || '',
                   });
@@ -364,11 +517,8 @@ export default function PointsPage() {
           }
         }
         setDriverPoints(allPoints);
-        setOriginalPoints(allPoints);
       }
 
-      // Clear editing state
-      setEditingPoints({});
       alert('Points saved successfully!');
     } catch (error) {
       console.error('Error saving points:', error);
@@ -414,8 +564,8 @@ export default function PointsPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
               Points Management
             </h1>
-            {hasUnsavedChanges && (
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              {hasUnsavedChanges && (
                 <button
                   onClick={handleCancelChanges}
                   disabled={isSaving}
@@ -424,25 +574,25 @@ export default function PointsPage() {
                   <X className="w-4 h-4" />
                   Cancel Changes
                 </button>
-                <button
-                  onClick={handleSaveAllChanges}
-                  disabled={isSaving}
-                  className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      Save All Changes ({Object.keys(editingPoints).length})
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
+              )}
+              <button
+                onClick={handleSaveAllChanges}
+                disabled={isSaving || filteredPoints.length === 0}
+                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Save Points ({filteredPoints.length})
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Filters */}
@@ -457,7 +607,6 @@ export default function PointsPage() {
                   onChange={(e) => setSelectedRound(e.target.value)}
                   className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="all">All Rounds</option>
                   {rounds.map(round => (
                     <option key={round.id} value={round.id}>
                       Round {round.roundNumber}: {round.name}
@@ -472,10 +621,9 @@ export default function PointsPage() {
                 </label>
                 <select
                   value={selectedDivision}
-                  onChange={(e) => setSelectedDivision(e.target.value as Division | 'all')}
+                  onChange={(e) => setSelectedDivision(e.target.value as Division)}
                   className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="all">All Divisions</option>
                   <option value="Division 1">Division 1</option>
                   <option value="Division 2">Division 2</option>
                   <option value="Division 3">Division 3</option>
@@ -493,10 +641,12 @@ export default function PointsPage() {
                   onChange={(e) => setSelectedRaceType(e.target.value)}
                   className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="all">All Race Types</option>
-                  <option value="qualification">Qualification</option>
-                  <option value="heat">Heat</option>
-                  <option value="final">Final</option>
+                  {availableRaceTypes.includes('heat') && (
+                    <option value="heat">Heat</option>
+                  )}
+                  {availableRaceTypes.includes('final') && (
+                    <option value="final">Final</option>
+                  )}
                 </select>
               </div>
             </div>
@@ -509,6 +659,9 @@ export default function PointsPage() {
                 <thead className="bg-slate-50 dark:bg-slate-900">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                      Overall Position
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                       Driver
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
@@ -518,7 +671,7 @@ export default function PointsPage() {
                       Round
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                      Position
+                      Race Position
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                       Race Type
@@ -526,11 +679,6 @@ export default function PointsPage() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                       Points
                     </th>
-                    {selectedRound !== 'all' && (
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Round Total
-                      </th>
-                    )}
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                       Total Points
                     </th>
@@ -539,37 +687,33 @@ export default function PointsPage() {
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                   {filteredPoints.length === 0 ? (
                     <tr>
-                      <td colSpan={selectedRound !== 'all' ? 7 : 6} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+                      <td colSpan={8} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
                         No points data found. Adjust your filters or add race results.
                       </td>
                     </tr>
                   ) : (
-                    (() => {
-                      // Track which drivers we've shown round totals for
-                      const shownRoundTotals = new Set<string>();
-                      
-                      return filteredPoints.map((point, index) => {
-                        const totalPoints = driverTotals[point.driverId] || 0;
-                        const roundTotal = selectedRound !== 'all' ? (roundTotalsByDriver[point.driverId] || 0) : null;
-                        
-                        // Check if this is the first row for this driver in this round (to show round total)
-                        const driverRoundKey = `${point.driverId}-${point.roundId}`;
-                        const isFirstRowForDriverRound = !shownRoundTotals.has(driverRoundKey);
-                        if (isFirstRowForDriverRound) {
-                          shownRoundTotals.add(driverRoundKey);
-                        }
+                    filteredPoints.map((point, index) => {
+                      const key = `${point.driverId}-${point.roundId}-${point.raceType}-${point.finalType || ''}`;
+                      const currentPoints = editingPoints[key] !== undefined ? editingPoints[key] : (savedPoints[key] || point.points);
+                      const totalPoints = driverTotals[point.driverId] || 0;
+                      const previousPoint = index > 0 ? filteredPoints[index - 1] : null;
+                      const previousKey = previousPoint ? `${previousPoint.driverId}-${previousPoint.roundId}-${previousPoint.raceType}-${previousPoint.finalType || ''}` : null;
+                      const previousPoints = previousKey ? (editingPoints[previousKey] !== undefined ? editingPoints[previousKey] : (savedPoints[previousKey] || previousPoint?.points || 0)) : null;
+                      const pointsChanged = currentPoints !== point.points;
+                      const movedDown = previousPoint && previousPoints !== null && previousPoints < currentPoints;
                       
                       return (
-                        <tr key={`${point.roundId}-${point.driverId}-${point.raceType}-${index}`} className="hover:bg-slate-50 dark:hover:bg-slate-700">
+                        <tr 
+                          key={`${point.roundId}-${point.driverId}-${point.raceType}-${index}`} 
+                          className={`hover:bg-slate-50 dark:hover:bg-slate-700 ${movedDown ? 'bg-red-50 dark:bg-red-900/20' : ''}`}
+                        >
+                          <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white">
+                            {point.overallPosition}
+                          </td>
                           <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              {totalPoints === Math.max(...Object.values(driverTotals)) && totalPoints > 0 && (
-                                <Trophy className="w-4 h-4 text-amber-500" />
-                              )}
-                              <span className="text-sm font-medium text-slate-900 dark:text-white">
-                                {point.driverName || 'Unknown Driver'}
-                              </span>
-                            </div>
+                            <span className="text-sm font-medium text-slate-900 dark:text-white">
+                              {point.driverName}
+                            </span>
                           </td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getDivisionColor(point.division)}`}>
@@ -580,43 +724,39 @@ export default function PointsPage() {
                             Round {point.roundNumber}: {point.roundName}
                           </td>
                           <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
-                            {point.position}
+                            {point.position || '-'}
                           </td>
-                          <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400 capitalize">
-                            {point.raceType || 'qualification'} {point.finalType && `(${point.finalType})`}
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getRaceTypeBadgeColor(point.raceType || 'qualification', point.finalType)}`}>
+                              {point.raceType === 'final' && point.finalType 
+                                ? `Final ${point.finalType.toUpperCase()}` 
+                                : point.raceType ? point.raceType.charAt(0).toUpperCase() + point.raceType.slice(1) 
+                                : 'Qualification'}
+                            </span>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               <input
                                 type="number"
-                                value={editingPoints[`${point.driverId}-${point.roundId}-${point.raceType}-${point.finalType || ''}`] ?? point.points}
+                                value={currentPoints}
                                 onChange={(e) => handleEditPoints(point, parseInt(e.target.value) || 0)}
                                 className="w-20 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm font-semibold"
                                 min="0"
                               />
-                              {editingPoints[`${point.driverId}-${point.roundId}-${point.raceType}-${point.finalType || ''}`] !== undefined && (
+                              {pointsChanged && (
                                 <span className="text-xs text-orange-600 dark:text-orange-400">*</span>
+                              )}
+                              {movedDown && (
+                                <ArrowDown className="w-4 h-4 text-red-600 dark:text-red-400" />
                               )}
                             </div>
                           </td>
-                          {selectedRound !== 'all' && (
-                            <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white">
-                              {isFirstRowForDriverRound ? (
-                                <span className="px-2 py-1 bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary-300 rounded font-bold">
-                                  {roundTotal}
-                                </span>
-                              ) : (
-                                <span className="text-slate-400">—</span>
-                              )}
-                            </td>
-                          )}
                           <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white">
                             {totalPoints}
                           </td>
                         </tr>
-                        );
-                      });
-                    })()
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -627,4 +767,3 @@ export default function PointsPage() {
     </>
   );
 }
-
