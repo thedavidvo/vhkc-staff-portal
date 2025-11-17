@@ -31,8 +31,59 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// PATCH endpoint removed - updateRaceResultsByRaceName function not implemented
-// If renaming functionality is needed, it should be implemented in sheetsDataService first
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { roundId, driverId, division, raceType, finalType, points } = body;
+    
+    if (!roundId || !driverId || !division || !raceType) {
+      return NextResponse.json({ error: 'roundId, driverId, division, and raceType required' }, { status: 400 });
+    }
+    
+    // Get the existing result first to preserve other fields
+    const existingResults = await getRaceResultsByRound(roundId);
+    let existingResult: any = null;
+    
+    if (existingResults) {
+      for (const divisionResult of existingResults) {
+      if (divisionResult.division === division) {
+        const found = divisionResult.results?.find((r: any) => 
+          r.driverId === driverId && 
+          r.raceType === raceType && 
+          (r.finalType || '') === (finalType || '')
+        );
+        if (found) {
+          existingResult = found;
+          break;
+        }
+      }
+      }
+    }
+    
+    if (!existingResult) {
+      return NextResponse.json({ error: 'Race result not found' }, { status: 404 });
+    }
+    
+    // Update with new points while preserving other fields
+    await updateRaceResult(roundId, driverId, {
+      ...existingResult,
+      division,
+      raceType,
+      finalType,
+      points,
+    });
+    
+    // Invalidate cache for this round and related caches
+    cache.invalidate(`race-results:${roundId}`);
+    cache.invalidate(`round-results:${roundId}`);
+    cache.invalidatePattern('drivers:');
+    
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error in PATCH /api/race-results:', error);
+    return NextResponse.json({ error: 'Failed to update race result points' }, { status: 500 });
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {

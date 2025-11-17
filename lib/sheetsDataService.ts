@@ -486,6 +486,7 @@ export async function addRaceResult(result: DriverRaceResult & { roundId: string
     else if (headerLower === 'racename') newRow[index] = result.raceName || '';
     else if (headerLower === 'finaltype') newRow[index] = result.finalType || '';
     else if (headerLower === 'confirmed') newRow[index] = result.confirmed ? 'true' : 'false';
+    else if (headerLower === 'points') newRow[index] = (result.points !== undefined ? result.points.toString() : '');
     // Leave other columns empty
   });
   
@@ -540,6 +541,7 @@ export async function updateRaceResult(
     else if (headerLower === 'racename') resultRow[index] = result.raceName || '';
     else if (headerLower === 'finaltype') resultRow[index] = result.finalType || '';
     else if (headerLower === 'confirmed') resultRow[index] = result.confirmed ? 'true' : 'false';
+    else if (headerLower === 'points') resultRow[index] = (result.points !== undefined ? result.points.toString() : (rows[rowIndex][index] || ''));
     else resultRow[index] = rows[rowIndex][index] || '';
   });
   

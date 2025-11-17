@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo } from 'react';
 import Header from '@/components/Header';
 import { useSeason } from '@/components/SeasonContext';
 import { Division } from '@/types';
-import { Loader2, Check, Edit2, Save, X } from 'lucide-react';
+import { Loader2, Trophy, Save, Edit2, X, Check } from 'lucide-react';
+import { getPointsForPosition } from '@/lib/pointsSystem';
 
 // Helper function to get division color
 const getDivisionColor = (division: Division) => {
@@ -45,21 +46,37 @@ export default function PointsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedRound, setSelectedRound] = useState<string>('all');
   const [selectedDivision, setSelectedDivision] = useState<Division | 'all'>('all');
-  const [editingPoint, setEditingPoint] = useState<{ driverId: string; roundId: string } | null>(null);
-  const [editedPoints, setEditedPoints] = useState<number>(0);
+  const [selectedRaceType, setSelectedRaceType] = useState<string>('all');
+  const [drivers, setDrivers] = useState<any[]>([]);
+  
+  // Editing state
+  const [editingPoints, setEditingPoints] = useState<Record<string, number>>({});
+  const [originalPoints, setOriginalPoints] = useState<DriverPoints[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Fetch rounds and race results
+  // Fetch rounds, drivers, and race results
   useEffect(() => {
     const fetchData = async () => {
       if (!selectedSeason) {
         setRounds([]);
         setDriverPoints([]);
+        setDrivers([]);
         setLoading(false);
         return;
       }
 
       try {
         setLoading(true);
+        
+        // Fetch drivers
+        const driversResponse = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
+        if (driversResponse.ok) {
+          const driversData = await driversResponse.json();
+          setDrivers(driversData);
+        }
+        
+        // Fetch rounds
         const roundsResponse = await fetch(`/api/rounds?seasonId=${selectedSeason.id}`);
         
         if (roundsResponse.ok) {
@@ -70,41 +87,65 @@ export default function PointsPage() {
             return dateB - dateA; // Most recent first
           });
           setRounds(sortedRounds);
-          
-          // Set the most recent round as default if available and no round is selected
-          if (sortedRounds.length > 0 && selectedRound === 'all') {
-            setSelectedRound(sortedRounds[0].id);
-          }
 
-          // Fetch results for each round from Race Results Records
+          // Fetch race results for each round
           const allPoints: DriverPoints[] = [];
           for (const round of roundsData) {
             try {
-              const recordsResponse = await fetch(`/api/race-result-records?roundId=${round.id}`);
-              if (recordsResponse.ok) {
-                const recordsData = await recordsResponse.json();
-                // Records are already flat, just map them to DriverPoints format
-                recordsData.forEach((record: any) => {
-                  allPoints.push({
-                    driverId: record.driverId,
-                    driverName: record.driverName || '',
-                    division: record.division,
-                    roundId: round.id,
-                    roundName: round.name,
-                    roundNumber: round.roundNumber || 0,
-                    position: record.position,
-                    points: record.points || 0,
-                    confirmed: false, // Race result records don't have confirmed field
-                    raceType: record.raceType || 'qualification',
-                    finalType: record.finalType || '',
+              const resultsResponse = await fetch(`/api/race-results?roundId=${round.id}`);
+              if (resultsResponse.ok) {
+                const resultsData = await resultsResponse.json();
+                
+                // Check if round has heat races
+                const hasHeatRace = resultsData.some((r: any) => r.raceType === 'heat');
+                
+                // Group results by division and race type for points calculation
+                const resultsByDivisionAndType: Record<string, any[]> = {};
+                resultsData.forEach((result: any) => {
+                  const key = `${result.division}-${result.raceType}-${result.finalType || ''}`;
+                  if (!resultsByDivisionAndType[key]) {
+                    resultsByDivisionAndType[key] = [];
+                  }
+                  resultsByDivisionAndType[key].push(result);
+                });
+                
+                // Calculate points for each group
+                Object.values(resultsByDivisionAndType).forEach((groupResults: any[]) => {
+                  // Sort by position to calculate overall position
+                  const sortedResults = [...groupResults].sort((a, b) => a.position - b.position);
+                  
+                  sortedResults.forEach((result, index) => {
+                    const overallPosition = index + 1;
+                    const points = getPointsForPosition(
+                      overallPosition,
+                      result.raceType || 'qualification',
+                      hasHeatRace
+                    );
+                    
+                    const driver = drivers.find((d: any) => d.id === result.driverId);
+                    
+                    allPoints.push({
+                      driverId: result.driverId,
+                      driverName: result.driverName || driver?.name || 'Unknown Driver',
+                      division: result.division,
+                      roundId: round.id,
+                      roundName: round.name,
+                      roundNumber: round.roundNumber || 0,
+                      position: result.position,
+                      points: points,
+                      confirmed: false,
+                      raceType: result.raceType || 'qualification',
+                      finalType: result.finalType || '',
+                    });
                   });
                 });
               }
             } catch (error) {
-              console.error(`Error fetching records for round ${round.id}:`, error);
+              console.error(`Error fetching results for round ${round.id}:`, error);
             }
           }
           setDriverPoints(allPoints);
+          setOriginalPoints(allPoints);
         }
       } catch (error) {
         console.error('Failed to fetch data:', error);
@@ -115,6 +156,11 @@ export default function PointsPage() {
 
     fetchData();
   }, [selectedSeason]);
+
+  // Track changes in editing
+  useEffect(() => {
+    setHasUnsavedChanges(Object.keys(editingPoints).length > 0);
+  }, [editingPoints]);
 
   // Filter points
   const filteredPoints = useMemo(() => {
@@ -128,13 +174,17 @@ export default function PointsPage() {
       filtered = filtered.filter(p => p.division === selectedDivision);
     }
 
-    // Sort by round (most recent first), then by position
+    if (selectedRaceType !== 'all') {
+      filtered = filtered.filter(p => p.raceType === selectedRaceType);
+    }
+
+    // Sort by round (most recent first), then by points (highest first)
     return filtered.sort((a, b) => {
       const roundCompare = b.roundNumber - a.roundNumber;
       if (roundCompare !== 0) return roundCompare;
-      return a.position - b.position;
+      return b.points - a.points;
     });
-  }, [driverPoints, selectedRound, selectedDivision]);
+  }, [driverPoints, selectedRound, selectedDivision, selectedRaceType]);
 
   // Group by driver
   const pointsByDriver = useMemo(() => {
@@ -190,74 +240,151 @@ export default function PointsPage() {
     return grouped;
   }, [filteredPoints]);
 
-  const handleEditPoints = (point: DriverPoints) => {
-    setEditingPoint({ driverId: point.driverId, roundId: point.roundId });
-    setEditedPoints(point.points);
+  // Handler to edit points
+  const handleEditPoints = (point: DriverPoints, newPoints: number) => {
+    const key = `${point.driverId}-${point.roundId}-${point.raceType}-${point.finalType || ''}`;
+    setEditingPoints(prev => ({
+      ...prev,
+      [key]: newPoints
+    }));
   };
 
-  const handleSavePoints = async (point: DriverPoints) => {
-    try {
-      // Update Race Results Records (where the data comes from)
-      const finalType = point.finalType || '';
-      const response = await fetch(`/api/race-result-records?roundId=${point.roundId}&driverId=${point.driverId}&division=${encodeURIComponent(point.division)}&raceType=${encodeURIComponent(point.raceType || 'qualification')}&finalType=${encodeURIComponent(finalType)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          points: editedPoints,
-        }),
-      });
+  // Handler to save all changes to Google Sheets
+  const handleSaveAllChanges = async () => {
+    if (!selectedSeason) {
+      alert('No season selected');
+      return;
+    }
 
-      if (response.ok) {
-        // Update local state
-        setDriverPoints(prev => prev.map(p => 
-          p.driverId === point.driverId && p.roundId === point.roundId && p.raceType === point.raceType && (p.finalType || '') === (point.finalType || '')
-            ? { ...p, points: editedPoints }
-            : p
-        ));
-        setEditingPoint(null);
+    if (Object.keys(editingPoints).length === 0) {
+      alert('No changes to save');
+      return;
+    }
+
+    const confirmMsg = `Save ${Object.keys(editingPoints).length} point change(s) to Google Sheets?`;
+    if (!confirm(confirmMsg)) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      // Update each modified point
+      for (const [key, newPoints] of Object.entries(editingPoints)) {
+        // Parse the key to extract point details
+        const [driverId, roundId, raceType, finalType] = key.split('-');
         
-        // Refresh data to ensure we have the latest
-        const recordsResponse = await fetch(`/api/race-result-records?roundId=${point.roundId}`);
-        if (recordsResponse.ok) {
-          const recordsData = await recordsResponse.json();
-          // Update the points for this specific record
-          setDriverPoints(prev => prev.map(p => {
-            const matchingRecord = recordsData.find((r: any) => 
-              r.driverId === p.driverId && 
-              r.roundId === p.roundId && 
-              r.division === p.division &&
-              r.raceType === p.raceType &&
-              (r.finalType || '') === (p.finalType || '')
-            );
-            return matchingRecord ? { ...p, points: matchingRecord.points || p.points } : p;
-          }));
+        // Find the original point
+        const originalPoint = driverPoints.find(p => 
+          p.driverId === driverId && 
+          p.roundId === roundId && 
+          p.raceType === raceType && 
+          (p.finalType || '') === finalType
+        );
+
+        if (!originalPoint) continue;
+
+        // Update the race result with new points via API
+        const response = await fetch('/api/race-results', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            roundId,
+            driverId,
+            division: originalPoint.division,
+            raceType: raceType || 'qualification',
+            finalType: finalType || undefined,
+            points: newPoints,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to update points for ${originalPoint.driverName}`);
         }
-        
-        alert('Points updated successfully!');
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        alert(`Failed to update points: ${errorData.error || 'Unknown error'}`);
       }
+
+      // Refresh data after saving
+      const roundsResponse = await fetch(`/api/rounds?seasonId=${selectedSeason.id}`);
+      if (roundsResponse.ok) {
+        const roundsData = await roundsResponse.json();
+        
+        // Fetch results for each round
+        const allPoints: DriverPoints[] = [];
+        for (const round of roundsData) {
+          try {
+            const resultsResponse = await fetch(`/api/race-results?roundId=${round.id}`);
+            if (resultsResponse.ok) {
+              const resultsData = await resultsResponse.json();
+              
+              // Check if round has heat races
+              const hasHeatRace = resultsData.some((r: any) => r.raceType === 'heat');
+              
+              // Group results by division and race type for points calculation
+              const resultsByDivisionAndType: Record<string, any[]> = {};
+              resultsData.forEach((result: any) => {
+                const key = `${result.division}-${result.raceType}-${result.finalType || ''}`;
+                if (!resultsByDivisionAndType[key]) {
+                  resultsByDivisionAndType[key] = [];
+                }
+                resultsByDivisionAndType[key].push(result);
+              });
+              
+              // Calculate points for each group
+              Object.values(resultsByDivisionAndType).forEach((groupResults: any[]) => {
+                const sortedResults = [...groupResults].sort((a, b) => a.position - b.position);
+                
+                sortedResults.forEach((result, index) => {
+                  const overallPosition = index + 1;
+                  const points = getPointsForPosition(
+                    overallPosition,
+                    result.raceType || 'qualification',
+                    hasHeatRace
+                  );
+                  
+                  const driver = drivers.find((d: any) => d.id === result.driverId);
+                  
+                  allPoints.push({
+                    driverId: result.driverId,
+                    driverName: result.driverName || driver?.name || 'Unknown Driver',
+                    division: result.division,
+                    roundId: round.id,
+                    roundName: round.name,
+                    roundNumber: round.roundNumber || 0,
+                    position: result.position,
+                    points: result.points || points,
+                    confirmed: false,
+                    raceType: result.raceType || 'qualification',
+                    finalType: result.finalType || '',
+                  });
+                });
+              });
+            }
+          } catch (error) {
+            console.error(`Error fetching results for round ${round.id}:`, error);
+          }
+        }
+        setDriverPoints(allPoints);
+        setOriginalPoints(allPoints);
+      }
+
+      // Clear editing state
+      setEditingPoints({});
+      alert('Points saved successfully!');
     } catch (error) {
-      console.error('Error updating points:', error);
-      alert('Failed to update points. Please try again.');
+      console.error('Error saving points:', error);
+      alert('Failed to save points. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleConfirmPoints = async (point: DriverPoints) => {
-    try {
-      // Race Results Records don't have a confirmed field
-      // Points are considered confirmed when they're saved
-      alert('Points are automatically confirmed when saved in Race Results Records.');
-    } catch (error) {
-      console.error('Error confirming points:', error);
-      alert('Failed to confirm points. Please try again.');
+  // Handler to cancel all changes
+  const handleCancelChanges = () => {
+    if (Object.keys(editingPoints).length > 0) {
+      if (confirm('Discard all unsaved changes?')) {
+        setEditingPoints({});
+      }
     }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingPoint(null);
-    setEditedPoints(0);
   };
 
   if (loading) {
@@ -283,13 +410,44 @@ export default function PointsPage() {
       <Header hideSearch />
       <div className="p-4 md:p-6">
         <div className="max-w-[95%] mx-auto">
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-6">
-            Points Management
-          </h1>
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
+              Points Management
+            </h1>
+            {hasUnsavedChanges && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCancelChanges}
+                  disabled={isSaving}
+                  className="px-4 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 transition-all font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <X className="w-4 h-4" />
+                  Cancel Changes
+                </button>
+                <button
+                  onClick={handleSaveAllChanges}
+                  disabled={isSaving}
+                  className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Save All Changes ({Object.keys(editingPoints).length})
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Filters */}
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-4 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Round
@@ -323,6 +481,22 @@ export default function PointsPage() {
                   <option value="Division 3">Division 3</option>
                   <option value="Division 4">Division 4</option>
                   <option value="New">New</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Race Type
+                </label>
+                <select
+                  value={selectedRaceType}
+                  onChange={(e) => setSelectedRaceType(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="all">All Race Types</option>
+                  <option value="qualification">Qualification</option>
+                  <option value="heat">Heat</option>
+                  <option value="final">Final</option>
                 </select>
               </div>
             </div>
@@ -360,15 +534,12 @@ export default function PointsPage() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                       Total Points
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                      Actions
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                   {filteredPoints.length === 0 ? (
                     <tr>
-                      <td colSpan={selectedRound !== 'all' ? 8 : 7} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+                      <td colSpan={selectedRound !== 'all' ? 7 : 6} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
                         No points data found. Adjust your filters or add race results.
                       </td>
                     </tr>
@@ -378,7 +549,6 @@ export default function PointsPage() {
                       const shownRoundTotals = new Set<string>();
                       
                       return filteredPoints.map((point, index) => {
-                        const isEditing = editingPoint?.driverId === point.driverId && editingPoint?.roundId === point.roundId;
                         const totalPoints = driverTotals[point.driverId] || 0;
                         const roundTotal = selectedRound !== 'all' ? (roundTotalsByDriver[point.driverId] || 0) : null;
                         
@@ -391,8 +561,15 @@ export default function PointsPage() {
                       
                       return (
                         <tr key={`${point.roundId}-${point.driverId}-${point.raceType}-${index}`} className="hover:bg-slate-50 dark:hover:bg-slate-700">
-                          <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white">
-                            {point.driverName || 'Unknown Driver'}
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              {totalPoints === Math.max(...Object.values(driverTotals)) && totalPoints > 0 && (
+                                <Trophy className="w-4 h-4 text-amber-500" />
+                              )}
+                              <span className="text-sm font-medium text-slate-900 dark:text-white">
+                                {point.driverName || 'Unknown Driver'}
+                              </span>
+                            </div>
                           </td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getDivisionColor(point.division)}`}>
@@ -406,22 +583,21 @@ export default function PointsPage() {
                             {point.position}
                           </td>
                           <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400 capitalize">
-                            {point.raceType || 'qualification'}
+                            {point.raceType || 'qualification'} {point.finalType && `(${point.finalType})`}
                           </td>
                           <td className="px-4 py-3">
-                            {isEditing ? (
+                            <div className="flex items-center gap-2">
                               <input
                                 type="number"
-                                value={editedPoints}
-                                onChange={(e) => setEditedPoints(parseInt(e.target.value) || 0)}
-                                className="w-20 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                                value={editingPoints[`${point.driverId}-${point.roundId}-${point.raceType}-${point.finalType || ''}`] ?? point.points}
+                                onChange={(e) => handleEditPoints(point, parseInt(e.target.value) || 0)}
+                                className="w-20 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm font-semibold"
                                 min="0"
                               />
-                            ) : (
-                              <span className="text-sm font-semibold text-slate-900 dark:text-white">
-                                {point.points}
-                              </span>
-                            )}
+                              {editingPoints[`${point.driverId}-${point.roundId}-${point.raceType}-${point.finalType || ''}`] !== undefined && (
+                                <span className="text-xs text-orange-600 dark:text-orange-400">*</span>
+                              )}
+                            </div>
                           </td>
                           {selectedRound !== 'all' && (
                             <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white">
@@ -436,47 +612,6 @@ export default function PointsPage() {
                           )}
                           <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white">
                             {totalPoints}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              {isEditing ? (
-                                <>
-                                  <button
-                                    onClick={() => handleSavePoints(point)}
-                                    className="p-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded"
-                                    title="Save"
-                                  >
-                                    <Save className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={handleCancelEdit}
-                                    className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                                    title="Cancel"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <button
-                                    onClick={() => handleEditPoints(point)}
-                                    className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
-                                    title="Edit Points"
-                                  >
-                                    <Edit2 className="w-4 h-4" />
-                                  </button>
-                                  {!point.confirmed && (
-                                    <button
-                                      onClick={() => handleConfirmPoints(point)}
-                                      className="p-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded"
-                                      title="Confirm Points"
-                                    >
-                                      <Check className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </>
-                              )}
-                            </div>
                           </td>
                         </tr>
                         );

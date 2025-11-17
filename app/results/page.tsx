@@ -5,7 +5,7 @@ import Header from '@/components/Header';
 import { useSeason } from '@/components/SeasonContext';
 import { Division } from '@/types';
 import { getPointsForPosition } from '@/lib/pointsSystem';
-import { Loader2, Filter, Trophy, Plus, Save, X } from 'lucide-react';
+import { Loader2, Filter, Trophy } from 'lucide-react';
 
 // Helper function to get division color
 const getDivisionColor = (division: Division) => {
@@ -92,9 +92,6 @@ export default function ResultsPage() {
   const [sortBy, setSortBy] = useState<'position' | 'time' | 'points'>('position');
   const [drivers, setDrivers] = useState<any[]>([]);
   
-  // Race Results Records state
-  const [isSavingRecord, setIsSavingRecord] = useState(false);
-
   // Helper function to parse time - time is in decimal format (e.g., 60.131)
   const parseTime = (timeStr: string): number => {
     if (!timeStr) return Infinity;
@@ -278,24 +275,6 @@ export default function ResultsPage() {
     });
   }, [filteredResults, raceResults]);
 
-  // Group results by round and race type for comparison
-  const groupedResults = useMemo(() => {
-    const grouped: Record<string, Record<string, RaceResult[]>> = {};
-    filteredResults.forEach(result => {
-      const roundKey = result.roundId;
-      const typeKey = result.raceType || 'unknown';
-      if (!grouped[roundKey]) {
-        grouped[roundKey] = {};
-      }
-      if (!grouped[roundKey][typeKey]) {
-        grouped[roundKey][typeKey] = [];
-      }
-      grouped[roundKey][typeKey].push(result);
-    });
-    return grouped;
-  }, [filteredResults]);
-
-
   if (loading) {
     return (
       <>
@@ -319,38 +298,36 @@ export default function ResultsPage() {
       <Header hideSearch />
       <div className="p-4 md:p-6">
         <div className="max-w-[95%] mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
-              Race Results
-            </h1>
-          </div>
-          
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-6">
+            Race Results
+          </h1>
+
           {/* Filters - Always show */}
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-4 mb-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Filter className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Filters</h2>
+            <div className="flex items-center gap-2 mb-4">
+              <Filter className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Filters</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* Round Filter - Dropdown (Single) */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Round
+                </label>
+                <select
+                  value={selectedRound}
+                  onChange={(e) => setSelectedRound(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">All Rounds</option>
+                  {rounds.map(round => (
+                    <option key={round.id} value={round.id}>
+                      Round {round.roundNumber}: {round.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {/* Round Filter - Dropdown (Single) */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Round
-                  </label>
-                  <select
-                    value={selectedRound}
-                    onChange={(e) => setSelectedRound(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="">All Rounds</option>
-                    {rounds.map(round => (
-                      <option key={round.id} value={round.id}>
-                        Round {round.roundNumber}: {round.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
 
               {/* Division Filter - Multiple */}
               <div>
@@ -378,219 +355,132 @@ export default function ResultsPage() {
                 </div>
               </div>
 
-                {/* Race Type Filter - Dropdown (Single) - No "All" option */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Race Type
-                  </label>
-                  <select
-                    value={selectedRaceType}
-                    onChange={(e) => setSelectedRaceType(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    {availableRaceTypes.length === 0 ? (
-                      <option value="">No race types available</option>
-                    ) : (
-                      availableRaceTypes.map(type => (
-                        <option key={type} value={type}>
-                          {type.charAt(0).toUpperCase() + type.slice(1)}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
+              {/* Race Type Filter - Dropdown (Single) - No "All" option */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Race Type
+                </label>
+                <select
+                  value={selectedRaceType}
+                  onChange={(e) => setSelectedRaceType(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  {availableRaceTypes.length === 0 ? (
+                    <option value="">No race types available</option>
+                  ) : (
+                    availableRaceTypes.map(type => (
+                      <option key={type} value={type}>
+                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
 
-                {/* Sort By Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Sort By
-                  </label>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as 'position' | 'time' | 'points')}
-                    className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="position">By Grid Finish</option>
-                    <option value="time">By Time</option>
-                    <option value="points">By Points</option>
-                  </select>
-                </div>
+              {/* Sort By Filter */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Sort By
+                </label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'position' | 'time' | 'points')}
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="position">By Grid Finish</option>
+                  <option value="time">By Time</option>
+                  <option value="points">By Points</option>
+                </select>
               </div>
             </div>
-
-          {/* Save Results Records Button - Always available when there are filtered results */}
-          {resultsWithOverallPosition.length > 0 && (
-            <div className="mb-6 flex justify-end">
-              <button
-                onClick={async () => {
-                  if (!selectedSeason) {
-                    alert('Please select a season');
-                    return;
-                  }
-                  
-                  if (resultsWithOverallPosition.length === 0) {
-                    alert('No results to save');
-                    return;
-                  }
-                  
-                  const confirmMsg = `Save ${resultsWithOverallPosition.length} result(s) as a snapshot?`;
-                  if (!confirm(confirmMsg)) {
-                    return;
-                  }
-                  
-                  try {
-                    setIsSavingRecord(true);
-                    const timestamp = Date.now();
-                    const createdAt = new Date().toISOString().split('T')[0];
-                    
-                    // Prepare records to save from results with calculated points
-                    const recordsToSave = resultsWithOverallPosition.map((result, index) => {
-                      // Look up driver name from drivers array if not present
-                      const driver = drivers.find(d => d.id === result.driverId);
-                      const driverName = result.driverName || driver?.name || 'Unknown Driver';
-                      
-                      return {
-                        id: `snapshot-${timestamp}-${index}`,
-                        seasonId: selectedSeason.id,
-                        roundId: result.roundId,
-                        division: result.division,
-                        raceType: result.raceType || 'qualification',
-                        finalType: result.finalType || '',
-                        driverId: result.driverId,
-                        driverName: driverName,
-                        position: result.position,
-                        fastestLap: result.fastestLap || '',
-                        points: result.points, // Use calculated points from resultsWithOverallPosition
-                        rank: result.overallPosition, // Use overall position as rank
-                        createdAt: createdAt,
-                      };
-                    });
-                    
-                    // Save to Google Sheets via API
-                    const response = await fetch('/api/race-result-records', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(recordsToSave),
-                    });
-                    
-                    if (response.ok) {
-                      alert(`Successfully saved ${recordsToSave.length} result(s) to Race Results Records`);
-                    } else {
-                      const errorData = await response.json();
-                      alert(`Failed to save records: ${errorData.error || 'Unknown error'}`);
-                    }
-                  } catch (error) {
-                    console.error('Failed to save race result records:', error);
-                    alert('Failed to save race result records. Please try again.');
-                  } finally {
-                    setIsSavingRecord(false);
-                  }
-                }}
-                disabled={resultsWithOverallPosition.length === 0 || isSavingRecord || !selectedSeason}
-                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {isSavingRecord ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    Save Results Records ({resultsWithOverallPosition.length})
-                  </>
-                )}
-              </button>
-            </div>
-          )}
+          </div>
 
           {/* Results Table - Always show */}
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50 dark:bg-slate-900">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50 dark:bg-slate-900">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                      Overall Position
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                      Race Finish
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                      Driver
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                      Division
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                      Round
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                      Race Type
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                      Fastest Lap
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                      Points
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                  {resultsWithOverallPosition.length === 0 ? (
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Overall Position
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Race Finish
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Driver
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Division
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Round
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Race Type
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Fastest Lap
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Points
-                      </th>
+                      <td colSpan={8} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+                        No results found. Adjust your filters or add race results.
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                    {resultsWithOverallPosition.length === 0 ? (
-                      <tr>
-                        <td colSpan={8} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
-                          No results found. Adjust your filters or add race results.
+                  ) : (
+                    resultsWithOverallPosition.map((result, index) => (
+                      <tr key={`${result.roundId}-${result.driverId}-${index}`} className="hover:bg-slate-50 dark:hover:bg-slate-700">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            {result.overallPosition === 1 && <Trophy className="w-4 h-4 text-amber-500" />}
+                            <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                              {result.overallPosition}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                            {result.position}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white">
+                          {result.driverName || 'Unknown Driver'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getDivisionColor(result.division)}`}>
+                            {result.division}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                          Round {result.roundNumber}: {result.roundName}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${result.finalType ? getFinalTypeColor(result.finalType) : 'bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200'}`}>
+                            {formatRaceType(result.raceType, result.finalType)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm font-mono text-slate-600 dark:text-slate-400">
+                          {result.fastestLap || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white">
+                          {result.points}
                         </td>
                       </tr>
-                    ) : (
-                      resultsWithOverallPosition.map((result, index) => (
-                        <tr key={`${result.roundId}-${result.driverId}-${index}`} className="hover:bg-slate-50 dark:hover:bg-slate-700">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              {result.overallPosition === 1 && <Trophy className="w-4 h-4 text-amber-500" />}
-                              <span className="text-sm font-semibold text-slate-900 dark:text-white">
-                                {result.overallPosition}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                              {result.position}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white">
-                            {result.driverName || 'Unknown Driver'}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getDivisionColor(result.division)}`}>
-                              {result.division}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
-                            Round {result.roundNumber}: {result.roundName}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${result.finalType ? getFinalTypeColor(result.finalType) : 'bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200'}`}>
-                              {formatRaceType(result.raceType, result.finalType)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm font-mono text-slate-600 dark:text-slate-400">
-                            {result.fastestLap || '-'}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white">
-                            {result.points}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
+          </div>
         </div>
       </div>
     </>
   );
 }
-

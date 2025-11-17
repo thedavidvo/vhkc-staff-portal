@@ -7,9 +7,30 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const roundId = searchParams.get('roundId');
+    const seasonId = searchParams.get('seasonId');
     
+    // If seasonId is provided, fetch all records for that season
+    if (seasonId) {
+      const { getRaceResultRecordsBySeason } = await import('@/lib/sheetsDataService');
+      const cacheKey = `race-result-records:season:${seasonId}`;
+      
+      // Try to get from cache first
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        return NextResponse.json(cached);
+      }
+      
+      const records = await getRaceResultRecordsBySeason(seasonId);
+      
+      // Cache results for 1 minute
+      cache.set(cacheKey, records, 1 * 60 * 1000);
+      
+      return NextResponse.json(records);
+    }
+    
+    // Otherwise, require roundId
     if (!roundId) {
-      return NextResponse.json({ error: 'roundId required' }, { status: 400 });
+      return NextResponse.json({ error: 'roundId or seasonId required' }, { status: 400 });
     }
     
     const cacheKey = `race-result-records:${roundId}`;
