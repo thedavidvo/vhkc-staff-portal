@@ -22,7 +22,7 @@ const getDivisionColor = (division: Division) => {
     case 'New':
       return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
     default:
-      return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
+      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
   }
 };
 
@@ -433,7 +433,7 @@ export default function StandingsPage() {
                         {driver.roundPoints.map((round: { roundId: string; roundNumber: number; roundName: string; location: string; points: number }) => (
                           <div
                             key={round.roundId}
-                            className="bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-2 min-w-[100px] flex-shrink-0"
+                            className="bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-2 min-w-[100px] flex-shrink-0"
                           >
                             <div className="text-xs text-slate-600 dark:text-slate-400 mb-0.5">
                               R{round.roundNumber}
@@ -540,7 +540,7 @@ export default function StandingsPage() {
                         {team.roundPoints.map((round: { roundId: string; roundNumber: number; roundName: string; location: string; points: number }) => (
                           <div
                             key={round.roundId}
-                            className="bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-2 min-w-[100px] flex-shrink-0"
+                            className="bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-2 min-w-[100px] flex-shrink-0"
                           >
                             <div className="text-xs text-slate-600 dark:text-slate-400 mb-0.5">
                               R{round.roundNumber}

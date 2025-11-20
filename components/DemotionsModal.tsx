@@ -39,7 +39,7 @@ export default function DemotionsModal({
               {demotions.map((demotion) => (
                 <div
                   key={demotion.driverId}
-                  className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700"
+                  className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div>

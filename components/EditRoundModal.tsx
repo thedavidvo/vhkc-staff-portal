@@ -155,7 +155,7 @@ export default function EditRoundModal({
                 <button
                   type="button"
                   onClick={() => setShowManualLocation(true)}
-                  className="w-full px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  className="w-full px-4 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
                   + Add Location Manually
                 </button>
@@ -213,7 +213,7 @@ export default function EditRoundModal({
                     setManualLocation('');
                     setManualAddress('');
                   }}
-                  className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium"
+                  className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm font-medium"
                 >
                   Cancel
                 </button>

@@ -261,7 +261,7 @@ export default function EditSeasonModal({
                 {sortedRounds.map((round) => (
                   <div
                     key={round.id}
-                    className="flex items-center justify-between p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-700/50"
+                    className="flex items-center justify-between p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/50"
                   >
                     <div className="flex-1">
                       <div className="font-medium text-slate-900 dark:text-white">
@@ -284,7 +284,7 @@ export default function EditSeasonModal({
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleEditRound(round)}
-                        className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                        className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
                         aria-label="Edit round"
                       >
                         <Edit2 className="w-4 h-4 text-slate-600 dark:text-slate-400" />
@@ -439,7 +439,7 @@ function RoundForm({ round, locations, onSave, onCancel, onLocationAdded, isEdit
                   <button
                     type="button"
                     onClick={() => setShowManualLocation(true)}
-                    className="w-full px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                    className="w-full px-4 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                   >
                     + Add Location Manually
                   </button>
@@ -497,7 +497,7 @@ function RoundForm({ round, locations, onSave, onCancel, onLocationAdded, isEdit
                       setManualLocation('');
                       setManualAddress('');
                     }}
-                    className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium"
+                    className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm font-medium"
                   >
                     Cancel
                   </button>

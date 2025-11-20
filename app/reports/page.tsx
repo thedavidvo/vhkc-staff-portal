@@ -23,7 +23,7 @@ const getDivisionColor = (division: Division) => {
     case 'New':
       return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
     default:
-      return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
+      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
   }
 };
 
@@ -1481,7 +1481,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
 
           {/* Round Details */}
           {selectedRound && (
-            <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-xl">
+            <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">
                 Round Details
               </h3>

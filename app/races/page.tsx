@@ -25,7 +25,7 @@ const getDivisionColor = (division: Division) => {
     case 'New':
       return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
     default:
-      return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
+      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
   }
 };
 
@@ -1126,7 +1126,7 @@ export default function RacesPage() {
                       className={`w-full text-left p-2 rounded-lg transition-colors text-sm ${
                         selectedEvent?.id === race.id
                           ? 'bg-primary-500 text-white'
-                          : 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-800'
                       }`}
                     >
                       <div className="font-medium">{race.name}</div>
@@ -1198,8 +1198,8 @@ export default function RacesPage() {
                           isSelected
                             ? 'bg-primary-500 text-white'
                             : hasResults
-                            ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600'
-                            : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-800'
+                            : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                         }`}
                       >
                         <div className="font-medium">{division}</div>
@@ -1252,7 +1252,7 @@ export default function RacesPage() {
                         className={`group flex items-center justify-between p-2 rounded-lg transition-colors text-sm cursor-pointer ${
                           selectedType === type
                             ? 'bg-primary-500 text-white'
-                            : 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-800'
                         }`}
                       >
                         <span className="flex-1 font-medium">
@@ -1263,7 +1263,7 @@ export default function RacesPage() {
                             e.stopPropagation();
                             handleDeleteType(type);
                           }}
-                          className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-800 opacity-0 group-hover:opacity-100 transition-opacity"
                           aria-label="Delete race name"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1646,41 +1646,41 @@ function SpreadsheetTable({
   return (
     <div className="p-4">
       <div>
-        <table className="w-full border-collapse border border-slate-300 dark:border-slate-600">
-          <thead className="bg-slate-100 dark:bg-slate-900 sticky top-0">
+        <table className="w-full border-collapse border border-slate-300 dark:border-slate-700">
+          <thead className="bg-slate-100 dark:bg-slate-800 sticky top-0">
             <tr>
               {showRowActions && (
-                <th className="px-2 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800 w-12">
+                <th className="px-2 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-700 bg-slate-200 dark:bg-slate-800 w-12">
                   
                 </th>
               )}
-              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
                 Driver Name
               </th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
                 Driver Alias
               </th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
                 Division
               </th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
                 Kart Number
               </th>
               {!isQualification && (
                 <>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
                     Grid Position
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
                     Overall Position
                   </th>
                 </>
               )}
-              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
                 Best Time
               </th>
               {!isQualification && (
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
+                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
                   Positions Gained/Lost
                 </th>
               )}
@@ -1690,10 +1690,10 @@ function SpreadsheetTable({
             {rowsToDisplay.map((result, index) => (
               <tr
                 key={`${result.driverId}-${index}`}
-                className="hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >
                 {showRowActions && (
-                  <td className="px-2 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 align-middle">
+                  <td className="px-2 py-1 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 align-middle">
                     {onDeleteRow && (
                       <button
                         type="button"
@@ -1706,7 +1706,7 @@ function SpreadsheetTable({
                     )}
                   </td>
                 )}
-                <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-visible">
+                <td className="px-3 py-1 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-visible">
                   <div className="relative">
                     <input
                       type="text"
@@ -1831,7 +1831,7 @@ function SpreadsheetTable({
                     {showSuggestions[index] && (suggestions[index] || []).length > 0 && dropdownPosition[index] && portalRef.current && createPortal(
                       <div 
                         data-dropdown-index={index}
-                        className="fixed bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl shadow-2xl overflow-y-auto z-[9999]" 
+                        className="fixed bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl shadow-2xl overflow-y-auto z-[9999]" 
                         style={{ 
                           maxHeight: '400px',
                           minWidth: '300px',
@@ -1880,7 +1880,7 @@ function SpreadsheetTable({
                               
                               {/* Show multiple aliases as sub-options */}
                               {hasMultipleAliases && (
-                                <div className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700">
+                                <div className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-700">
                                   <div className="px-4 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400">
                                     Select alias:
                                   </div>
@@ -1908,7 +1908,7 @@ function SpreadsheetTable({
                     )}
                   </div>
                 </td>
-                <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+                <td className="px-3 py-1 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
                   <input
                     type="text"
                     value={result.driverAlias || ''}
@@ -1978,7 +1978,7 @@ function SpreadsheetTable({
                     placeholder="Alias"
                   />
                 </td>
-                <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+                <td className="px-3 py-1 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
                   <div className="relative inline-block">
                     <select
                       value={result.division || division}
@@ -2082,7 +2082,7 @@ function SpreadsheetTable({
                     </select>
                   </div>
                 </td>
-                <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+                <td className="px-3 py-1 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
                   <input
                     type="text"
                     value={result.kartNumber || ''}
@@ -2155,7 +2155,7 @@ function SpreadsheetTable({
                 </td>
                 {!isQualification && (
                   <>
-                    <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+                    <td className="px-3 py-1 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
                       <input
                         type="number"
                         value={result.gridPosition || ''}
@@ -2226,7 +2226,7 @@ function SpreadsheetTable({
                         placeholder="Grid"
                       />
                     </td>
-                    <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+                    <td className="px-3 py-1 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
                       <input
                         type="number"
                         value={result.overallPosition || ''}
@@ -2299,7 +2299,7 @@ function SpreadsheetTable({
                     </td>
                   </>
                 )}
-                <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+                <td className="px-3 py-1 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
                   <input
                     type="text"
                     value={result.fastestLap || ''}
@@ -2355,7 +2355,7 @@ function SpreadsheetTable({
                   />
                 </td>
                 {!isQualification && (
-                  <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+                  <td className="px-3 py-1 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
                     <div className="px-2 py-1 text-sm font-semibold text-slate-900 dark:text-white">
                       {result.gridPosition && result.overallPosition
                         ? (() => {

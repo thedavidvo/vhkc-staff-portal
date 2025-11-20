@@ -186,7 +186,7 @@ export default function AddDriverModal({
                       newAliases[index] = e.target.value;
                       setFormData({ ...formData, aliases: newAliases });
                     }}
-                    className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder={`Alias ${index + 1}`}
                   />
                   {index > 0 && (
@@ -208,7 +208,7 @@ export default function AddDriverModal({
                 onClick={() => {
                   setFormData({ ...formData, aliases: [...formData.aliases, ''] });
                 }}
-                className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+                className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-800 transition-colors"
               >
                 + Add Another Alias
               </button>
@@ -332,7 +332,7 @@ export default function AddDriverModal({
                         : status === 'INACTIVE'
                         ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 ring-2 ring-offset-2 ring-yellow-400'
                         : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 ring-2 ring-offset-2 ring-red-400'
-                      : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
                   }`}
                 >
                   {formatStatus(status)}

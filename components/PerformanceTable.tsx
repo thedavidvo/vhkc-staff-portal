@@ -104,13 +104,13 @@ export default function PerformanceTable({ drivers }: PerformanceTableProps) {
             placeholder="Search drivers..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
         <select
           value={divisionFilter}
           onChange={(e) => setDivisionFilter(e.target.value)}
-          className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+          className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
         >
           <option value="all">All Divisions</option>
           {divisions.map((div) => (
@@ -123,7 +123,7 @@ export default function PerformanceTable({ drivers }: PerformanceTableProps) {
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[800px]">
-          <thead className="bg-slate-50 dark:bg-slate-900">
+          <thead className="bg-slate-50 dark:bg-slate-800">
             <tr>
               <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                 <SortButton field="name">Driver Name</SortButton>
@@ -140,7 +140,7 @@ export default function PerformanceTable({ drivers }: PerformanceTableProps) {
             {filteredAndSortedDrivers.map((driver) => (
               <tr
                 key={driver.id}
-                className="hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >
                 <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-slate-900 dark:text-white">

@@ -5,8 +5,21 @@ import PageLayout from '@/components/PageLayout';
 import SectionCard from '@/components/SectionCard';
 import { useSeason } from '@/components/SeasonContext';
 import { Division } from '@/types';
-import { GitCompare, Users, Trophy, Clock, Search, X, TrendingUp, Award } from 'lucide-react';
+import { GitCompare, Users, Trophy, Clock, Search, X, TrendingUp, Award, BarChart3, LineChart } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
+import {
+  LineChart as RechartsLineChart,
+  BarChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Cell
+} from 'recharts';
 
 interface Driver {
   id: string;
@@ -73,6 +86,7 @@ export default function ComparePage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [rounds, setRounds] = useState<any[]>([]);
   const [raceResults, setRaceResults] = useState<RaceResult[]>([]);
+  const [points, setPoints] = useState<any[]>([]);
   const [selectedDrivers, setSelectedDrivers] = useState<string[]>([]);
   const [selectedRound, setSelectedRound] = useState<string>('');
   const [selectedDivision, setSelectedDivision] = useState<Division | ''>('');
@@ -153,6 +167,13 @@ export default function ComparePage() {
           sampleResult: allResults[0],
         });
         setRaceResults(allResults);
+
+        // Fetch points data
+        const pointsResponse = await fetch(`/api/points?seasonId=${selectedSeason.id}`);
+        if (pointsResponse.ok) {
+          const pointsData = await pointsResponse.json();
+          setPoints(Array.isArray(pointsData) ? pointsData : []);
+        }
       } catch (error) {
         console.error('Failed to fetch data:', error);
       } finally {
@@ -218,6 +239,173 @@ export default function ComparePage() {
     });
     return Array.from(divisions).sort();
   }, [raceResults]);
+
+  // Chart data for points progression
+  const pointsProgressionData = useMemo(() => {
+    if (selectedDrivers.length === 0 || rounds.length === 0) return [];
+
+    const sortedRounds = [...rounds].sort((a, b) => (a.roundNumber || 0) - (b.roundNumber || 0));
+    
+    return sortedRounds.map(round => {
+      const dataPoint: any = {
+        round: `R${round.roundNumber}`,
+        roundNumber: round.roundNumber || 0,
+        roundName: (round.location && round.location.trim()) || 'TBD',
+      };
+
+      selectedDrivers.forEach(driverId => {
+        const driver = drivers.find(d => d.id === driverId);
+        if (!driver) return;
+
+        // Calculate cumulative points up to this round
+        const driverPoints = points
+          .filter(p => p.driverId === driverId && p.roundId && rounds.find(r => r.id === p.roundId && (r.roundNumber || 0) <= (round.roundNumber || 0)))
+          .reduce((sum, p) => sum + (parseFloat(p.points) || 0), 0);
+
+        dataPoint[driver.name] = driverPoints;
+      });
+
+      return dataPoint;
+    });
+  }, [selectedDrivers, rounds, points, drivers]);
+
+  // Chart data for fastest lap times
+  const fastestLapData = useMemo(() => {
+    if (selectedDrivers.length === 0 || rounds.length === 0) return [];
+
+    const sortedRounds = [...rounds].sort((a, b) => (a.roundNumber || 0) - (b.roundNumber || 0));
+    
+    return sortedRounds.map(round => {
+      const dataPoint: any = {
+        round: `R${round.roundNumber}`,
+        roundNumber: round.roundNumber || 0,
+        roundName: (round.location && round.location.trim()) || 'TBD',
+      };
+
+      selectedDrivers.forEach(driverId => {
+        const driver = drivers.find(d => d.id === driverId);
+        if (!driver) return;
+
+        const driverResults = raceResults.filter(r => 
+          r.roundId === round.id && r.driverId === driverId && r.fastestLap
+        );
+
+        if (driverResults.length > 0) {
+          const validTimes = driverResults
+            .map(r => parseTime(r.fastestLap))
+            .filter(t => t !== Infinity && t > 0);
+          
+          if (validTimes.length > 0) {
+            const fastest = Math.min(...validTimes);
+            dataPoint[driver.name] = fastest;
+          }
+        }
+      });
+
+      return dataPoint;
+    });
+  }, [selectedDrivers, rounds, raceResults, drivers]);
+
+  // Chart data for position trends
+  const positionTrendsData = useMemo(() => {
+    if (selectedDrivers.length === 0 || rounds.length === 0) return [];
+
+    const sortedRounds = [...rounds].sort((a, b) => (a.roundNumber || 0) - (b.roundNumber || 0));
+    
+    return sortedRounds.map(round => {
+      const dataPoint: any = {
+        round: `R${round.roundNumber}`,
+        roundNumber: round.roundNumber || 0,
+        roundName: (round.location && round.location.trim()) || 'TBD',
+      };
+
+      selectedDrivers.forEach(driverId => {
+        const driver = drivers.find(d => d.id === driverId);
+        if (!driver) return;
+
+        // Get best position from final races, fallback to other races
+        const driverResults = raceResults.filter(r => 
+          r.roundId === round.id && r.driverId === driverId
+        );
+
+        if (driverResults.length > 0) {
+          const finalResults = driverResults.filter(r => r.raceType?.toLowerCase() === 'final');
+          const resultsToUse = finalResults.length > 0 ? finalResults : driverResults;
+          const bestPosition = Math.min(...resultsToUse.map(r => r.position || 999));
+          dataPoint[driver.name] = bestPosition < 999 ? bestPosition : null;
+        }
+      });
+
+      return dataPoint;
+    });
+  }, [selectedDrivers, rounds, raceResults, drivers]);
+
+  // Chart data for total points and average position
+  const summaryChartData = useMemo(() => {
+    if (selectedDrivers.length === 0) return [];
+
+    return selectedDrivers.map(driverId => {
+      const driver = drivers.find(d => d.id === driverId);
+      if (!driver) return null;
+
+      const driverPoints = points.filter(p => p.driverId === driverId);
+      const totalPoints = driverPoints.reduce((sum, p) => sum + (parseFloat(p.points) || 0), 0);
+      
+      const driverResults = raceResults.filter(r => r.driverId === driverId);
+      const positions = driverResults
+        .filter(r => r.raceType?.toLowerCase() === 'final')
+        .map(r => r.position)
+        .filter(p => p && p > 0);
+      
+      const avgPosition = positions.length > 0 
+        ? positions.reduce((sum, p) => sum + p, 0) / positions.length 
+        : null;
+
+      return {
+        driver: driver.name,
+        totalPoints,
+        avgPosition: avgPosition ? Math.round(avgPosition * 10) / 10 : null,
+        racesCompleted: positions.length,
+      };
+    }).filter((d): d is NonNullable<typeof d> => d !== null);
+  }, [selectedDrivers, drivers, points, raceResults]);
+
+  // Chart data for points per round
+  const pointsPerRoundData = useMemo(() => {
+    if (selectedDrivers.length === 0 || rounds.length === 0) return [];
+
+    const sortedRounds = [...rounds].sort((a, b) => (a.roundNumber || 0) - (b.roundNumber || 0));
+    
+    return sortedRounds.map(round => {
+      const dataPoint: any = {
+        round: `R${round.roundNumber}`,
+        roundNumber: round.roundNumber || 0,
+        roundName: (round.location && round.location.trim()) || 'TBD',
+      };
+
+      selectedDrivers.forEach(driverId => {
+        const driver = drivers.find(d => d.id === driverId);
+        if (!driver) return;
+
+        const roundPoints = points
+          .filter(p => p.driverId === driverId && p.roundId === round.id)
+          .reduce((sum, p) => sum + (parseFloat(p.points) || 0), 0);
+
+        dataPoint[driver.name] = roundPoints;
+      });
+
+      return dataPoint;
+    });
+  }, [selectedDrivers, rounds, points, drivers]);
+
+  // Color palette for drivers
+  const driverColors = [
+    '#3b82f6', // blue
+    '#ef4444', // red
+    '#10b981', // green
+    '#f59e0b', // amber
+    '#8b5cf6', // purple
+  ];
 
   // Get best times per round
   const bestTimes = useMemo(() => {
@@ -419,7 +607,7 @@ export default function ComparePage() {
                       key={driver.id}
                       onClick={() => handleAddDriver(driver.id)}
                       disabled={selectedDrivers.length >= 5}
-                      className="text-left px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="text-left px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <div className="font-medium text-slate-900 dark:text-white">
                         {driver.name}
@@ -433,99 +621,414 @@ export default function ComparePage() {
             </div>
           </SectionCard>
 
-          {/* Comparison Results */}
+          {/* Comparison Graphs */}
           {selectedDrivers.length > 0 && (
-            <SectionCard
-              title="Comparison Results"
-              icon={TrendingUp}
-            >
-              {comparisonData.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-slate-500 dark:text-slate-400">
-                    No race results found for selected drivers
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {comparisonData.map(({ round, drivers: roundDrivers }) => (
-                    <div
-                      key={round.id}
-                      className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6"
-                    >
-                      <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
-                        Round {round.roundNumber}: {(round.location && round.location.trim()) || 'TBD'}
-                      </h3>
-                      
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-b border-slate-200 dark:border-slate-700">
-                              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                Driver
-                              </th>
-                              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                Race Type
-                              </th>
-                              <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                Fastest Lap
-                              </th>
-                              <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                Position
-                              </th>
-                              <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                Points
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {Object.values(roundDrivers).map(({ driver, results }) => (
-                              results.length > 0 ? (
-                                results.map((result, idx) => (
-                                  <tr
-                                    key={`${driver.id}-${result.raceType}-${idx}`}
-                                    className="border-b border-slate-100 dark:border-slate-700/50"
-                                  >
-                                    {idx === 0 && (
-                                      <td
-                                        rowSpan={results.length}
-                                        className="py-3 px-4 font-medium text-slate-900 dark:text-white"
-                                      >
-                                        {driver.name}
-                                      </td>
-                                    )}
-                                    <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">
-                                      {formatRaceType(result.raceType, result.finalType)}
-                                    </td>
-                                    <td className="py-3 px-4 text-sm text-right font-mono text-slate-900 dark:text-white">
-                                      {formatTime(parseTime(result.fastestLap))}s
-                                    </td>
-                                    <td className="py-3 px-4 text-sm text-right text-slate-600 dark:text-slate-400">
-                                      {result.position}
-                                    </td>
-                                    <td className="py-3 px-4 text-sm text-right font-semibold text-slate-900 dark:text-white">
-                                      {result.points}
-                                    </td>
-                                  </tr>
-                                ))
-                              ) : (
-                                <tr key={driver.id} className="border-b border-slate-100 dark:border-slate-700/50">
-                                  <td className="py-3 px-4 font-medium text-slate-900 dark:text-white">
-                                    {driver.name}
-                                  </td>
-                                  <td colSpan={4} className="py-3 px-4 text-sm text-slate-500 dark:text-slate-400 text-center">
-                                    No results
-                                  </td>
-                                </tr>
-                              )
+            <>
+              {/* Points Progression Chart */}
+              {pointsProgressionData.length > 0 && (
+                <SectionCard
+                  title="Points Progression"
+                  subtitle="Cumulative points over rounds"
+                  icon={LineChart}
+                  className="mb-8"
+                >
+                  <div className="h-80 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsLineChart data={pointsProgressionData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" className="dark:stroke-slate-700" />
+                        <XAxis 
+                          dataKey="round" 
+                          stroke="#64748b"
+                          className="text-xs dark:text-slate-400"
+                          tick={{ fill: 'currentColor' }}
+                        />
+                        <YAxis 
+                          stroke="#64748b"
+                          className="text-xs dark:text-slate-400"
+                          tick={{ fill: 'currentColor' }}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: 'white', 
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px'
+                          }}
+                          labelStyle={{ color: '#1e293b', fontWeight: 'bold' }}
+                          itemStyle={{ color: '#1e293b' }}
+                        />
+                        <Legend />
+                        {selectedDrivers.map((driverId, idx) => {
+                          const driver = drivers.find(d => d.id === driverId);
+                          if (!driver) return null;
+                          return (
+                            <Line
+                              key={driverId}
+                              type="monotone"
+                              dataKey={driver.name}
+                              stroke={driverColors[idx % driverColors.length]}
+                              strokeWidth={2}
+                              dot={{ r: 4 }}
+                              activeDot={{ r: 6 }}
+                            />
+                          );
+                        })}
+                      </RechartsLineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </SectionCard>
+              )}
+
+              {/* Summary Charts - Total Points and Average Position */}
+              {summaryChartData.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                  <SectionCard
+                    title="Total Points"
+                    subtitle="Season total points comparison"
+                    icon={Trophy}
+                  >
+                    <div className="h-64 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={summaryChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" className="dark:stroke-slate-700" />
+                        <XAxis 
+                          dataKey="driver" 
+                          stroke="#64748b"
+                          className="text-xs dark:text-slate-400"
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                          tick={{ fill: 'currentColor' }}
+                        />
+                        <YAxis 
+                          stroke="#64748b" 
+                          className="text-xs dark:text-slate-400"
+                          tick={{ fill: 'currentColor' }}
+                        />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: 'white', 
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '8px'
+                            }}
+                            itemStyle={{ color: '#1e293b' }}
+                          />
+                          <Bar dataKey="totalPoints" radius={[8, 8, 0, 0]}>
+                            {summaryChartData.map((entry, idx) => (
+                              <Cell key={`cell-${idx}`} fill={driverColors[idx % driverColors.length]} />
                             ))}
-                          </tbody>
-                        </table>
-                      </div>
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
-                  ))}
+                  </SectionCard>
+
+                  <SectionCard
+                    title="Average Position"
+                    subtitle="Average final race position"
+                    icon={BarChart3}
+                  >
+                    <div className="h-64 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={summaryChartData.filter(d => d !== null && d.avgPosition !== null)}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" className="dark:stroke-slate-700" />
+                          <XAxis 
+                            dataKey="driver" 
+                            stroke="#64748b"
+                            className="text-xs"
+                            angle={-45}
+                            textAnchor="end"
+                            height={80}
+                          />
+                          <YAxis 
+                            stroke="#64748b" 
+                            className="text-xs"
+                            reversed
+                            domain={['dataMin - 1', 'dataMax + 1']}
+                          />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: 'white', 
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '8px'
+                            }}
+                            formatter={(value: any) => value !== null && value !== undefined ? value.toFixed(1) : 'N/A'}
+                          />
+                          <Bar dataKey="avgPosition" radius={[8, 8, 0, 0]}>
+                            {summaryChartData.filter(d => d !== null && d.avgPosition !== null).map((entry, idx) => (
+                              <Cell key={`cell-${idx}`} fill={driverColors[idx % driverColors.length]} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </SectionCard>
                 </div>
               )}
-            </SectionCard>
+
+              {/* Fastest Lap Times Chart */}
+              {fastestLapData.some(d => selectedDrivers.some(id => {
+                const driver = drivers.find(dr => dr.id === id);
+                return driver && d[driver.name] !== undefined;
+              })) && (
+                <SectionCard
+                  title="Fastest Lap Times"
+                  subtitle="Best lap times across rounds"
+                  icon={Clock}
+                  className="mb-8"
+                >
+                  <div className="h-80 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsLineChart data={fastestLapData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" className="dark:stroke-slate-700" />
+                        <XAxis 
+                          dataKey="round" 
+                          stroke="#64748b"
+                          className="text-xs dark:text-slate-400"
+                          tick={{ fill: 'currentColor' }}
+                        />
+                        <YAxis 
+                          stroke="#64748b"
+                          className="text-xs dark:text-slate-400"
+                          tick={{ fill: 'currentColor' }}
+                          domain={['dataMin - 0.5', 'dataMax + 0.5']}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: 'white', 
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px'
+                          }}
+                          itemStyle={{ color: '#1e293b' }}
+                          formatter={(value: any) => value !== undefined && value !== null ? `${value.toFixed(3)}s` : 'N/A'}
+                        />
+                        <Legend />
+                        {selectedDrivers.map((driverId, idx) => {
+                          const driver = drivers.find(d => d.id === driverId);
+                          if (!driver) return null;
+                          return (
+                            <Line
+                              key={driverId}
+                              type="monotone"
+                              dataKey={driver.name}
+                              stroke={driverColors[idx % driverColors.length]}
+                              strokeWidth={2}
+                              dot={{ r: 4 }}
+                              activeDot={{ r: 6 }}
+                            />
+                          );
+                        })}
+                      </RechartsLineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </SectionCard>
+              )}
+
+              {/* Position Trends Chart */}
+              {positionTrendsData.some(d => selectedDrivers.some(id => {
+                const driver = drivers.find(dr => dr.id === id);
+                return driver && d[driver.name] !== undefined && d[driver.name] !== null;
+              })) && (
+                <SectionCard
+                  title="Position Trends"
+                  subtitle="Final race positions over rounds"
+                  icon={TrendingUp}
+                  className="mb-8"
+                >
+                  <div className="h-80 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsLineChart data={positionTrendsData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" className="dark:stroke-slate-700" />
+                        <XAxis 
+                          dataKey="round" 
+                          stroke="#64748b"
+                          className="text-xs dark:text-slate-400"
+                          tick={{ fill: 'currentColor' }}
+                        />
+                        <YAxis 
+                          stroke="#64748b"
+                          className="text-xs dark:text-slate-400"
+                          tick={{ fill: 'currentColor' }}
+                          reversed
+                          domain={['dataMin - 1', 'dataMax + 1']}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: 'white', 
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px'
+                          }}
+                          itemStyle={{ color: '#1e293b' }}
+                          formatter={(value: any) => value !== null && value !== undefined ? `P${value}` : 'N/A'}
+                        />
+                        <Legend />
+                        {selectedDrivers.map((driverId, idx) => {
+                          const driver = drivers.find(d => d.id === driverId);
+                          if (!driver) return null;
+                          return (
+                            <Line
+                              key={driverId}
+                              type="monotone"
+                              dataKey={driver.name}
+                              stroke={driverColors[idx % driverColors.length]}
+                              strokeWidth={2}
+                              dot={{ r: 4 }}
+                              activeDot={{ r: 6 }}
+                            />
+                          );
+                        })}
+                      </RechartsLineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </SectionCard>
+              )}
+
+              {/* Points Per Round Chart */}
+              {pointsPerRoundData.some(d => selectedDrivers.some(id => {
+                const driver = drivers.find(dr => dr.id === id);
+                return driver && d[driver.name] !== undefined && d[driver.name] > 0;
+              })) && (
+                <SectionCard
+                  title="Points Per Round"
+                  subtitle="Points earned in each round"
+                  icon={BarChart3}
+                  className="mb-8"
+                >
+                  <div className="h-80 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={pointsPerRoundData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" className="dark:stroke-slate-700" />
+                        <XAxis 
+                          dataKey="round" 
+                          stroke="#64748b"
+                          className="text-xs dark:text-slate-400"
+                          tick={{ fill: 'currentColor' }}
+                        />
+                        <YAxis 
+                          stroke="#64748b" 
+                          className="text-xs dark:text-slate-400"
+                          tick={{ fill: 'currentColor' }}
+                        />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: 'white', 
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '8px'
+                            }}
+                            itemStyle={{ color: '#1e293b' }}
+                          />
+                        <Legend />
+                        {selectedDrivers.map((driverId, idx) => {
+                          const driver = drivers.find(d => d.id === driverId);
+                          if (!driver) return null;
+                          return (
+                            <Bar
+                              key={driverId}
+                              dataKey={driver.name}
+                              fill={driverColors[idx % driverColors.length]}
+                              radius={[4, 4, 0, 0]}
+                            />
+                          );
+                        })}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </SectionCard>
+              )}
+
+              {/* Comparison Results Table */}
+              <SectionCard
+                title="Detailed Comparison"
+                subtitle="Round-by-round race results"
+                icon={TrendingUp}
+              >
+                {comparisonData.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-slate-500 dark:text-slate-400">
+                      No race results found for selected drivers
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {comparisonData.map(({ round, drivers: roundDrivers }) => (
+                      <div
+                        key={round.id}
+                        className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6"
+                      >
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+                          Round {round.roundNumber}: {(round.location && round.location.trim()) || 'TBD'}
+                        </h3>
+                        
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="border-b border-slate-200 dark:border-slate-700">
+                                <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                  Driver
+                                </th>
+                                <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                  Race Type
+                                </th>
+                                <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                  Fastest Lap
+                                </th>
+                                <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                  Position
+                                </th>
+                                <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                  Points
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {Object.values(roundDrivers).map(({ driver, results }) => (
+                                results.length > 0 ? (
+                                  results.map((result, idx) => (
+                                    <tr
+                                      key={`${driver.id}-${result.raceType}-${idx}`}
+                                      className="border-b border-slate-100 dark:border-slate-700/50"
+                                    >
+                                      {idx === 0 && (
+                                        <td
+                                          rowSpan={results.length}
+                                          className="py-3 px-4 font-medium text-slate-900 dark:text-white"
+                                        >
+                                          {driver.name}
+                                        </td>
+                                      )}
+                                      <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">
+                                        {formatRaceType(result.raceType, result.finalType)}
+                                      </td>
+                                      <td className="py-3 px-4 text-sm text-right font-mono text-slate-900 dark:text-white">
+                                        {formatTime(parseTime(result.fastestLap))}s
+                                      </td>
+                                      <td className="py-3 px-4 text-sm text-right text-slate-600 dark:text-slate-400">
+                                        {result.position}
+                                      </td>
+                                      <td className="py-3 px-4 text-sm text-right font-semibold text-slate-900 dark:text-white">
+                                        {result.points}
+                                      </td>
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr key={driver.id} className="border-b border-slate-100 dark:border-slate-700/50">
+                                    <td className="py-3 px-4 font-medium text-slate-900 dark:text-white">
+                                      {driver.name}
+                                    </td>
+                                    <td colSpan={4} className="py-3 px-4 text-sm text-slate-500 dark:text-slate-400 text-center">
+                                      No results
+                                    </td>
+                                  </tr>
+                                )
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SectionCard>
+            </>
           )}
         </>
       ) : (
@@ -613,7 +1116,7 @@ export default function ComparePage() {
                   key={round.id}
                   className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
                 >
-                  <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                  <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                       Round {round.roundNumber}: {(round.location && round.location.trim()) || 'TBD'}
                     </h3>

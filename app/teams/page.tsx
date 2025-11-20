@@ -17,7 +17,7 @@ const getDivisionColor = (division: Division) => {
     case 'Division 2':
       return 'bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200';
     default:
-      return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
+      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
   }
 };
 
@@ -498,7 +498,7 @@ export default function TeamsPage() {
                     className={`px-4 py-2 rounded-lg transition-colors font-medium ${
                       divisionFilter === 'all'
                         ? 'bg-primary-500 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-800'
                     }`}
                   >
                     All Divisions
@@ -508,7 +508,7 @@ export default function TeamsPage() {
                     className={`px-4 py-2 rounded-lg transition-colors font-medium ${
                       divisionFilter === 'Division 1'
                         ? 'bg-primary-500 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-800'
                     }`}
                   >
                     Division 1
@@ -518,7 +518,7 @@ export default function TeamsPage() {
                     className={`px-4 py-2 rounded-lg transition-colors font-medium ${
                       divisionFilter === 'Division 2'
                         ? 'bg-primary-500 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-800'
                     }`}
                   >
                     Division 2
@@ -536,7 +536,7 @@ export default function TeamsPage() {
                   placeholder="Search by team name..."
                   value={teamSearchQuery}
                   onChange={(e) => setTeamSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
         </SectionCard>
@@ -597,7 +597,7 @@ export default function TeamsPage() {
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleEditTeam(team)}
-                          className="p-1.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors"
+                          className="p-1.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
                           title="Edit team"
                         >
                           <Edit className="w-4 h-4" />
@@ -616,7 +616,7 @@ export default function TeamsPage() {
                         {teamDrivers.map((driver) => (
                           <div
                             key={driver.id}
-                            className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors"
+                            className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                           >
                             <span className="text-sm font-medium text-slate-900 dark:text-white">
                               {driver.name}
@@ -632,7 +632,7 @@ export default function TeamsPage() {
                         ))}
                       </div>
                     ) : (
-                      <div className="p-4 text-center bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                      <div className="p-4 text-center bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
                         <p className="text-sm text-slate-500 dark:text-slate-400">
                           No drivers in team
                         </p>
@@ -656,10 +656,10 @@ export default function TeamsPage() {
                               [team.id]: e.target.value,
                             });
                           }}
-                          className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                          className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                         />
                         {(driverSearchQuery[team.id] || '').trim() && (
-                          <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                          <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
                             {(() => {
                               const filtered = getFilteredDriversForTeam(team, driverSearchQuery[team.id] || '');
                               return filtered.length > 0 ? (
@@ -689,7 +689,7 @@ export default function TeamsPage() {
                                         });
                                       }}
                                       disabled={isInOtherTeam}
-                                      className={`w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-900 dark:text-white text-sm ${
+                                      className={`w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-900 dark:text-white text-sm ${
                                         isInOtherTeam ? 'opacity-50 cursor-not-allowed' : ''
                                       }`}
                                       title={isInOtherTeam ? `Already in team "${otherTeam?.name}"` : ''}
@@ -749,7 +749,7 @@ export default function TeamsPage() {
                     setSelectedDivisionForTeam(e.target.value as Division);
                   }
                 }}
-                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!isEditMode && divisionFilter !== 'all'}
               >
                 <option value="">Select division...</option>
@@ -771,7 +771,7 @@ export default function TeamsPage() {
                 placeholder="Team name"
                 value={newTeamName}
                 onChange={(e) => setNewTeamName(e.target.value)}
-                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
             {isEditMode && (
@@ -786,10 +786,10 @@ export default function TeamsPage() {
                     value={registrationDriverSearch}
                     onChange={(e) => setRegistrationDriverSearch(e.target.value)}
                     disabled={selectedDriversForRegistration.length >= 3}
-                    className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   {registrationDriverSearch.trim() && selectedDriversForRegistration.length < 3 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                       {(() => {
                         const filtered = getFilteredDriversForRegistration(registrationDriverSearch)
                           .filter((d) => !selectedDriversForRegistration.includes(d.id));
@@ -822,7 +822,7 @@ export default function TeamsPage() {
                                   }
                                 }}
                                 disabled={isInOtherTeam || selectedDriversForRegistration.length >= 3}
-                                className={`w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-900 dark:text-white text-sm ${
+                                className={`w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-900 dark:text-white text-sm ${
                                   isInOtherTeam ? 'opacity-50 cursor-not-allowed' : ''
                                 }`}
                                 title={isInOtherTeam ? `Already in team "${otherTeam?.name}"` : ''}
@@ -852,7 +852,7 @@ export default function TeamsPage() {
                       return driver ? (
                         <div
                           key={driverId}
-                          className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-900 rounded-lg"
+                          className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded-lg"
                         >
                           <span className="text-sm text-slate-900 dark:text-white">{driver.name}</span>
                           <button
@@ -887,7 +887,7 @@ export default function TeamsPage() {
               </button>
               <button
                 onClick={handleCancelModal}
-                className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >
                 Cancel
               </button>

@@ -50,9 +50,7 @@ const bottomNavItems: NavItem[] = [
   { name: 'Locations', href: '/locations', icon: MapPin, category: 'settings' },
 ];
 
-const comingSoonItems: NavItem[] = [
-  { name: 'Audit', href: '/audit', icon: ShieldCheck, category: 'tools' },
-];
+const comingSoonItems: NavItem[] = [];
 
 export default function Sidebar() {
   const { isCollapsed, setIsCollapsed } = useSidebar();
@@ -148,7 +146,7 @@ export default function Sidebar() {
           </Link>
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-2 rounded-xl hover:bg-slate-700/50 transition-all hidden md:flex items-center justify-center ml-2 border border-slate-700/50 hover:border-slate-600/50 hover-lift"
+            className="p-2 rounded-xl hover:bg-slate-700/50 transition-all hidden md:flex items-center justify-center ml-2 border border-slate-700/50 hover:border-slate-700/50 hover-lift"
             aria-label="Toggle sidebar"
           >
             {isCollapsed ? (
@@ -266,43 +264,45 @@ export default function Sidebar() {
           </div>
           
           {/* Coming Soon Section */}
-          <div className="pt-4 border-t border-slate-700/50 space-y-2">
-            {(!isCollapsed || (mounted && isMobile)) && (
-              <div className="px-4 py-2 mb-2">
-                <span className="text-xs text-slate-400 uppercase font-bold tracking-wider">Coming Soon</span>
-              </div>
-            )}
-            {comingSoonItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={handleLinkClick}
-                  className={`group relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ease-out ${
-                    isActive
-                      ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg'
-                      : 'text-slate-400 hover:bg-slate-700/30 hover:text-slate-300 opacity-60'
-                  }`}
-                >
-                  <Icon 
-                    className={`w-5 h-5 flex-shrink-0 transition-all duration-200 ${
-                      isActive ? 'scale-110' : 'group-hover:scale-105'
-                    }`} 
-                  />
-                  {(!isCollapsed || (mounted && isMobile)) && (
-                    <span className="font-medium transition-opacity duration-200">
-                      {item.name}
-                    </span>
-                  )}
-                  {isActive && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full shadow-lg" />
-                  )}
-                </Link>
-              );
-            })}
-          </div>
+          {comingSoonItems.length > 0 && (
+            <div className="pt-4 border-t border-slate-700/50 space-y-2">
+              {(!isCollapsed || (mounted && isMobile)) && (
+                <div className="px-4 py-2 mb-2">
+                  <span className="text-xs text-slate-400 uppercase font-bold tracking-wider">Coming Soon</span>
+                </div>
+              )}
+              {comingSoonItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={handleLinkClick}
+                    className={`group relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ease-out ${
+                      isActive
+                        ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg'
+                        : 'text-slate-400 hover:bg-slate-700/30 hover:text-slate-300 opacity-60'
+                    }`}
+                  >
+                    <Icon 
+                      className={`w-5 h-5 flex-shrink-0 transition-all duration-200 ${
+                        isActive ? 'scale-110' : 'group-hover:scale-105'
+                      }`} 
+                    />
+                    {(!isCollapsed || (mounted && isMobile)) && (
+                      <span className="font-medium transition-opacity duration-200">
+                        {item.name}
+                      </span>
+                    )}
+                    {isActive && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full shadow-lg" />
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </nav>
       </aside>
     </>

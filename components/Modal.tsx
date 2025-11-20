@@ -92,12 +92,12 @@ export default function Modal({
 
       {/* Modal */}
       <div
-        className={`relative w-full ${sizeClasses[size]} bg-white dark:bg-slate-900 rounded-3xl shadow-modern-2xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-scaleIn`}
+        className={`relative w-full ${sizeClasses[size]} bg-white dark:bg-slate-800 rounded-3xl shadow-modern-2xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-scaleIn`}
         onMouseDown={(e) => e.stopPropagation()}
         onMouseUp={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-6 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900">
+        <div className="p-6 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-4 flex-1">
               {Icon && (
@@ -133,7 +133,7 @@ export default function Modal({
 
         {/* Footer */}
         {footer && (
-          <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+          <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
             {footer}
           </div>
         )}

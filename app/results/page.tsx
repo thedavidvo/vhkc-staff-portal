@@ -23,13 +23,13 @@ const getDivisionColor = (division: Division) => {
     case 'New':
       return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
     default:
-      return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
+      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
   }
 };
 
 // Helper function to get final type color
 const getFinalTypeColor = (finalType?: string) => {
-  if (!finalType) return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
+  if (!finalType) return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
   
   switch (finalType.toUpperCase()) {
     case 'A':
@@ -45,7 +45,7 @@ const getFinalTypeColor = (finalType?: string) => {
     case 'F':
       return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
     default:
-      return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
+      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
   }
 };
 
@@ -349,7 +349,7 @@ export default function ResultsPage() {
                 <select
                   value={selectedRound}
                   onChange={(e) => setSelectedRound(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {rounds.map(round => (
                     <option key={round.id} value={round.id}>
@@ -364,7 +364,7 @@ export default function ResultsPage() {
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Divisions (Multiple)
                 </label>
-                <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-300 dark:border-slate-600 rounded-lg p-2">
+                <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-300 dark:border-slate-700 rounded-lg p-2">
                   {['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'].map(division => (
                     <label key={division} className="flex items-center gap-2">
                       <input
@@ -377,7 +377,7 @@ export default function ResultsPage() {
                             setSelectedDivisions(selectedDivisions.filter(d => d !== division));
                           }
                         }}
-                        className="rounded border-slate-300 dark:border-slate-600"
+                        className="rounded border-slate-300 dark:border-slate-700"
                       />
                       <span className="text-sm text-slate-700 dark:text-slate-300">{division}</span>
                     </label>
@@ -393,7 +393,7 @@ export default function ResultsPage() {
                 <select
                   value={selectedRaceType}
                   onChange={(e) => setSelectedRaceType(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {availableRaceTypes.length === 0 ? (
                     <option value="">No race types available</option>
@@ -415,7 +415,7 @@ export default function ResultsPage() {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as 'position' | 'time' | 'points')}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="position">By Grid Finish</option>
                   <option value="time">By Time</option>
@@ -433,7 +433,7 @@ export default function ResultsPage() {
         >
           <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-slate-50 dark:bg-slate-900">
+                <thead className="bg-slate-50 dark:bg-slate-800">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                       Overall Position
@@ -470,7 +470,7 @@ export default function ResultsPage() {
                     </tr>
                   ) : (
                     resultsWithOverallPosition.map((result, index) => (
-                      <tr key={`${result.roundId}-${result.driverId}-${index}`} className="hover:bg-slate-50 dark:hover:bg-slate-700">
+                      <tr key={`${result.roundId}-${result.driverId}-${index}`} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             {result.overallPosition === 1 && <Trophy className="w-4 h-4 text-amber-500" />}

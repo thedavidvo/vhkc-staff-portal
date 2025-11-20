@@ -46,7 +46,7 @@ export default function SeasonSelector() {
   const dropdownContent = isOpen && buttonRect && mounted ? (
     <div
       ref={dropdownRef}
-      className="fixed rounded-lg shadow-2xl border border-slate-700 dark:border-slate-600 max-h-96 overflow-y-auto scrollbar-hide"
+      className="fixed rounded-lg shadow-2xl border border-slate-700 dark:border-slate-700 max-h-96 overflow-y-auto scrollbar-hide"
       style={{
         backgroundColor: 'rgb(15 23 42)',
         zIndex: 9999,
@@ -95,7 +95,7 @@ export default function SeasonSelector() {
         <button
           ref={buttonRef}
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full flex items-center gap-2 px-3 py-2 bg-slate-800 dark:bg-slate-700 border border-slate-700 dark:border-slate-600 rounded-lg hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors shadow-sm text-left"
+          className="w-full flex items-center gap-2 px-3 py-2 bg-slate-800 dark:bg-slate-800 border border-slate-700 dark:border-slate-700 rounded-lg hover:bg-slate-700 dark:hover:bg-slate-800 transition-colors shadow-sm text-left"
         >
           <Calendar className="w-4 h-4 text-slate-300 dark:text-slate-300 flex-shrink-0" />
           <span className="font-medium text-slate-200 dark:text-white text-sm truncate flex-1">

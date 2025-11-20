@@ -23,7 +23,7 @@ const getDivisionColor = (division: Division) => {
     case 'New':
       return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
     default:
-      return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
+      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
   }
 };
 
@@ -37,7 +37,7 @@ const getStatusColor = (status: DriverStatus) => {
     case 'BANNED':
       return 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200';
     default:
-      return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
+      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
   }
 };
 
@@ -212,17 +212,27 @@ export default function DriversPage() {
 
   const handleDelete = async (driverId: string) => {
     if (!selectedSeason) return;
-    if (!confirm('Are you sure you want to delete this driver?')) {
+    if (!confirm('Are you sure you want to delete this driver? This will permanently delete the driver and all their race results, points, check-ins, and division changes.')) {
       return;
     }
 
     try {
-      // TODO: Implement delete driver API endpoint
-      // For now, just update local state
-      setDrivers(drivers.filter((d) => d.id !== driverId));
-      if (selectedDriver?.id === driverId) {
-        setSelectedDriver(null);
-        setIsEditing(false);
+      const response = await fetch(`/api/drivers?driverId=${driverId}&seasonId=${selectedSeason.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        // Update local state
+        setDrivers(drivers.filter((d) => d.id !== driverId));
+        if (selectedDriver?.id === driverId) {
+          setSelectedDriver(null);
+          setIsEditing(false);
+        }
+        // Notify other components
+        notifyDriversUpdated();
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to delete driver. Please try again.');
       }
     } catch (error) {
       console.error('Failed to delete driver:', error);
@@ -391,7 +401,7 @@ export default function DriversPage() {
         >
           <div className="overflow-x-auto max-h-[calc(100vh-400px)]">
                   <table className="w-full">
-                    <thead className="bg-slate-50 dark:bg-slate-900">
+                    <thead className="bg-slate-50 dark:bg-slate-800">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                           Name
@@ -414,7 +424,7 @@ export default function DriversPage() {
                       {filteredDrivers.map((driver) => (
                         <tr
                           key={driver.id}
-                          className={`hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer ${
+                          className={`hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer ${
                             selectedDriver?.id === driver.id ? 'bg-primary-50 dark:bg-primary-900/20' : ''
                           }`}
                           onClick={() => {
@@ -509,7 +519,7 @@ export default function DriversPage() {
                             type="text"
                             value={editForm.firstName || selectedDriver.firstName || ''}
                             onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
-                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                             placeholder={selectedDriver.firstName || 'First Name'}
                           />
                         </div>
@@ -521,7 +531,7 @@ export default function DriversPage() {
                             type="text"
                             value={editForm.lastName || selectedDriver.lastName || ''}
                             onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
-                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                             placeholder={selectedDriver.lastName || 'Last Name'}
                           />
                         </div>
@@ -534,7 +544,7 @@ export default function DriversPage() {
                           type="email"
                           value={editForm.email || ''}
                           onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                           placeholder={selectedDriver.email}
                         />
                       </div>
@@ -557,7 +567,7 @@ export default function DriversPage() {
                                   setEditForm({ ...editForm, dateOfBirth: dateString });
                                 }
                               }}
-                              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                               placeholder="DD"
                             />
                           </div>
@@ -575,7 +585,7 @@ export default function DriversPage() {
                                   setEditForm({ ...editForm, dateOfBirth: dateString });
                                 }
                               }}
-                              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                               placeholder="MM"
                             />
                           </div>
@@ -593,7 +603,7 @@ export default function DriversPage() {
                                   setEditForm({ ...editForm, dateOfBirth: dateString });
                                 }
                               }}
-                              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                               placeholder="YYYY"
                             />
                           </div>
@@ -608,7 +618,7 @@ export default function DriversPage() {
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                           Division
                         </label>
-                        <div className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-900">
+                        <div className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800">
                           <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(selectedDriver.division)}`}>
                             {selectedDriver.division}
                           </span>
@@ -651,7 +661,7 @@ export default function DriversPage() {
                                   newAliases[index] = e.target.value;
                                   setEditForm({ ...editForm, aliases: newAliases });
                                 }}
-                                className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                                className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                                 placeholder={`Alias ${index + 1}`}
                               />
                               {index < (editForm.aliases || ['']).length - 1 && (
@@ -679,7 +689,7 @@ export default function DriversPage() {
                               const currentAliases = editForm.aliases || [''];
                               setEditForm({ ...editForm, aliases: [...currentAliases, ''] });
                             }}
-                            className="px-3 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors text-sm"
+                            className="px-3 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-800 transition-colors text-sm"
                           >
                             + Add Alias
                           </button>
@@ -696,7 +706,7 @@ export default function DriversPage() {
                           type="text"
                           value={editForm.homeTrack || selectedDriver.homeTrack || ''}
                           onChange={(e) => setEditForm({ ...editForm, homeTrack: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                           placeholder={selectedDriver.homeTrack || 'Home Track'}
                         />
                       </div>
@@ -704,7 +714,7 @@ export default function DriversPage() {
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                           Team Name
                         </label>
-                        <div className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400">
+                        <div className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                           {selectedDriver.teamName || 'No Team'}
                         </div>
                       </div>
@@ -721,7 +731,7 @@ export default function DriversPage() {
                               className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
                                 (editForm.status || selectedDriver.status) === status
                                   ? getStatusColor(status) + ' ring-2 ring-offset-2 ring-slate-400'
-                                  : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
                               }`}
                             >
                               {formatStatus(status)}
@@ -743,7 +753,7 @@ export default function DriversPage() {
                             setEditForm({});
                             setDateOfBirth({ day: 0, month: 0, year: 0 });
                           }}
-                          className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                          className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                         >
                           <X className="w-4 h-4" />
                         </button>

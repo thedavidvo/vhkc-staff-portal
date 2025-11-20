@@ -8,8 +8,9 @@ import SectionCard from '@/components/SectionCard';
 import StatsCards from '@/components/StatsCards';
 import RaceHistory from '@/components/RaceHistory';
 import { useSeason } from '@/components/SeasonContext';
-import { Calendar, MapPin, Flag, Trophy, Medal, Award, Loader2, LayoutDashboard, BarChart3 } from 'lucide-react';
+import { Calendar, MapPin, Flag, Trophy, Medal, Award, Loader2, LayoutDashboard, BarChart3, TrendingUp, TrendingDown } from 'lucide-react';
 import { Division } from '@/types';
+import DivisionChangesModal from '@/components/DivisionChangesModal';
 
 // Helper function to get division color
 const getDivisionColor = (division: Division) => {
@@ -25,7 +26,7 @@ const getDivisionColor = (division: Division) => {
     case 'New':
       return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
     default:
-      return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
+      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
   }
 };
 
@@ -35,8 +36,12 @@ export default function Dashboard() {
   const [drivers, setDrivers] = useState<any[]>([]);
   const [rounds, setRounds] = useState<any[]>([]);
   const [points, setPoints] = useState<any[]>([]);
+  const [divisionChanges, setDivisionChanges] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [loadingChanges, setLoadingChanges] = useState(false);
+  const [promotionsModalOpen, setPromotionsModalOpen] = useState(false);
+  const [demotionsModalOpen, setDemotionsModalOpen] = useState(false);
 
   // Check authentication on mount
   useEffect(() => {
@@ -98,6 +103,34 @@ export default function Dashboard() {
     fetchData();
   }, [selectedSeason, isCheckingAuth, seasonsLoading]);
 
+  // Fetch division changes for the season
+  useEffect(() => {
+    const fetchDivisionChanges = async () => {
+      if (!selectedSeason?.id) {
+        setDivisionChanges([]);
+        return;
+      }
+
+      try {
+        setLoadingChanges(true);
+        const response = await fetch(`/api/division-changes?seasonId=${selectedSeason.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setDivisionChanges(Array.isArray(data) ? data : []);
+        } else {
+          setDivisionChanges([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch division changes:', error);
+        setDivisionChanges([]);
+      } finally {
+        setLoadingChanges(false);
+      }
+    };
+
+    fetchDivisionChanges();
+  }, [selectedSeason]);
+
   // Calculate dynamic stats
   const stats = useMemo(() => {
     const activeDrivers = drivers.filter((d) => d.status === 'ACTIVE');
@@ -107,6 +140,15 @@ export default function Dashboard() {
       activeDivisions: uniqueDivisions.size,
     };
   }, [drivers]);
+
+  // Separate promotions and demotions
+  const promotions = useMemo(() => {
+    return divisionChanges.filter((c: any) => c.changeType === 'promotion');
+  }, [divisionChanges]);
+
+  const demotions = useMemo(() => {
+    return divisionChanges.filter((c: any) => c.changeType === 'demotion');
+  }, [divisionChanges]);
 
   // Convert rounds to races format
   const races = useMemo(() => {
@@ -292,13 +334,33 @@ export default function Dashboard() {
       icon={LayoutDashboard}
     >
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <StatsCards 
-          stats={stats} 
-          onDriversClick={() => router.push('/drivers')}
-          onDivisionsClick={() => router.push('/divisions')}
-        />
-      </div>
+      <StatsCards 
+        stats={stats} 
+        onDriversClick={() => router.push('/drivers')}
+        onDivisionsClick={() => router.push('/divisions')}
+        onPromotionsClick={() => setPromotionsModalOpen(true)}
+        onDemotionsClick={() => setDemotionsModalOpen(true)}
+        promotionsCount={promotions.length}
+        demotionsCount={demotions.length}
+      />
+
+      {/* Division Changes Modals */}
+      <DivisionChangesModal
+        isOpen={promotionsModalOpen}
+        onClose={() => setPromotionsModalOpen(false)}
+        type="promotions"
+        changes={promotions}
+        rounds={rounds}
+        loading={loadingChanges}
+      />
+      <DivisionChangesModal
+        isOpen={demotionsModalOpen}
+        onClose={() => setDemotionsModalOpen(false)}
+        type="demotions"
+        changes={demotions}
+        rounds={rounds}
+        loading={loadingChanges}
+      />
 
       {/* Next Upcoming Race */}
       {nextUpcomingRace ? (
@@ -375,7 +437,7 @@ export default function Dashboard() {
                   return (
                     <div
                       key={division}
-                      className="p-4 bg-slate-50/50 dark:bg-slate-900/50 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-all duration-200"
+                      className="p-4 bg-slate-50/50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-all duration-200"
                     >
                       <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
                         <span className={`px-2 py-1 rounded-lg text-xs ${getDivisionColor(division)}`}>
@@ -449,12 +511,12 @@ export default function Dashboard() {
                 <div className="relative">
                   <div className="overflow-y-auto" style={{ maxHeight: '320px' }}>
                     <table className="w-full">
-                      <thead className="bg-slate-50 dark:bg-slate-900 sticky top-0 z-20">
+                      <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-20">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase sticky left-0 bg-slate-50 dark:bg-slate-900 z-30">
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase sticky left-0 bg-slate-50 dark:bg-slate-800 z-30">
                             Pos
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase sticky left-[60px] bg-slate-50 dark:bg-slate-900 z-30">
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase sticky left-[60px] bg-slate-50 dark:bg-slate-800 z-30">
                             Driver
                           </th>
                           {rounds.length > 0 && (
@@ -481,7 +543,7 @@ export default function Dashboard() {
                           return (
                             <tr
                               key={driver.id}
-                              className="hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                              className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                             >
                               <td className="px-4 py-3 whitespace-nowrap sticky left-0 bg-white dark:bg-slate-800 z-10">
                                 <div className="flex items-center gap-2">

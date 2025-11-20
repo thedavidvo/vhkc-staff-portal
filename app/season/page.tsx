@@ -293,7 +293,7 @@ export default function SeasonPage() {
                       {displayedRounds.map((round) => (
                         <div
                           key={round.id}
-                          className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 relative group cursor-pointer hover:shadow-lg transition-all"
+                          className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 relative group cursor-pointer hover:shadow-lg transition-all"
                           onClick={() => handleRoundClick(round)}
                         >
                           <div className="flex items-start justify-between mb-2">
@@ -306,7 +306,7 @@ export default function SeasonPage() {
                                   e.stopPropagation();
                                   handleEditRound(round);
                                 }}
-                                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
                                 aria-label="Edit round"
                               >
                                 <Edit2 className="w-4 h-4 text-slate-600 dark:text-slate-400" />
@@ -370,7 +370,7 @@ export default function SeasonPage() {
                       <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
                         {year}
                       </h2>
-                      <div className="flex-1 h-px bg-slate-300 dark:bg-slate-600"></div>
+                      <div className="flex-1 h-px bg-slate-300 dark:bg-slate-800"></div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                       {yearSeasons.map((season) => (
@@ -390,7 +390,7 @@ export default function SeasonPage() {
                           <div className="flex gap-1">
                             <button
                               onClick={() => handleEditSeason(season)}
-                              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                               aria-label="Edit season"
                             >
                               <Edit2 className="w-4 h-4 text-slate-600 dark:text-slate-400" />
@@ -493,7 +493,7 @@ export default function SeasonPage() {
                   setIsRoundDetailsOpen(false);
                   setSelectedRound(null);
                 }}
-                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 aria-label="Close modal"
               >
                 <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
@@ -567,7 +567,7 @@ export default function SeasonPage() {
                   setIsRoundDetailsOpen(false);
                   setSelectedRound(null);
                 }}
-                className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors font-medium"
+                className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium"
               >
                 Close
               </button>

@@ -24,7 +24,7 @@ export default function SectionCard({
   return (
     <div className={`glass rounded-3xl shadow-modern-lg border border-slate-200/50 dark:border-slate-700/50 flex flex-col ${className}`}>
       {(title || actions) && (
-        <div className="p-6 pb-7 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-slate-50/50 to-slate-100/50 dark:from-slate-800/50 dark:to-slate-900/50 flex-shrink-0" style={{ overflow: 'visible' }}>
+        <div className="p-6 pb-7 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-slate-50/50 to-slate-100/50 dark:from-slate-800/50 dark:to-slate-800/50 flex-shrink-0" style={{ overflow: 'visible' }}>
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               {Icon && (

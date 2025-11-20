@@ -23,7 +23,7 @@ const getDivisionColor = (division: Division) => {
     case 'New':
       return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
     default:
-      return 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300';
+      return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300';
   }
 };
 
@@ -45,7 +45,7 @@ const getRaceTypeBadgeColor = (raceType: string, finalType?: string) => {
       case 'F':
         return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
       default:
-        return 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300';
+        return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300';
     }
   }
   
@@ -56,7 +56,7 @@ const getRaceTypeBadgeColor = (raceType: string, finalType?: string) => {
     case 'heat':
       return 'bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200';
     default:
-      return 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300';
+      return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300';
   }
 };
 
@@ -696,7 +696,7 @@ export default function PointsPage() {
                 <select
                   value={selectedRound}
                   onChange={(e) => setSelectedRound(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {rounds.map(round => (
                     <option key={round.id} value={round.id}>
@@ -713,7 +713,7 @@ export default function PointsPage() {
                 <select
                   value={selectedDivision}
                   onChange={(e) => setSelectedDivision(e.target.value as Division)}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="Division 1">Division 1</option>
                   <option value="Division 2">Division 2</option>
@@ -730,7 +730,7 @@ export default function PointsPage() {
                 <select
                   value={selectedRaceType}
                   onChange={(e) => setSelectedRaceType(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {availableRaceTypes.includes('heat') && (
                     <option value="heat">Heat</option>
@@ -751,7 +751,7 @@ export default function PointsPage() {
         >
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-slate-50 dark:bg-slate-900">
+                <thead className="bg-slate-50 dark:bg-slate-800">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                       Overall Position
@@ -803,7 +803,7 @@ export default function PointsPage() {
                       return (
                         <tr 
                           key={`${point.roundId}-${point.driverId}-${point.raceType}-${index}`} 
-                          className={`hover:bg-slate-50 dark:hover:bg-slate-700 ${movedDown ? 'bg-red-50 dark:bg-red-900/20' : ''}`}
+                          className={`hover:bg-slate-50 dark:hover:bg-slate-800 ${movedDown ? 'bg-red-50 dark:bg-red-900/20' : ''}`}
                         >
                           <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white">
                             {point.overallPosition}
@@ -838,7 +838,7 @@ export default function PointsPage() {
                                 type="number"
                                 value={currentPoints}
                                 onChange={(e) => handleEditPoints(point, parseInt(e.target.value) || 0)}
-                                className="w-20 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm font-semibold"
+                                className="w-20 px-2 py-1 border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-semibold"
                                 min="0"
                               />
                               {pointsChanged && (

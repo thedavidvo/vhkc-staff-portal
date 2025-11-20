@@ -223,7 +223,7 @@ export default function LocationsPage() {
                 {filteredLocations.map((location) => (
                   <div
                     key={location.id}
-                    className="p-6 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                    className="p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-4 flex-1 min-w-0">
@@ -237,13 +237,13 @@ export default function LocationsPage() {
                                 type="text"
                                 value={editingLocation.name}
                                 onChange={(e) => setEditingLocation({ ...editingLocation, name: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary font-semibold"
+                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary font-semibold"
                                 autoFocus
                               />
                               <textarea
                                 value={editingLocation.address}
                                 onChange={(e) => setEditingLocation({ ...editingLocation, address: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary text-sm min-h-[80px]"
+                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary text-sm min-h-[80px]"
                                 placeholder="Address (optional)"
                               />
                             </div>
@@ -273,7 +273,7 @@ export default function LocationsPage() {
                             <button
                               onClick={() => setEditingLocation(null)}
                               disabled={saving}
-                              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                               aria-label="Cancel"
                             >
                               <X className="w-4 h-4 text-slate-600 dark:text-slate-400" />
@@ -283,7 +283,7 @@ export default function LocationsPage() {
                           <>
                             <button
                               onClick={() => setEditingLocation({ ...location })}
-                              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                               aria-label="Edit location"
                             >
                               <Edit className="w-4 h-4 text-slate-600 dark:text-slate-400" />

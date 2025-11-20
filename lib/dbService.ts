@@ -267,6 +267,20 @@ export async function updateDriver(driver: Driver, seasonId?: string): Promise<v
 }
 
 export async function deleteDriver(driverId: string): Promise<void> {
+  // Delete all related data for this driver in the correct order
+  // 1. Delete race results
+  await sql`DELETE FROM race_results WHERE driver_id = ${driverId}`;
+  
+  // 2. Delete points
+  await sql`DELETE FROM points WHERE driver_id = ${driverId}`;
+  
+  // 3. Delete check-ins
+  await sql`DELETE FROM check_ins WHERE driver_id = ${driverId}`;
+  
+  // 4. Delete division changes
+  await sql`DELETE FROM division_changes WHERE driver_id = ${driverId}`;
+  
+  // 5. Finally delete the driver
   await sql`DELETE FROM drivers WHERE id = ${driverId}`;
 }
 

@@ -315,7 +315,7 @@ export default function RoundPointsEditModal({
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4 mb-4 space-y-3">
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 mb-4 space-y-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">
                     Select Round for Division Change *
@@ -341,7 +341,7 @@ export default function RoundPointsEditModal({
               </div>
               
               {roundPoints.length === 0 ? (
-                <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-6 text-center">
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-6 text-center">
                   <p className="text-slate-600 dark:text-slate-400 mb-2">
                     No round points found for this driver.
                   </p>
@@ -351,7 +351,7 @@ export default function RoundPointsEditModal({
                 </div>
               ) : (
                 <>
-                  <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4 mb-4">
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 mb-4">
                     <p className="text-sm text-slate-600 dark:text-slate-400">
                       Modify the overall points for each round below. Changes will be saved when you click "Confirm Changes".
                     </p>
@@ -359,7 +359,7 @@ export default function RoundPointsEditModal({
                   
                   <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-slate-50 dark:bg-slate-900">
+                  <thead className="bg-slate-50 dark:bg-slate-800">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                         Round
@@ -378,7 +378,7 @@ export default function RoundPointsEditModal({
                       return (
                         <tr
                           key={point.id}
-                          className={`hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${
+                          className={`hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${
                             hasChanges ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
                           }`}
                         >
@@ -405,8 +405,8 @@ export default function RoundPointsEditModal({
                                   const newValue = parseFloat(e.target.value) || 0;
                                   handlePointsChange(point.id, newValue);
                                 }}
-                                className={`w-24 px-2 py-1 text-right border rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary ${
-                                  hasChanges ? 'border-yellow-500 dark:border-yellow-600' : 'border-slate-300 dark:border-slate-600'
+                                className={`w-24 px-2 py-1 text-right border rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary ${
+                                  hasChanges ? 'border-yellow-500 dark:border-yellow-600' : 'border-slate-300 dark:border-slate-700'
                                 }`}
                               />
                             </div>

@@ -18,7 +18,7 @@ const getDivisionColor = (division: Division) => {
     case 'New':
       return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
     default:
-      return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
+      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
   }
 };
 
@@ -188,7 +188,7 @@ export default function RaceHistory({ races, drivers = [], points = [], rounds =
                     } ${
                       selectedRaceId === race.id
                         ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500 !border-l-blue-500'
-                        : 'hover:bg-slate-50 dark:hover:bg-slate-700'
+                        : 'hover:bg-slate-50 dark:hover:bg-slate-800'
                     }`}
                     style={
                       selectedRaceId === race.id
@@ -263,6 +263,7 @@ export default function RaceHistory({ races, drivers = [], points = [], rounds =
               ))}
             </div>
           </div>
+          
           <div className="overflow-y-auto flex-1">
             {standings.length === 0 ? (
               <div className="p-8 text-center text-slate-500 dark:text-slate-400">
@@ -271,7 +272,7 @@ export default function RaceHistory({ races, drivers = [], points = [], rounds =
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-slate-50 dark:bg-slate-900">
+                  <thead className="bg-slate-50 dark:bg-slate-800">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                         Pos
@@ -293,7 +294,7 @@ export default function RaceHistory({ races, drivers = [], points = [], rounds =
                     {standings.map((driver) => (
                       <tr
                         key={driver.id}
-                        className="hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                        className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                       >
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center gap-2">

@@ -37,7 +37,7 @@ export default function RecentRaceResults({ race }: RecentRaceResultsProps) {
           <select
             value={selectedDivision}
             onChange={(e) => setSelectedDivision(e.target.value as Division | 'all')}
-            className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+            className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="all">All Divisions</option>
             {divisions.map((div) => (
@@ -52,11 +52,11 @@ export default function RecentRaceResults({ race }: RecentRaceResultsProps) {
       <div className="overflow-x-auto">
         {filteredResults.map((divisionResult) => (
           <div key={divisionResult.division} className="mb-6 last:mb-0">
-            <h4 className="px-6 py-3 bg-slate-50 dark:bg-slate-900 text-sm font-semibold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-700">
+            <h4 className="px-6 py-3 bg-slate-50 dark:bg-slate-800 text-sm font-semibold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-700">
               {divisionResult.division}
             </h4>
             <table className="w-full">
-              <thead className="bg-slate-50 dark:bg-slate-900">
+              <thead className="bg-slate-50 dark:bg-slate-800">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                     Position
@@ -76,7 +76,7 @@ export default function RecentRaceResults({ race }: RecentRaceResultsProps) {
                 {divisionResult.results.map((result, index) => (
                   <tr
                     key={result.driverId}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                    className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">

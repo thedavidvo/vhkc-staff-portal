@@ -31,7 +31,7 @@ const getDivisionColor = (division: Division) => {
     case 'New':
       return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
     default:
-      return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
+      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
   }
 };
 
@@ -88,9 +88,9 @@ const getDivisionSelectColors = (division: Division) => {
       };
     default:
       return {
-        bg: 'bg-white dark:bg-slate-700',
+        bg: 'bg-white dark:bg-slate-800',
         text: 'text-slate-900 dark:text-white',
-        border: 'border-slate-300 dark:border-slate-600'
+        border: 'border-slate-300 dark:border-slate-700'
       };
   }
 };
@@ -130,6 +130,30 @@ export default function DivisionsPage() {
     };
 
     fetchDrivers();
+  }, [selectedSeason]);
+
+  // Listen for driver updates (e.g., when a driver is deleted)
+  useEffect(() => {
+    const handleDriversUpdated = async () => {
+      if (!selectedSeason) return;
+      
+      try {
+        const response = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setDrivers(data);
+        }
+      } catch (error) {
+        console.error('Failed to refresh drivers:', error);
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('vhkc:drivers-updated', handleDriversUpdated);
+      return () => {
+        window.removeEventListener('vhkc:drivers-updated', handleDriversUpdated);
+      };
+    }
   }, [selectedSeason]);
 
   // Fetch rounds from API
@@ -368,12 +392,12 @@ export default function DivisionsPage() {
             >
               <div className="overflow-x-auto max-h-[calc(100vh-400px)]">
                 <table className="w-full">
-                    <thead className="bg-slate-50 dark:bg-slate-900 sticky top-0 z-10">
+                    <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-10">
                       <tr>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider sticky left-0 bg-slate-50 dark:bg-slate-900 z-20 min-w-[200px]">
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider sticky left-0 bg-slate-50 dark:bg-slate-800 z-20 min-w-[200px]">
                           Name
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider sticky left-[200px] bg-slate-50 dark:bg-slate-900 z-20 w-48">
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider sticky left-[200px] bg-slate-50 dark:bg-slate-800 z-20 w-48">
                           Current Division
                         </th>
                         <th className="px-6 py-4 text-center text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
@@ -396,7 +420,7 @@ export default function DivisionsPage() {
                           return (
                             <tr
                               key={driver.id}
-                              className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${
+                              className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${
                                 pendingChange ? 'bg-amber-50 dark:bg-amber-900/10' : ''
                               }`}
                             >
@@ -481,7 +505,7 @@ export default function DivisionsPage() {
                         {promotions.map((change) => (
                           <div
                             key={change.driverId}
-                            className="p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+                            className="p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex-1 min-w-0">
@@ -509,7 +533,7 @@ export default function DivisionsPage() {
                                 </button>
                                 <button
                                   onClick={() => handleDeclineChange(change.driverId)}
-                                  className="p-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg transition-colors"
+                                  className="p-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg transition-colors"
                                   aria-label="Decline"
                                   title="Decline"
                                 >
@@ -533,7 +557,7 @@ export default function DivisionsPage() {
                         {demotions.map((change) => (
                           <div
                             key={change.driverId}
-                            className="p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+                            className="p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex-1 min-w-0">
@@ -561,7 +585,7 @@ export default function DivisionsPage() {
                                 </button>
                                 <button
                                   onClick={() => handleDeclineChange(change.driverId)}
-                                  className="p-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg transition-colors"
+                                  className="p-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg transition-colors"
                                   aria-label="Decline"
                                   title="Decline"
                                 >
@@ -577,7 +601,7 @@ export default function DivisionsPage() {
 
                   {pendingChanges.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-12 text-center">
-                      <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700/50 flex items-center justify-center mb-4">
+                      <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800/50 flex items-center justify-center mb-4">
                         <Check className="w-8 h-8 text-slate-400 dark:text-slate-500" />
                       </div>
                       <p className="text-sm font-medium text-slate-500 dark:text-slate-400">

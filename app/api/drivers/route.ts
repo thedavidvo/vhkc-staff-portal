@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDriversBySeason, addDriver, updateDriver } from '@/lib/dbService';
+import { getDriversBySeason, addDriver, updateDriver, deleteDriver } from '@/lib/dbService';
 import { cache } from '@/lib/cache';
 
 export async function GET(request: NextRequest) {
@@ -74,6 +74,36 @@ export async function PUT(request: NextRequest) {
   } catch (error) {
     console.error('Error in PUT /api/drivers:', error);
     return NextResponse.json({ error: 'Failed to update driver' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const driverId = searchParams.get('driverId');
+    const seasonId = searchParams.get('seasonId');
+    
+    if (!driverId) {
+      return NextResponse.json({ error: 'driverId required' }, { status: 400 });
+    }
+    
+    // Delete the driver and all related data
+    await deleteDriver(driverId);
+    
+    // Invalidate all relevant caches
+    if (seasonId) {
+      cache.invalidate(`drivers:${seasonId}`);
+    }
+    cache.invalidatePattern('drivers:');
+    cache.invalidatePattern('race-results:');
+    cache.invalidatePattern('points:');
+    cache.invalidatePattern('checkins:');
+    cache.invalidatePattern('division-changes:');
+    
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error in DELETE /api/drivers:', error);
+    return NextResponse.json({ error: 'Failed to delete driver' }, { status: 500 });
   }
 }
 

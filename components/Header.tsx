@@ -119,7 +119,7 @@ export default function Header({ title, hideSearch }: { title?: string; hideSear
 
             {isProfileMenuOpen && (
               <div className="absolute right-0 mt-2 w-56 glass-strong rounded-2xl shadow-modern-2xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden z-50 animate-scaleIn">
-                <div className="px-4 py-3 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900">
+                <div className="px-4 py-3 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800">
                   <p className="text-sm font-semibold text-slate-900 dark:text-white">Profile</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">User Account</p>
                 </div>
