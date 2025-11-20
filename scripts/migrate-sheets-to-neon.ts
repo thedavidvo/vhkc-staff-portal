@@ -113,28 +113,7 @@ async function migrateData() {
     }
     console.log(`✓ Migrated ${totalResults} race results\n`);
     
-    // 6. Migrate Race Result Records
-    console.log('Migrating Race Result Records...');
-    let totalRecords = 0;
-    for (const season of seasons) {
-      try {
-        const records = await sheetsService.getRaceResultRecordsBySeason(season.id);
-        for (const record of records) {
-          try {
-            await dbService.addRaceResultRecord(record);
-            totalRecords++;
-          } catch (error: any) {
-            console.log(`    ⚠ Record may already exist: ${error.message}`);
-          }
-        }
-        console.log(`  ✓ Migrated records for season: ${season.name}`);
-      } catch (error: any) {
-        console.log(`  ⚠ Error migrating records for season ${season.name}: ${error.message}`);
-      }
-    }
-    console.log(`✓ Migrated ${totalRecords} race result records\n`);
-    
-    // 7. Migrate Check-ins
+    // 6. Migrate Check-ins
     console.log('Migrating Check-ins...');
     let totalCheckIns = 0;
     for (const season of seasons) {
@@ -167,7 +146,6 @@ async function migrateData() {
     console.log(`Drivers:        ${totalDrivers}`);
     console.log(`Teams:          ${totalTeams}`);
     console.log(`Race Results:   ${totalResults}`);
-    console.log(`Result Records: ${totalRecords}`);
     console.log(`Check-ins:      ${totalCheckIns}`);
     console.log('===================================');
     console.log('\n✅ Migration completed successfully!');

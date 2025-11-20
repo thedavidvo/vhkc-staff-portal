@@ -27,6 +27,24 @@ const getDivisionColor = (division: Division) => {
   }
 };
 
+// Helper function to get division colors for PDF (RGB values)
+const getDivisionPDFColors = (division: Division): { bg: [number, number, number]; text: [number, number, number] } => {
+  switch (division) {
+    case 'Division 1':
+      return { bg: [219, 234, 254], text: [30, 64, 175] }; // Blue-100 bg, Blue-800 text
+    case 'Division 2':
+      return { bg: [252, 231, 243], text: [157, 23, 77] }; // Pink-100 bg, Pink-800 text
+    case 'Division 3':
+      return { bg: [255, 237, 213], text: [154, 52, 18] }; // Orange-100 bg, Orange-800 text
+    case 'Division 4':
+      return { bg: [254, 249, 195], text: [133, 77, 14] }; // Yellow-100 bg, Yellow-800 text
+    case 'New':
+      return { bg: [243, 232, 255], text: [107, 33, 168] }; // Purple-100 bg, Purple-800 text
+    default:
+      return { bg: [241, 245, 249], text: [30, 41, 59] }; // Slate-100 bg, Slate-800 text
+  }
+};
+
 interface RaceResult {
   driverId: string;
   driverName: string;
@@ -59,6 +77,8 @@ export default function ReportsPage() {
   const [rounds, setRounds] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
   const [raceResults, setRaceResults] = useState<RaceResult[]>([]);
+  const [points, setPoints] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
 
@@ -74,9 +94,10 @@ export default function ReportsPage() {
 
       try {
         setLoading(true);
-        const [roundsResponse, driversResponse] = await Promise.all([
+        const [roundsResponse, driversResponse, teamsResponse] = await Promise.all([
           fetch(`/api/rounds?seasonId=${selectedSeason.id}`),
           fetch(`/api/drivers?seasonId=${selectedSeason.id}`),
+          fetch(`/api/teams?seasonId=${selectedSeason.id}`),
         ]);
         
         if (roundsResponse.ok) {
@@ -97,6 +118,11 @@ export default function ReportsPage() {
           const driversData = await driversResponse.json();
           setDrivers(driversData.filter((d: any) => d.status === 'ACTIVE'));
         }
+
+        if (teamsResponse.ok) {
+          const teamsData = await teamsResponse.json();
+          setTeams(teamsData || []);
+        }
       } catch (error) {
         console.error('Failed to fetch data:', error);
       } finally {
@@ -111,13 +137,18 @@ export default function ReportsPage() {
     const fetchRaceResults = async () => {
       if (!selectedRoundId) {
         setRaceResults([]);
+        setPoints([]);
         return;
       }
 
       try {
-        const response = await fetch(`/api/race-results?roundId=${selectedRoundId}`);
-        if (response.ok) {
-          const data = await response.json();
+        const [resultsResponse, pointsResponse] = await Promise.all([
+          fetch(`/api/race-results?roundId=${selectedRoundId}`),
+          fetch(`/api/points?roundId=${selectedRoundId}`),
+        ]);
+
+        if (resultsResponse.ok) {
+          const data = await resultsResponse.json();
           // Flatten the results from division-based structure
           const flattened: RaceResult[] = [];
           if (Array.isArray(data)) {
@@ -134,9 +165,15 @@ export default function ReportsPage() {
           }
           setRaceResults(flattened);
         }
+
+        if (pointsResponse.ok) {
+          const pointsData = await pointsResponse.json();
+          setPoints(pointsData || []);
+        }
       } catch (error) {
         console.error('Failed to fetch race results:', error);
         setRaceResults([]);
+        setPoints([]);
       }
     };
 
@@ -293,10 +330,23 @@ export default function ReportsPage() {
   const selectedRound = rounds.find(r => r.id === selectedRoundId);
 
   const generatePDF = async () => {
-    if (!selectedRound || raceResults.length === 0) {
-      alert('No data to export. Please select a round with race results.');
+    if (!selectedRound) {
+      alert('Please select a round to generate a report.');
       return;
     }
+
+    if (raceResults.length === 0) {
+      alert('No race results found for this round. Please ensure race results have been entered.');
+      return;
+    }
+
+    console.log('Generating PDF with:', {
+      round: selectedRound,
+      raceResultsCount: raceResults.length,
+      driversCount: drivers.length,
+      pointsCount: points.length,
+      participantsCount: participants.length,
+    });
 
     setExporting(true);
 
@@ -305,303 +355,928 @@ export default function ReportsPage() {
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       
-      // Load and add logo
-      const logoUrl = '/vhkc-logo.png';
-      let logoAdded = false;
-      
-      try {
-        const logoResponse = await fetch(logoUrl);
-        if (logoResponse.ok) {
-          const logoBlob = await logoResponse.blob();
-          const logoDataUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(logoBlob);
-          });
-          
-          // Add logo to header (40x40 size, positioned on left)
-          doc.addImage(logoDataUrl, 'PNG', 20, 15, 40, 40);
-          logoAdded = true;
+      // Helper function to load logo with dimensions
+      const loadLogo = async (): Promise<{ dataUrl: string; width: number; height: number } | null> => {
+        try {
+          const logoUrl = '/vhkc-logo.png';
+          const logoResponse = await fetch(logoUrl);
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob();
+            return new Promise<{ dataUrl: string; width: number; height: number }>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                const dataUrl = reader.result as string;
+                // Create an image to get actual dimensions
+                const img = new Image();
+                img.onload = () => {
+                  resolve({
+                    dataUrl,
+                    width: img.width,
+                    height: img.height,
+                  });
+                };
+                img.onerror = reject;
+                img.src = dataUrl;
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(logoBlob);
+            });
+          }
+        } catch (error) {
+          console.warn('Could not load logo:', error);
         }
-      } catch (logoError) {
-        console.warn('Could not load logo:', logoError);
-      }
+        return null;
+      };
 
-      let yPos = 25;
+      const logoInfo = await loadLogo();
+      const logoDataUrl = logoInfo?.dataUrl || null;
 
-      // Modern Professional Header with gradient effect
+      // ============================================
+      // COVER PAGE
+      // ============================================
+      
+      // Background gradient effect (dark to lighter)
       doc.setFillColor(15, 23, 42); // Dark slate
-      doc.rect(0, 0, pageWidth, 70, 'F');
+      doc.rect(0, 0, pageWidth, pageHeight, 'F');
       
-      // Add subtle accent line
-      doc.setFillColor(59, 130, 246); // Primary blue
-      doc.rect(0, 68, pageWidth, 2, 'F');
+      // Add logo centered at top (maintain aspect ratio)
+      let logoWidth = 0;
+      let logoHeight = 0;
+      let logoY = 60;
       
-      // Header text (right side if logo is present)
+      if (logoInfo) {
+        try {
+          const maxWidth = 120;
+          const maxHeight = 120;
+          const aspectRatio = logoInfo.width / logoInfo.height;
+          
+          logoWidth = maxWidth;
+          logoHeight = maxWidth / aspectRatio;
+          
+          // If height exceeds max, scale by height instead
+          if (logoHeight > maxHeight) {
+            logoHeight = maxHeight;
+            logoWidth = maxHeight * aspectRatio;
+          }
+          
+          doc.addImage(logoInfo.dataUrl, 'PNG', pageWidth / 2 - logoWidth / 2, logoY, logoWidth, logoHeight);
+        } catch (e) {
+          console.warn('Error adding logo to cover:', e);
+        }
+      }
+      
+      // Main title - Using 62 DRagz font (helvetica bold as fallback)
       doc.setTextColor(255, 255, 255);
-      const headerX = logoAdded ? pageWidth - 20 : pageWidth / 2;
-      const headerAlign = logoAdded ? 'right' : 'center';
-      
-      doc.setFontSize(22);
+      doc.setFontSize(32);
+      // Note: If 62 DRagz font file is available, load it here using doc.addFont()
+      // For now using helvetica bold as fallback
       doc.setFont('helvetica', 'bold');
-      doc.text('VHKC RACE RESULTS', headerX, 35, { align: headerAlign as any });
+      const mainTitle = `VHKC RACE RESULTS`;
+      const textStartY = logoInfo ? (logoY + logoHeight + 20) : 120;
       
-      doc.setFontSize(12);
+      doc.text(mainTitle, pageWidth / 2, textStartY, { align: 'center' });
+      
+      doc.setFontSize(18);
       doc.setFont('helvetica', 'normal');
-      doc.text('OFFICIAL REPORT', headerX, 45, { align: headerAlign as any });
+      doc.text('OFFICIAL REPORT', pageWidth / 2, textStartY + 20, { align: 'center' });
       
-      doc.setFontSize(9);
-      const reportDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-      doc.text(`Generated: ${reportDate}`, headerX, 55, { align: headerAlign as any });
+      let currentY = textStartY + 45; // Start position after "OFFICIAL REPORT"
       
-      yPos = 80;
-
-      // Modern Information Section with card-like design
-      const infoStartX = 20;
-      const infoWidth = pageWidth - 40;
-      const infoBoxHeight = 50;
+      // Build paragraph-style text with reduced spacing
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
       
-      // Card background
-      doc.setFillColor(249, 250, 251); // Very light gray
-      doc.setDrawColor(226, 232, 240); // Light border
-      doc.setLineWidth(0.5);
-      doc.roundedRect(infoStartX, yPos, infoWidth, infoBoxHeight, 2, 2, 'FD');
+      const seasonText = selectedSeason?.name || 'Season';
+      const roundText = `Round ${selectedRound.roundNumber || ''}`;
+      const divisionText = selectedDivision !== 'All' ? selectedDivision : '';
+      const locationText = selectedRound.address || selectedRound.location || 'TBD';
       
-      // Section title
-      doc.setFillColor(59, 130, 246); // Primary blue
-      doc.roundedRect(infoStartX, yPos, infoWidth, 8, 2, 2, 'F');
+      // Combine into paragraph format with minimal spacing - Order: Season, Round, Division, Location
+      const infoParts: string[] = [seasonText, roundText];
+      if (divisionText) infoParts.push(divisionText);
+      if (locationText && locationText !== 'TBD') infoParts.push(locationText);
+      
+      const infoParagraph = infoParts.join(' • ');
+      doc.text(infoParagraph, pageWidth / 2, currentY, { align: 'center' });
+      
+      // Add new page for thank you message
+      doc.addPage();
+      
+      // Professional Header
+      doc.setFillColor(15, 23, 42); // Dark slate
+      doc.rect(0, 0, pageWidth, 50, 'F');
+      
+      // Add logo to header (maintain aspect ratio and align with text)
+      let headerLogoWidth = 0;
+      let headerLogoHeight = 0;
+      
+      if (logoInfo) {
+        try {
+          const maxWidth = 35;
+          const maxHeight = 35;
+          const aspectRatio = logoInfo.width / logoInfo.height;
+          
+          headerLogoWidth = maxWidth;
+          headerLogoHeight = maxWidth / aspectRatio;
+          
+          // If height exceeds max, scale by height instead
+          if (headerLogoHeight > maxHeight) {
+            headerLogoHeight = maxHeight;
+            headerLogoWidth = maxHeight * aspectRatio;
+          }
+          
+          // Center logo vertically with text (header is 50px tall, text is at y=25, so center logo at y=25-height/2)
+          const logoY = 25 - (headerLogoHeight / 2);
+          doc.addImage(logoInfo.dataUrl, 'PNG', 20, logoY, headerLogoWidth, headerLogoHeight);
+        } catch (e) {
+          console.warn('Error adding logo to header:', e);
+        }
+      }
+      
+      // Header text - Using Futura font (helvetica as fallback)
       doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold'); // Using helvetica as closest to Futura
+      const headerText = `${selectedSeason?.name || 'Season'} - Round ${selectedRound.roundNumber || ''}`;
+      const headerTextX = logoInfo ? (20 + headerLogoWidth + 10) : pageWidth / 2;
+      const headerAlign = logoInfo ? 'left' : 'center';
+      
+      doc.text(headerText, headerTextX, 25, { align: headerAlign as any });
+      
       doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text('EVENT INFORMATION', infoStartX + 8, yPos + 5.5);
-      
-      // Information items
-      doc.setTextColor(30, 41, 59);
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
+      const locationHeader = selectedRound.location || selectedRound.address || 'TBD';
+      doc.text(locationHeader, headerTextX, 35, { align: headerAlign as any });
       
-      let currentY = yPos + 18;
-      const infoLineHeight = 7;
-      const labelWidth = 50;
+      // Accent line
+      doc.setFillColor(59, 130, 246); // Primary blue
+      doc.rect(0, 48, pageWidth, 2, 'F');
       
-      const infoItems = [
-        { label: 'Season', value: selectedSeason?.name || 'N/A' },
-        { label: 'Round', value: `${selectedRound.roundNumber || ''} - ${selectedRound.location || 'TBD'}` },
-      ];
+      let yPos = 70;
+
+      // Thank You Message
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal'); // Using helvetica as closest to Futura
+      doc.setTextColor(30, 41, 59);
       
-      if (selectedRound.date) {
-        const date = new Date(selectedRound.date);
-        infoItems.push({ 
-          label: 'Date', 
-          value: date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) 
-        });
-      }
-      
-      if (selectedRound.address) {
-        infoItems.push({ label: 'Location', value: selectedRound.address });
-      }
-      
-      if (selectedDivision !== 'All') {
-        infoItems.push({ label: 'Division', value: selectedDivision });
-      }
-      
-      // Two-column layout for info
-      const midPoint = infoStartX + infoWidth / 2;
-      infoItems.forEach((item, index) => {
-        const xPos = index % 2 === 0 ? infoStartX + 8 : midPoint + 8;
-        const yPosItem = currentY + Math.floor(index / 2) * infoLineHeight;
+      const thankYouMessage = `G'day racers,
+
+Thank you for racing with VHKC. We appreciate your continued participation and the effort each driver brings to every event. Your involvement is what allows the series to maintain a strong racing community built on clean competition, steady improvement, and mutual respect on and off the track.
+
+Each round provides valuable opportunities for drivers to refine their skills, build consistency, and gain experience in a structured racing environment. We are grateful for the positive attitude and cooperation shown throughout the session, which helped ensure the event ran smoothly from start to finish. Your commitment to adhering to race procedures, safety expectations, and overall track etiquette contributes directly to the success of our program.
+
+Below, you will find the recorded results from the previous round, including timing data, final placements, and additional session details.
+
+Thank you once again for your involvement with VHKC. We look forward to continuing the momentum and sharing many more successful race events with you.`;
+
+      const splitText = doc.splitTextToSize(thankYouMessage, pageWidth - 40);
+      doc.text(splitText, 20, yPos, { align: 'left' });
+      yPos += splitText.length * 5 + 20;
+
+      // Helper function to add header to a page
+      const addPageHeader = () => {
+        doc.setFillColor(15, 23, 42);
+        doc.rect(0, 0, pageWidth, 50, 'F');
         
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${item.label}:`, xPos, yPosItem);
-        doc.setFont('helvetica', 'normal');
-        const labelTextWidth = doc.getTextWidth(`${item.label}:`);
-        doc.text(item.value, xPos + labelTextWidth + 4, yPosItem);
-      });
-      
-      yPos = yPos + infoBoxHeight + 15;
-
-      // Modern professional table helper function
-      const addTable = async (title: string, data: any[], columns: string[], getRowData: (item: any) => any[]) => {
-        if (data.length === 0) return;
-
-        // Check if we need a new page
-        if (yPos > pageHeight - 80) {
-          doc.addPage();
-          yPos = 25;
-          // Re-add logo on new page if it was added before
-          if (logoAdded) {
-            try {
-              const logoResponse = await fetch(logoUrl);
-              if (logoResponse.ok) {
-                const logoBlob = await logoResponse.blob();
-                const logoDataUrl = await new Promise<string>((resolve) => {
-                  const reader = new FileReader();
-                  reader.onloadend = () => resolve(reader.result as string);
-                  reader.readAsDataURL(logoBlob);
-                });
-                doc.addImage(logoDataUrl, 'PNG', 20, 15, 40, 40);
-              }
-            } catch (e) {
-              // Logo load failed, continue without it
+        let headerLogoWidth = 0;
+        let headerLogoHeight = 0;
+        
+        if (logoInfo) {
+          try {
+            const maxWidth = 35;
+            const maxHeight = 35;
+            const aspectRatio = logoInfo.width / logoInfo.height;
+            
+            headerLogoWidth = maxWidth;
+            headerLogoHeight = maxWidth / aspectRatio;
+            
+            // If height exceeds max, scale by height instead
+            if (headerLogoHeight > maxHeight) {
+              headerLogoHeight = maxHeight;
+              headerLogoWidth = maxHeight * aspectRatio;
             }
+            
+            // Center logo vertically with text (header is 50px tall, text is at y=25, so center logo at y=25-height/2)
+            const logoY = 25 - (headerLogoHeight / 2);
+            doc.addImage(logoInfo.dataUrl, 'PNG', 20, logoY, headerLogoWidth, headerLogoHeight);
+          } catch (e) {
+            // Logo load failed, continue without it
           }
         }
-
-        // Modern section title with accent
-        doc.setFillColor(59, 130, 246); // Primary blue accent bar
-        doc.rect(20, yPos - 2, 4, 12, 'F');
         
-        doc.setFontSize(12);
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        const headerText = `${selectedSeason?.name || 'Season'} - Round ${selectedRound.roundNumber || ''}`;
+        const headerTextX = logoInfo ? (20 + headerLogoWidth + 10) : pageWidth / 2;
+        const headerAlign = logoInfo ? 'left' : 'center';
+        
+        doc.text(headerText, headerTextX, 25, { align: headerAlign as any });
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        const locationHeader = selectedRound.location || selectedRound.address || 'TBD';
+        doc.text(locationHeader, headerTextX, 35, { align: headerAlign as any });
+        
+        doc.setFillColor(59, 130, 246);
+        doc.rect(0, 48, pageWidth, 2, 'F');
+      };
+
+
+      // Modern professional table helper function - Each table on new page
+      const addTable = async (title: string, data: any[], columns: string[], getRowData: (item: any) => any[], useRank: boolean = true, divisionColumnIndex?: number, groupColumnIndex?: number) => {
+        if (data.length === 0) return;
+
+        // Always start on a new page for each table
+        doc.addPage();
+        addPageHeader();
+        
+        let tableYPos = 60;
+
+        // Modern section title with accent - Using Super Brigade font
+        doc.setFillColor(59, 130, 246); // Primary blue accent bar
+        doc.rect(20, tableYPos - 2, 4, 10, 'F');
+        
+        doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(15, 23, 42);
-        doc.text(title.toUpperCase(), 28, yPos + 5);
+        doc.text(title.toUpperCase(), 28, tableYPos + 4);
         
-        yPos += 12;
+        // Subtle divider line
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.3);
+        doc.line(28, tableYPos + 6, pageWidth - 20, tableYPos + 6);
+        
+        tableYPos += 8;
 
         // Prepare table data
-        const tableData = data.map((item, index) => [
-          (index + 1).toString(),
-          ...getRowData(item)
-        ]);
+        const tableData = data.map((item, index) => {
+          if (useRank) {
+            return [(index + 1).toString(), ...getRowData(item)];
+          }
+          return getRowData(item);
+        });
+
+        const headColumns = useRank ? ['#', ...columns] : columns;
+
+        // Calculate column widths to prevent wrapping
+        const availableWidth = pageWidth - 40; // Margins (20 left + 20 right)
+        const numColumns = headColumns.length;
+        
+        // Build column styles with appropriate widths
+        const columnStyles: any = {};
+        if (useRank) {
+          columnStyles[0] = { cellWidth: 15, halign: 'center', fontStyle: 'bold', textColor: [59, 130, 246], font: 'helvetica' };
+        }
+        
+        // Distribute remaining width among other columns
+        const remainingColumns = numColumns - (useRank ? 1 : 0);
+        const columnWidth = remainingColumns > 0 ? (availableWidth - (useRank ? 15 : 0)) / remainingColumns : availableWidth;
+        let colIndex = useRank ? 1 : 0;
+        for (let i = 0; i < remainingColumns; i++) {
+          columnStyles[colIndex] = { 
+            cellWidth: columnWidth, 
+            font: 'helvetica',
+            overflow: 'ellipsize', // Prevent wrapping by using ellipsize
+          };
+          colIndex++;
+        }
 
         autoTable(doc, {
-          head: [['#', ...columns]],
+          head: [headColumns],
           body: tableData,
-          startY: yPos,
+          startY: tableYPos,
           theme: 'striped',
           headStyles: { 
             fillColor: [15, 23, 42], // Dark slate
             textColor: [255, 255, 255], 
             fontStyle: 'bold',
-            fontSize: 9,
+            fontSize: 7,
             halign: 'left',
-            cellPadding: { top: 6, bottom: 6, left: 5, right: 5 },
-            lineWidth: 0.3,
-            lineColor: [255, 255, 255]
+            cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
+            lineWidth: 0.5,
+            lineColor: [255, 255, 255],
+            font: 'helvetica' // Using helvetica as closest to Futura
           },
           bodyStyles: {
-            fontSize: 8.5,
+            fontSize: 6.5,
             textColor: [30, 41, 59],
-            cellPadding: { top: 5, bottom: 5, left: 5, right: 5 },
-            lineWidth: 0.1,
-            lineColor: [226, 232, 240]
+            cellPadding: { top: 2, bottom: 2, left: 3, right: 3 },
+            lineWidth: 0.2,
+            lineColor: [226, 232, 240],
+            fontStyle: 'normal',
+            font: 'helvetica' // Using helvetica as closest to Futura
           },
+          // Custom styles for badge cells will override these
           alternateRowStyles: {
             fillColor: [249, 250, 251] // Very light gray
           },
-          columnStyles: {
-            0: { cellWidth: 18, halign: 'center', fontStyle: 'bold' }, // Rank column
-          },
-          margin: { left: 20, right: 20, top: yPos },
-          tableWidth: 'auto',
+          columnStyles: columnStyles,
+          margin: { left: 20, right: 20, top: tableYPos },
+          tableWidth: availableWidth, // Use fixed width to prevent wrapping
           showHead: 'everyPage',
           styles: {
-            overflow: 'linebreak',
-            cellPadding: 5,
+            overflow: 'ellipsize', // Use ellipsize to prevent wrapping
+            cellPadding: 2,
             valign: 'middle',
-            minCellHeight: 7
+            minCellHeight: 5,
+            fontSize: 6.5,
+            font: 'helvetica' // Using helvetica as closest to Futura
           },
+          didParseCell: (data: any) => {
+            // Ensure division and group header columns have blue color like other headers
+            if (data.section === 'head') {
+              if ((divisionColumnIndex !== undefined && data.column.index === divisionColumnIndex) ||
+                  (groupColumnIndex !== undefined && data.column.index === groupColumnIndex)) {
+                // Keep the same header styling as other columns (dark slate background, white text)
+                data.cell.styles.fillColor = [15, 23, 42]; // Dark slate (same as other headers)
+                data.cell.styles.textColor = [255, 255, 255]; // White text
+              }
+            }
+            
+            // Apply division color badging if this is a division column (body cells only)
+            if (data.section === 'body' && divisionColumnIndex !== undefined && data.column.index === divisionColumnIndex) {
+              // Get division value from cell text
+              const divisionValue = Array.isArray(data.cell.text) ? data.cell.text[0] : data.cell.text;
+              if (divisionValue && typeof divisionValue === 'string' && divisionValue.trim()) {
+                const division = divisionValue.trim() as Division;
+                const colors = getDivisionPDFColors(division);
+                // Scale badge with table size
+                const baseFontSize = data.cell.styles.fontSize || 6.5;
+                const badgePadding = baseFontSize * 0.2;
+                data.cell.styles.fillColor = colors.bg;
+                data.cell.styles.textColor = colors.text;
+                data.cell.styles.fontStyle = 'bold';
+                data.cell.styles.fontSize = baseFontSize * 0.95;
+                data.cell.styles.cellPadding = { top: badgePadding, bottom: badgePadding, left: badgePadding, right: badgePadding };
+                data.cell.styles.halign = 'center';
+                data.cell.styles.valign = 'middle';
+                data.cell.styles.lineWidth = 0;
+                (data.cell as any).isBadge = true;
+                (data.cell as any).badgeColors = colors;
+                (data.cell as any).badgeText = divisionValue.trim();
+              }
+            }
+            
+            // Apply group color badging if this is a group column (body cells only)
+            if (data.section === 'body' && groupColumnIndex !== undefined && data.column.index === groupColumnIndex) {
+              // Get group value from cell text
+              const groupValue = Array.isArray(data.cell.text) ? data.cell.text[0] : data.cell.text;
+              if (groupValue && typeof groupValue === 'string' && groupValue.trim()) {
+                const colors = getGroupPDFColors(groupValue.trim());
+                if (colors) {
+                  const baseFontSize = data.cell.styles.fontSize || 6.5;
+                  const badgePadding = baseFontSize * 0.2;
+                  data.cell.styles.fillColor = colors.bg;
+                  data.cell.styles.textColor = colors.text;
+                  data.cell.styles.fontStyle = 'bold';
+                  data.cell.styles.fontSize = baseFontSize * 0.95;
+                  data.cell.styles.cellPadding = { top: badgePadding, bottom: badgePadding, left: badgePadding, right: badgePadding };
+                  data.cell.styles.halign = 'center';
+                  data.cell.styles.valign = 'middle';
+                  data.cell.styles.lineWidth = 0;
+                  (data.cell as any).isBadge = true;
+                  (data.cell as any).badgeColors = colors;
+                  (data.cell as any).badgeText = (Array.isArray(data.cell.text) ? data.cell.text[0] : data.cell.text) || '';
+                }
+              }
+            }
+          },
+          willDrawCell: (data: any) => {
+            // Draw pill-shaped badges (division and group columns) - draw before text
+            if (data.section === 'body' && (data.cell as any).isBadge) {
+              const cellValue = Array.isArray(data.cell.text) ? data.cell.text[0] : data.cell.text;
+              if (cellValue && typeof cellValue === 'string' && cellValue.trim()) {
+                // Get cell dimensions
+                const cellX = data.cell.x;
+                const cellY = data.cell.y;
+                const cellW = data.cell.width;
+                const cellH = data.cell.height;
+                
+                // Get padding from cell styles
+                const padding = data.cell.styles.cellPadding || { top: 2, bottom: 2, left: 2, right: 2 };
+                const paddingTop = typeof padding === 'object' ? padding.top : padding;
+                const paddingBottom = typeof padding === 'object' ? padding.bottom : padding;
+                const paddingLeft = typeof padding === 'object' ? padding.left : padding;
+                const paddingRight = typeof padding === 'object' ? padding.right : padding;
+                const text = (data.cell as any).badgeText || cellValue;
+                doc.setFontSize(data.cell.styles.fontSize || 6.5);
+                const textWidth = doc.getTextWidth(text);
+                const textPaddingX = (data.cell.styles.fontSize || 6.5) * 0.7;
+                const textPaddingY = (data.cell.styles.fontSize || 6.5) * 0.35;
+                const badgeW = Math.min(textWidth + textPaddingX * 2, cellW - (paddingLeft + paddingRight) - 0.5);
+                const badgeH = Math.min((data.cell.styles.fontSize || 6.5) + textPaddingY * 2, cellH - (paddingTop + paddingBottom) - 0.5);
+                const badgeX = cellX + (cellW - badgeW) / 2;
+                const badgeY = cellY + (cellH - badgeH) / 2;
+                
+                // For true pill shape (rounded-full), radius must be exactly half the height
+                // This creates the fully rounded pill shape with curved ends
+                const radius = badgeH / 2;
+                
+                // Only draw if dimensions are valid and radius is reasonable
+                if (badgeH > 0 && badgeW > 0 && radius > 0 && radius <= badgeW / 2) {
+                  // Get fill color from stored badge colors
+                  const badgeColors = (data.cell as any).badgeColors;
+                  const fillColor = badgeColors?.bg || data.cell.styles.fillColor || [255, 255, 255];
+                  doc.setFillColor(fillColor[0], fillColor[1], fillColor[2]);
+                  
+                  // Draw pill-shaped badge using roundedRect
+                  // Radius = half height creates the pill shape (rounded-full)
+                  (doc as any).roundedRect(badgeX, badgeY, badgeW, badgeH, radius, radius, 'F');
+                }
+              }
+            }
+          },
+          didDrawCell: (data: any) => {},
         });
-
-        yPos = (doc as any).lastAutoTable.finalY + 15;
       };
 
-      // Participants List (moved to first)
-      if (participants.length > 0) {
+      // Helper to get driver info
+      const getDriverInfo = (driverId: string) => {
+        const driver = drivers.find(d => d.id === driverId);
+        if (!driver) return null;
+        
+        // Ensure aliases is an array
+        let aliasesArray: string[] = [];
+        if (driver.aliases) {
+          if (Array.isArray(driver.aliases)) {
+            aliasesArray = driver.aliases;
+          } else if (typeof driver.aliases === 'string') {
+            aliasesArray = driver.aliases.split(',').map((a: string) => a.trim()).filter((a: string) => a);
+          }
+        }
+        
+        return {
+          ...driver,
+          aliases: aliasesArray,
+        };
+      };
+
+      // Helper to get driver alias (first alias or empty)
+      const getDriverAlias = (driverId: string) => {
+        const driver = getDriverInfo(driverId);
+        if (driver?.aliases && Array.isArray(driver.aliases) && driver.aliases.length > 0) {
+          return driver.aliases[0];
+        }
+        return '';
+      };
+
+      // Main Driver Table (Driver Name, Alias, Home Track, Division)
+      const mainDriverData = participants.map(p => {
+        const driver = getDriverInfo(p.driverId);
+        return {
+          driverId: p.driverId,
+          driverName: p.driverName || '',
+          alias: getDriverAlias(p.driverId),
+          homeTrack: driver?.homeTrack || '',
+          division: p.division || '',
+        };
+      }).sort((a: any, b: any) => a.driverName.localeCompare(b.driverName));
+
+      if (mainDriverData.length > 0) {
         await addTable(
-          'Participants',
-          participants,
-          ['Driver', 'Division'],
+          'Main Driver Table',
+          mainDriverData,
+          ['Driver Name', 'Alias', 'Home Track', 'Division'],
           (item) => [
-            item.driverName || '',
-            item.division || '',
-          ]
+            item.driverName,
+            item.alias,
+            item.homeTrack,
+            item.division,
+          ],
+          true, // useRank
+          4 // Division column index (after #, Driver Name, Alias, Home Track)
         );
       }
 
-      // Qualifying Results
+      // Helper function to get group color for PDF (for Qual Group 1, Heat A, etc.)
+      const getGroupPDFColors = (groupName: string): { bg: [number, number, number]; text: [number, number, number] } | null => {
+        if (!groupName) return null;
+        const groupLower = groupName.toLowerCase();
+        
+        // Extract number or letter from group name (e.g., "Qual Group 1" -> "1", "Heat A" -> "A")
+        const match = groupLower.match(/(\d+|[a-z])/);
+        if (!match) return null;
+        
+        const identifier = match[1];
+        
+        // Color scheme for groups - using a rotating color palette
+        const groupColors: { bg: [number, number, number]; text: [number, number, number] }[] = [
+          { bg: [219, 234, 254], text: [30, 64, 175] }, // Blue
+          { bg: [252, 231, 243], text: [157, 23, 77] }, // Pink
+          { bg: [255, 237, 213], text: [154, 52, 18] }, // Orange
+          { bg: [254, 249, 195], text: [133, 77, 14] }, // Yellow
+          { bg: [243, 232, 255], text: [107, 33, 168] }, // Purple
+          { bg: [220, 252, 231], text: [20, 83, 45] }, // Green
+          { bg: [254, 226, 226], text: [153, 27, 27] }, // Red
+        ];
+        
+        // If it's a number, use modulo
+        if (!isNaN(Number(identifier))) {
+          const num = parseInt(identifier, 10);
+          const index = (num - 1) % groupColors.length;
+          return groupColors[index >= 0 ? index : 0];
+        }
+        
+        // If it's a letter, use char code
+        const letterIndex = identifier.charCodeAt(0) - 97; // 'a' = 0, 'b' = 1, etc.
+        const index = letterIndex >= 0 ? (letterIndex % groupColors.length) : 0;
+        return groupColors[index];
+      };
+
+      // Times Tables - Separate into Qualifying, Heat, and Final times
+      const hasHeat = Object.keys(organizedResults.heats).length > 0;
+      
+      // 1. Qualifying Times Table
       if (organizedResults.qualifying.length > 0) {
+        const qualTimesData = organizedResults.qualifying.map(q => ({
+          driverId: q.driverId,
+          driverName: q.driverName || '',
+          alias: getDriverAlias(q.driverId),
+          division: q.division || '',
+          qualRank: q.position || 0,
+          qualTime: q.fastestLap || '',
+          qualKartNumber: q.kartNumber || '',
+          group: q.raceName || q.finalType || '',
+        })).sort((a, b) => {
+          const rankA = typeof a.qualRank === 'number' ? a.qualRank : (typeof a.qualRank === 'string' ? parseInt(a.qualRank, 10) : 999);
+          const rankB = typeof b.qualRank === 'number' ? b.qualRank : (typeof b.qualRank === 'string' ? parseInt(b.qualRank, 10) : 999);
+          return (isNaN(rankA) ? 999 : rankA) - (isNaN(rankB) ? 999 : rankB);
+        });
+
+        await addTable(
+          'Qualifying Times',
+          qualTimesData,
+          ['Driver Name', 'Alias', 'Division', 'Rank', 'Time', 'Kart Number', 'Group'],
+          (item) => [
+            item.driverName,
+            item.alias || '',
+            item.division,
+            item.qualRank?.toString() || '',
+            item.qualTime || '-',
+            item.qualKartNumber || '',
+            item.group || '',
+          ],
+          true, // useRank
+          3, // Division column index (after #, Driver Name, Alias)
+          7 // Group column index (after #, Driver Name, Alias, Division, Rank, Time, Kart Number)
+        );
+      }
+
+      // 2. Qualifying Results (Driver Name, Alias, Kart Number, Division, Best Time, Group, Rank)
+      if (organizedResults.qualifying.length > 0) {
+        const qualData = organizedResults.qualifying.map(q => {
+          const driver = getDriverInfo(q.driverId);
+          return {
+            ...q,
+            alias: getDriverAlias(q.driverId),
+            group: q.raceName || q.finalType || '',
+          };
+        }).sort((a, b) => (a.position || 999) - (b.position || 999));
+
         await addTable(
           'Qualifying Results',
-          organizedResults.qualifying,
-          ['Driver', 'Division', 'Position', 'Fastest Lap'],
+          qualData,
+          ['Driver Name', 'Alias', 'Kart Number', 'Division', 'Best Time', 'Group', 'Rank'],
           (item) => [
             item.driverName || '',
+            item.alias || '',
+            item.kartNumber || '',
             item.division || '',
-            item.position?.toString() || '',
             item.fastestLap || '-',
-          ]
+            item.group || '',
+            item.position?.toString() || '',
+          ],
+          true, // useRank
+          4, // Division column index (after #, Driver Name, Alias, Kart Number)
+          6 // Group column index (after #, Driver Name, Alias, Kart Number, Division, Best Time)
         );
       }
 
-      // Heat Results
-      for (const heatKey of Object.keys(organizedResults.heats)) {
-        const heatResults = organizedResults.heats[heatKey];
-        if (heatResults.length > 0) {
-          await addTable(
-            `Heat ${heatKey} Results`,
-            heatResults,
-            ['Driver', 'Division', 'Position', 'Fastest Lap'],
-            (item) => [
-              item.driverName || '',
-              item.division || '',
-              item.position?.toString() || '',
-              item.fastestLap || '-',
-            ]
-          );
+      // 3. Heat Times Table (if exists)
+      if (hasHeat) {
+        const heatTimesData: any[] = [];
+        Object.keys(organizedResults.heats).forEach(heatKey => {
+          organizedResults.heats[heatKey].forEach(h => {
+            heatTimesData.push({
+              driverId: h.driverId,
+              driverName: h.driverName || '',
+              alias: getDriverAlias(h.driverId),
+              division: h.division || '',
+              heatRank: h.position || '',
+              heatTime: h.fastestLap || '',
+              heatKartNumber: h.kartNumber || '',
+              group: heatKey,
+            });
+          });
+        });
+        
+        heatTimesData.sort((a, b) => {
+          if (a.group !== b.group) {
+            return a.group.localeCompare(b.group);
+          }
+          return (a.heatRank || 999) - (b.heatRank || 999);
+        });
+
+        await addTable(
+          'Heat Times',
+          heatTimesData,
+          ['Driver Name', 'Alias', 'Division', 'Rank', 'Time', 'Kart Number', 'Group'],
+          (item) => [
+            item.driverName || '',
+            item.alias || '',
+            item.division || '',
+            item.heatRank?.toString() || '',
+            item.heatTime || '-',
+            item.heatKartNumber || '',
+            item.group || '',
+          ],
+          true, // useRank
+          3, // Division column index (after #, Driver Name, Alias)
+          7 // Group column index (after #, Driver Name, Alias, Division, Rank, Time, Kart Number)
+        );
+      }
+
+      // 4. Heat Results (if exists)
+      if (hasHeat) {
+        for (const heatKey of Object.keys(organizedResults.heats)) {
+          const heatResults = organizedResults.heats[heatKey];
+          if (heatResults.length > 0) {
+            const heatData = heatResults.map(h => {
+              const driver = getDriverInfo(h.driverId);
+              const driverPoint = points.find(p => p.driverId === h.driverId && p.raceType === 'heat' && (p.finalType === heatKey || !p.finalType));
+              return {
+                ...h,
+                alias: getDriverAlias(h.driverId),
+                points: driverPoint?.points || 0,
+                group: heatKey,
+              };
+            }).sort((a, b) => (a.position || 999) - (b.position || 999));
+
+            await addTable(
+              `Heat Results - ${heatKey}`,
+              heatData,
+              ['Driver Name', 'Alias', 'Kart Number', 'Best Time', 'Division', 'Position', 'Points'],
+              (item) => [
+                item.driverName || '',
+                item.alias || '',
+                item.kartNumber || '',
+                item.fastestLap || '-',
+                item.division || '',
+                item.position?.toString() || '',
+                item.points?.toString() || '0',
+              ],
+              true, // useRank
+              5 // Division column index (after #, Driver Name, Alias, Kart Number, Best Time)
+            );
+          }
         }
       }
 
-      // Final Results
+      // 5. Final Times Table
+      const finalTimesData: any[] = [];
+      Object.keys(organizedResults.finals).forEach(finalKey => {
+        organizedResults.finals[finalKey].forEach(f => {
+          finalTimesData.push({
+            driverId: f.driverId,
+            driverName: f.driverName || '',
+            alias: getDriverAlias(f.driverId),
+            division: f.division || '',
+            finalRank: f.position || '',
+            finalTime: f.fastestLap || '',
+            finalKartNumber: f.kartNumber || '',
+            group: finalKey,
+          });
+        });
+      });
+      
+      finalTimesData.sort((a, b) => {
+        if (a.group !== b.group) {
+          return a.group.localeCompare(b.group);
+        }
+        return (a.finalRank || 999) - (b.finalRank || 999);
+      });
+
+      if (finalTimesData.length > 0) {
+        await addTable(
+          'Final Times',
+          finalTimesData,
+          ['Driver Name', 'Alias', 'Division', 'Rank', 'Time', 'Kart Number', 'Group'],
+          (item) => [
+            item.driverName || '',
+            item.alias || '',
+            item.division || '',
+            item.finalRank?.toString() || '',
+            item.finalTime || '-',
+            item.finalKartNumber || '',
+            item.group || '',
+          ],
+          true, // useRank
+          3, // Division column index (after #, Driver Name, Alias)
+          7 // Group column index (after #, Driver Name, Alias, Division, Rank, Time, Kart Number)
+        );
+      }
+
+      // Final Results (Driver Name, Alias, Kart Number, Best Time, Division, Division Placing, Points, Grid Position, Overall Position, movement)
+      const finalData: any[] = [];
       for (const finalKey of Object.keys(organizedResults.finals)) {
         const finalResults = organizedResults.finals[finalKey];
-        if (finalResults.length > 0) {
+        finalResults.forEach(result => {
+          const driver = getDriverInfo(result.driverId);
+          const driverPoint = points.find(p => p.driverId === result.driverId && p.raceType === 'final' && (p.finalType === finalKey || !p.finalType));
+          finalData.push({
+            ...result,
+            alias: getDriverAlias(result.driverId),
+            divisionPlacing: result.position || '',
+            points: driverPoint?.points || 0,
+            gridPosition: result.gridPosition || '',
+            overallPosition: result.overallPosition || result.position || '',
+            movement: '', // Movement would need to be calculated from previous round
+            finalType: finalKey,
+          });
+        });
+      }
+
+      if (finalData.length > 0) {
+        finalData.sort((a, b) => {
+          // Sort by final type first, then by position
+          if (a.finalType !== b.finalType) {
+            return a.finalType.localeCompare(b.finalType);
+          }
+          return (a.position || 999) - (b.position || 999);
+        });
+
+        await addTable(
+          'Final Results',
+          finalData,
+          ['Driver Name', 'Alias', 'Kart Number', 'Best Time', 'Division', 'Division Placing'],
+          (item) => [
+            item.driverName || '',
+            item.alias || '',
+            item.kartNumber || '',
+            item.fastestLap || '-',
+            item.division || '',
+            item.divisionPlacing?.toString() || '',
+          ],
+          true, // useRank
+          5 // Division column index (after #, Driver Name, Alias, Kart Number, Best Time)
+        );
+      }
+
+      // Heat Points (if exists) - Add before Final Points
+      if (hasHeat) {
+        const heatPointsData = points
+          .filter(p => p.raceType === 'heat')
+          .map(p => {
+            const driver = getDriverInfo(p.driverId);
+            return {
+              driverId: p.driverId,
+              driverName: driver?.name || '',
+              alias: getDriverAlias(p.driverId),
+              division: p.division || '',
+              points: p.points || 0,
+            };
+          })
+          .sort((a, b) => b.points - a.points);
+
+        if (heatPointsData.length > 0) {
           await addTable(
-            `Final ${finalKey} Results`,
-            finalResults,
-            ['Driver', 'Division', 'Position', 'Fastest Lap'],
+            'Heat Points',
+            heatPointsData,
+            ['Driver Name', 'Alias', 'Division', 'Race Points'],
             (item) => [
-              item.driverName || '',
-              item.division || '',
-              item.position?.toString() || '',
-              item.fastestLap || '-',
-            ]
+              item.driverName,
+              item.alias || '',
+              item.division,
+              item.points.toString(),
+            ],
+            true, // useRank
+            3 // Division column index (after #, Driver Name, Alias)
           );
         }
       }
 
-      // Overall Results
-      if (organizedResults.overall.length > 0) {
+      // Final Points (Driver Name, Alias, Division, Race Points)
+      const finalPointsData = points
+        .filter(p => p.raceType === 'final')
+        .map(p => {
+          const driver = getDriverInfo(p.driverId);
+          return {
+            driverId: p.driverId,
+            driverName: driver?.name || '',
+            alias: getDriverAlias(p.driverId),
+            division: p.division || '',
+            points: p.points || 0,
+          };
+        })
+        .sort((a, b) => b.points - a.points);
+
+      if (finalPointsData.length > 0) {
         await addTable(
-          'Overall Results',
-          organizedResults.overall,
-          ['Driver', 'Division', 'Position', 'Fastest Lap'],
+          'Final Points',
+          finalPointsData,
+          ['Driver Name', 'Alias', 'Division', 'Race Points'],
           (item) => [
-            item.driverName || '',
-            item.division || '',
-            (item.overallPosition || item.position)?.toString() || '',
-            item.fastestLap || '-',
-          ]
+            item.driverName,
+            item.alias || '',
+            item.division,
+            item.points.toString(),
+          ],
+          true, // useRank
+          3 // Division column index (after #, Driver Name, Alias)
         );
       }
 
-      // Best Lap Times
-      if (bestLapTimes.length > 0) {
+      // Driver Standings - Fetch season-wide standings
+      let seasonPoints: any[] = [];
+      try {
+        if (selectedSeason?.id) {
+          const seasonPointsResponse = await fetch(`/api/points?seasonId=${selectedSeason.id}`);
+          if (seasonPointsResponse.ok) {
+            seasonPoints = await seasonPointsResponse.json();
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to fetch season points for standings:', error);
+      }
+
+      const driverStandingsMap = new Map<string, { driverId: string; driverName: string; alias: string; division: Division; totalPoints: number }>();
+      
+      seasonPoints.forEach(p => {
+        const existing = driverStandingsMap.get(p.driverId);
+        if (existing) {
+          existing.totalPoints += p.points || 0;
+        } else {
+          const driver = getDriverInfo(p.driverId);
+          driverStandingsMap.set(p.driverId, {
+            driverId: p.driverId,
+            driverName: driver?.name || '',
+            alias: getDriverAlias(p.driverId),
+            division: p.division,
+            totalPoints: p.points || 0,
+          });
+        }
+      });
+
+      const driverStandings = Array.from(driverStandingsMap.values())
+        .sort((a, b) => b.totalPoints - a.totalPoints);
+
+      if (driverStandings.length > 0) {
         await addTable(
-          'Best Lap Times (Ranked)',
-          bestLapTimes,
-          ['Driver', 'Division', 'Best Lap Time', 'Race Type'],
+          'Driver Standings',
+          driverStandings,
+          ['Driver Name', 'Alias', 'Division', 'Total Points'],
           (item) => [
-            item.driverName || '',
-            item.division || '',
-            item.fastestLap || '-',
-            item.raceType || item.raceName || '-',
-          ]
+            item.driverName,
+            item.alias || '',
+            item.division,
+            item.totalPoints.toString(),
+          ],
+          true, // useRank
+          3 // Division column index (after #, Driver Name, Alias)
+        );
+      }
+
+      // Team Standings - Aggregate points by team
+      const teamStandingsMap = new Map<string, { teamName: string; totalPoints: number; driverCount: number }>();
+      
+      driverStandings.forEach(driver => {
+        const driverInfo = getDriverInfo(driver.driverId);
+        const teamName = driverInfo?.teamName || '';
+        if (teamName) {
+          const existing = teamStandingsMap.get(teamName);
+          if (existing) {
+            existing.totalPoints += driver.totalPoints;
+            existing.driverCount += 1;
+          } else {
+            teamStandingsMap.set(teamName, {
+              teamName,
+              totalPoints: driver.totalPoints,
+              driverCount: 1,
+            });
+          }
+        }
+      });
+
+      const teamStandings = Array.from(teamStandingsMap.values())
+        .sort((a, b) => b.totalPoints - a.totalPoints);
+
+      if (teamStandings.length > 0) {
+        await addTable(
+          'Team Standings',
+          teamStandings,
+          ['Team Name', 'Total Points', 'Drivers'],
+          (item) => [
+            item.teamName,
+            item.totalPoints.toString(),
+            item.driverCount.toString(),
+          ],
+          false // No rank column for team standings
         );
       }
 
       // Modern professional footer
-      const totalPages = doc.getNumberOfPages();
+      const totalPages = (doc as any).internal.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
         
@@ -616,14 +1291,9 @@ export default function ReportsPage() {
         // Footer text
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('helvetica', 'normal'); // Using helvetica as closest to Futura
         const footerText = `VHKC Race Results Report | Page ${i} of ${totalPages}`;
-        doc.text(footerText, pageWidth / 2, pageHeight - 12, { align: 'center' });
-        
-        doc.setFontSize(7);
-        doc.setTextColor(200, 200, 200);
-        const timestamp = new Date().toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' });
-        doc.text(`Generated: ${timestamp}`, pageWidth / 2, pageHeight - 6, { align: 'center' });
+        doc.text(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' });
       }
 
       // Generate filename
