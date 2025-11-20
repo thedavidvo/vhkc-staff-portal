@@ -327,7 +327,6 @@ export async function getRaceResultsByRound(roundId: string): Promise<RaceDivisi
       gridPosition: result.grid_position || 0,
       overallPosition: result.overall_position || 0,
       fastestLap: result.fastest_lap || '',
-      points: parseFloat(result.points) || 0,
       raceType: result.race_type || 'qualification',
       raceName: result.race_name || '',
       finalType: result.final_type || '',
@@ -344,17 +343,20 @@ export async function getRaceResultsByRound(roundId: string): Promise<RaceDivisi
 export async function addRaceResult(
   result: DriverRaceResult & { roundId: string; division: string; raceType?: string; raceName?: string; finalType?: string; confirmed?: boolean }
 ): Promise<void> {
+  // Ensure kartNumber is explicitly set (handle null/undefined)
+  const kartNumber = result.kartNumber != null ? String(result.kartNumber) : '';
+  
   await sql`
     INSERT INTO race_results (
       round_id, driver_id, driver_alias, division, kart_number,
-      grid_position, overall_position, fastest_lap, points,
+      grid_position, overall_position, fastest_lap,
       race_type, race_name, final_type, confirmed
     ) VALUES (
       ${result.roundId}, ${result.driverId}, ${result.driverAlias || ''},
-      ${result.division}, ${result.kartNumber || ''},
+      ${result.division}, ${kartNumber},
       ${result.gridPosition || result.position || 0},
       ${result.overallPosition || result.gridPosition || result.position || 0},
-      ${result.fastestLap || ''}, ${result.points || 0},
+      ${result.fastestLap || ''},
       ${result.raceType || 'qualification'}, ${result.raceName || ''},
       ${result.finalType || ''}, ${result.confirmed || false}
     )
@@ -366,7 +368,6 @@ export async function addRaceResult(
       grid_position = EXCLUDED.grid_position,
       overall_position = EXCLUDED.overall_position,
       fastest_lap = EXCLUDED.fastest_lap,
-      points = EXCLUDED.points,
       race_name = EXCLUDED.race_name,
       confirmed = EXCLUDED.confirmed
   `;
@@ -380,15 +381,17 @@ export async function updateRaceResult(
   const raceType = result.raceType || 'qualification';
   const finalType = result.finalType || '';
   
+  // Ensure kartNumber is explicitly set (handle null/undefined)
+  const kartNumber = result.kartNumber != null ? String(result.kartNumber) : '';
+  
   await sql`
     UPDATE race_results
     SET driver_alias = ${result.driverAlias || ''},
         division = ${result.division},
-        kart_number = ${result.kartNumber || ''},
+        kart_number = ${kartNumber},
         grid_position = ${result.gridPosition || result.position || 0},
         overall_position = ${result.overallPosition || result.gridPosition || result.position || 0},
         fastest_lap = ${result.fastestLap || ''},
-        points = ${result.points || 0},
         race_type = ${raceType},
         race_name = ${result.raceName || ''},
         final_type = ${finalType},
@@ -495,182 +498,6 @@ export async function updateTeam(team: Team): Promise<void> {
 
 export async function deleteTeam(teamId: string): Promise<void> {
   await sql`DELETE FROM teams WHERE id = ${teamId}`;
-}
-
-// ============================================================================
-// RACE RESULT RECORDS OPERATIONS (Snapshots)
-// ============================================================================
-
-export interface RaceResultRecord {
-  id: string;
-  seasonId: string;
-  roundId: string;
-  division: Division;
-  raceType: string;
-  finalType?: string;
-  driverId: string;
-  driverName: string;
-  position: number;
-  fastestLap: string;
-  points: number;
-  rank: number;
-  createdAt: string;
-}
-
-export async function getRaceResultRecordsBySeason(seasonId: string): Promise<RaceResultRecord[]> {
-  const records = await sql`SELECT * FROM race_result_records WHERE season_id = ${seasonId} ORDER BY created_at DESC` as any[];
-  return records.map((r: any) => ({
-    id: r.id,
-    seasonId: r.season_id,
-    roundId: r.round_id,
-    division: r.division as Division,
-    raceType: r.race_type,
-    finalType: r.final_type || '',
-    driverId: r.driver_id,
-    driverName: r.driver_name,
-    position: r.position,
-    fastestLap: r.fastest_lap || '',
-    points: parseFloat(r.points),
-    rank: r.rank,
-    createdAt: r.created_at,
-  }));
-}
-
-export async function getRaceResultRecordsByRound(roundId: string): Promise<RaceResultRecord[]> {
-  const records = await sql`SELECT * FROM race_result_records WHERE round_id = ${roundId} ORDER BY rank` as any[];
-  return records.map((r: any) => ({
-    id: r.id,
-    seasonId: r.season_id,
-    roundId: r.round_id,
-    division: r.division as Division,
-    raceType: r.race_type,
-    finalType: r.final_type || '',
-    driverId: r.driver_id,
-    driverName: r.driver_name,
-    position: r.position,
-    fastestLap: r.fastest_lap || '',
-    points: parseFloat(r.points),
-    rank: r.rank,
-    createdAt: r.created_at,
-  }));
-}
-
-export async function getRaceResultRecords(
-  seasonId: string,
-  roundId: string,
-  division: Division,
-  raceType: string
-): Promise<RaceResultRecord[]> {
-  const records = await sql`
-    SELECT * FROM race_result_records
-    WHERE season_id = ${seasonId}
-      AND round_id = ${roundId}
-      AND division = ${division}
-      AND race_type = ${raceType}
-    ORDER BY rank
-  ` as any[];
-  return records.map((r: any) => ({
-    id: r.id,
-    seasonId: r.season_id,
-    roundId: r.round_id,
-    division: r.division as Division,
-    raceType: r.race_type,
-    finalType: r.final_type || '',
-    driverId: r.driver_id,
-    driverName: r.driver_name,
-    position: r.position,
-    fastestLap: r.fastest_lap || '',
-    points: parseFloat(r.points),
-    rank: r.rank,
-    createdAt: r.created_at,
-  }));
-}
-
-export async function addRaceResultRecord(record: RaceResultRecord): Promise<void> {
-  await sql`
-    INSERT INTO race_result_records (
-      id, season_id, round_id, division, race_type, final_type,
-      driver_id, driver_name, position, fastest_lap, points, rank, created_at
-    ) VALUES (
-      ${record.id}, ${record.seasonId}, ${record.roundId}, ${record.division},
-      ${record.raceType}, ${record.finalType || ''}, ${record.driverId},
-      ${record.driverName}, ${record.position}, ${record.fastestLap},
-      ${record.points}, ${record.rank}, ${record.createdAt}
-    )
-  `;
-}
-
-export async function addRaceResultRecords(records: RaceResultRecord[]): Promise<void> {
-  for (const record of records) {
-    await addRaceResultRecord(record);
-  }
-}
-
-export async function updateRaceResultRecord(recordId: string, updates: Partial<RaceResultRecord>): Promise<void> {
-  const existing = await sql`SELECT * FROM race_result_records WHERE id = ${recordId}` as any[];
-  if (existing.length === 0) {
-    throw new Error(`Record with ID ${recordId} not found`);
-  }
-  
-  const record = existing[0];
-  await sql`
-    UPDATE race_result_records
-    SET season_id = ${updates.seasonId ?? record.season_id},
-        round_id = ${updates.roundId ?? record.round_id},
-        division = ${updates.division ?? record.division},
-        race_type = ${updates.raceType ?? record.race_type},
-        final_type = ${updates.finalType ?? record.final_type ?? ''},
-        driver_id = ${updates.driverId ?? record.driver_id},
-        driver_name = ${updates.driverName ?? record.driver_name},
-        position = ${updates.position ?? record.position},
-        fastest_lap = ${updates.fastestLap ?? record.fastest_lap},
-        points = ${updates.points ?? record.points},
-        rank = ${updates.rank ?? record.rank},
-        created_at = ${updates.createdAt ?? record.created_at}
-    WHERE id = ${recordId}
-  `;
-}
-
-export async function updateRaceResultRecordByFields(
-  roundId: string,
-  driverId: string,
-  division: Division,
-  raceType: string,
-  finalType: string,
-  updates: Partial<RaceResultRecord>
-): Promise<void> {
-  const records = await getRaceResultRecordsByRound(roundId);
-  const matchingRecord = records.find(r => 
-    r.driverId === driverId && 
-    r.division === division && 
-    r.raceType === raceType &&
-    (r.finalType || '') === (finalType || '')
-  );
-  
-  if (!matchingRecord) {
-    throw new Error('Record not found');
-  }
-  
-  await updateRaceResultRecord(matchingRecord.id, updates);
-}
-
-export async function deleteRaceResultRecord(recordId: string): Promise<void> {
-  await sql`DELETE FROM race_result_records WHERE id = ${recordId}`;
-}
-
-export async function deleteRaceResultRecords(
-  seasonId: string,
-  roundId: string,
-  division: Division,
-  raceType: string
-): Promise<void> {
-  await sql`
-    DELETE FROM race_result_records
-    WHERE season_id = ${seasonId}
-      AND round_id = ${roundId}
-      AND division = ${division}
-      AND race_type = ${raceType}
-  `;
 }
 
 // ============================================================================

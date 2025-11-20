@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { roundId, driverId, division, raceType, finalType, points } = body;
+    const { roundId, driverId, division, raceType, finalType } = body;
     
     if (!roundId || !driverId || !division || !raceType) {
       return NextResponse.json({ error: 'roundId, driverId, division, and raceType required' }, { status: 400 });
@@ -64,13 +64,12 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Race result not found' }, { status: 404 });
     }
     
-    // Update with new points while preserving other fields
+    // Update while preserving other fields (points removed from race_results)
     await updateRaceResult(roundId, driverId, {
       ...existingResult,
       division,
       raceType,
       finalType,
-      points,
     });
     
     // Invalidate cache for this round and related caches
@@ -81,7 +80,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in PATCH /api/race-results:', error);
-    return NextResponse.json({ error: 'Failed to update race result points' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update race result' }, { status: 500 });
   }
 }
 

@@ -1,10 +1,14 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Header from '@/components/Header';
+import PageLayout from '@/components/PageLayout';
+import SectionCard from '@/components/SectionCard';
+import Modal from '@/components/Modal';
 import { useSeason } from '@/components/SeasonContext';
 import { Race, Division, DriverRaceResult } from '@/types';
-import { Plus, Save, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Save, Trash2, Loader2, Flag, Calendar, Users, Trophy } from 'lucide-react';
 import { getPointsForPosition } from '@/lib/pointsSystem';
 
 // Helper function to get division color (for table cells with division badges)
@@ -130,7 +134,7 @@ export default function RacesPage() {
   const races = useMemo(() => {
     return rounds.map((round) => ({
       id: round.id,
-      name: round.name,
+      name: round.location || 'TBD',
       season: selectedSeason?.name || '',
       round: round.roundNumber,
       roundNumber: round.roundNumber,
@@ -802,16 +806,19 @@ export default function RacesPage() {
           // For now, use 0 or the existing position if available
           const position = isQualification ? (result.position || 0) : (result.overallPosition || result.gridPosition || result.position || 0);
           
+          // Ensure kartNumber is explicitly included (handle null/undefined)
+          const kartNumber = result.kartNumber != null ? String(result.kartNumber).trim() : '';
+          
           return {
             roundId: selectedEvent.id,
             driverId: driverId,
             driverAlias: result.driverAlias || '',
             division: selectedDivision,
+            kartNumber: kartNumber,
             position: position, // Include position for compatibility
             gridPosition: gridPosition,
             overallPosition: overallPosition,
             fastestLap: result.fastestLap || '',
-            points: 0, // Points are calculated dynamically, not stored
             raceType: raceType,
             raceName: selectedType, // Save the full race name (e.g., "Qual Group 1", "Heat A", "Final A")
             finalType: finalType, // Save the group number (1-6) for Qualification races, or final type (A-F) for Heat and Final races
@@ -829,14 +836,19 @@ export default function RacesPage() {
           if (divisionResult && divisionResult.results) {
             existingResult = divisionResult.results.find((r: any) => 
               r.driverId === result.driverId && 
-              r.raceType === result.raceType
+              r.raceType === result.raceType &&
+              (r.finalType || '') === (result.finalType || '')
             );
           }
         }
         
         if (existingResult && result.driverId && !result.driverId.startsWith('temp-')) {
-          // Update existing result
-          return fetch(`/api/race-results?roundId=${result.roundId}&driverId=${result.driverId}`, {
+          // Update existing result - include raceType and finalType in URL for proper matching
+          const url = new URL(`/api/race-results?roundId=${result.roundId}&driverId=${result.driverId}`, window.location.origin);
+          if (result.raceType) url.searchParams.set('raceType', result.raceType);
+          if (result.finalType) url.searchParams.set('finalType', result.finalType);
+          
+          return fetch(url.toString(), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(result),
@@ -907,18 +919,36 @@ export default function RacesPage() {
             // Reload driver results for the current division and selected type
             const divisionResults = refreshedResults.find((r: any) => r.division === selectedDivision)?.results || [];
             
-            // Filter by selected type if one is selected
-            let filteredResults = divisionResults;
-            if (selectedType) {
-              // Extract race type from selectedType (e.g., "Race Name (qualification)" -> "qualification")
-              const match = selectedType.match(/\((\w+)\)$/);
-              const typeRaceType = match ? match[1] : null;
-              if (typeRaceType) {
-                filteredResults = divisionResults.filter((r: any) => r.raceType === typeRaceType);
+            // Filter by the raceType and finalType that were just saved
+            let filteredResults = divisionResults.filter((r: any) => {
+              // Match by raceType and finalType that we just saved
+              const matchesRaceType = r.raceType?.toLowerCase() === raceType.toLowerCase();
+              
+              // For qualification, match by finalType (which contains the group number)
+              if (raceType === 'qualification') {
+                return matchesRaceType && r.finalType === finalType;
               }
+              
+              // For heat and final, match by finalType (which contains the letter)
+              if (raceType === 'heat' || raceType === 'final') {
+                return matchesRaceType && r.finalType?.toUpperCase() === finalType.toUpperCase();
+              }
+              
+              // Fallback: just match raceType
+              return matchesRaceType;
+            });
+            
+            // Also match by raceName if available (for backward compatibility)
+            if (selectedType && filteredResults.length === 0) {
+              filteredResults = divisionResults.filter((r: any) => {
+                // Try to match by exact raceName
+                return r.raceName === selectedType;
+              });
             }
             
             setDriverResults([...filteredResults]);
+            // Prevent the useEffect from reloading results
+            shouldLoadResultsRef.current = false;
           }
         }
       }
@@ -948,19 +978,20 @@ export default function RacesPage() {
 
   return (
     <>
-    <Header hideSearch />
-      <div className="p-4 md:p-6 flex flex-col min-h-screen">
-      <div className="max-w-[95%] mx-auto flex flex-col w-full">
-        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-6">
-          Races Management
-        </h1>
-        <div className="grid grid-cols-12 gap-6 mb-6 flex-shrink-0">
+      <PageLayout
+        title="Races Management"
+        subtitle="Manage race events and enter race results"
+        icon={Flag}
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
           {/* Panel 1: Event */}
-          <div className="col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[300px]">
-            <div className="p-2 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">Event</h2>
-            </div>
-            <div className="p-2 overflow-y-auto flex-1 min-h-0">
+          <SectionCard
+            title="Events"
+            icon={Calendar}
+            className="lg:col-span-4 max-h-[300px] flex flex-col"
+            noPadding
+          >
+            <div className="overflow-y-auto p-2 flex-1 min-h-0">
               {races.length > 0 ? (
                 <div className="space-y-1">
                   {races.map((race) => (
@@ -997,14 +1028,17 @@ export default function RacesPage() {
                 </div>
               )}
             </div>
-          </div>
+          </SectionCard>
 
           {/* Panel 2: Division */}
-          <div className="col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[300px]">
-            <div className="p-2 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">Division</h2>
-            </div>
-            <div className="p-2 overflow-y-auto flex-1 min-h-0">
+          <SectionCard
+            title="Division"
+            icon={Users}
+            className="lg:col-span-4 flex flex-col"
+            noPadding
+          >
+            <div className="flex flex-col flex-1 min-h-0">
+              <div className="p-2">
               {selectedEvent ? (
                 <div className="space-y-1">
                   {availableDivisions.map((division) => {
@@ -1066,13 +1100,15 @@ export default function RacesPage() {
                   Select an event to view races
                 </div>
               )}
+              </div>
             </div>
-          </div>
+          </SectionCard>
 
           {/* Panel 3: Race Name */}
-          <div className="col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[300px]">
-            <div className="p-2 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between flex-shrink-0">
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">Race Name</h2>
+          <SectionCard
+            title="Race Name"
+            icon={Trophy}
+            actions={
               <button
                 onClick={handleAddType}
                 className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all shadow-md text-xs font-medium"
@@ -1080,8 +1116,12 @@ export default function RacesPage() {
                 <Plus className="w-3 h-3" />
                 Add
               </button>
-            </div>
-            <div className="p-2 overflow-y-auto flex-1 min-h-0">
+            }
+            className="lg:col-span-4 max-h-[300px] flex flex-col"
+            noPadding
+          >
+            <div className="flex flex-col flex-1 min-h-0">
+              <div className="p-2 overflow-y-auto flex-1 min-h-0">
               {selectedEvent && selectedDivision ? (
                 <div className="space-y-1">
                   {types.length > 0 ? (
@@ -1126,35 +1166,33 @@ export default function RacesPage() {
                   Select an event and division to create race names
                 </div>
               )}
+              </div>
             </div>
-          </div>
-
+          </SectionCard>
         </div>
 
-        {/* Race Results Panel - Moved to Bottom */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col min-h-[500px]">
-          <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between flex-shrink-0">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Race Results</h2>
-              {selectedEvent && selectedDivision && selectedType && (
-                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                  {selectedEvent.name} • Round {selectedEvent.roundNumber || selectedEvent.round} • {selectedDivision} • {selectedType}
-                </p>
-              )}
-            </div>
-            {selectedEvent && selectedDivision && selectedType && (
+        {/* Race Results Panel */}
+        <SectionCard
+          title="Race Results"
+          subtitle={selectedEvent && selectedDivision && selectedType ? `${selectedEvent.name} • Round ${selectedEvent.roundNumber || selectedEvent.round} • ${selectedDivision} • ${selectedType}` : undefined}
+          icon={Flag}
+          actions={
+            selectedEvent && selectedDivision && selectedType && (
               <button
                 onClick={handleSave}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all shadow-md text-sm font-medium"
+                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all shadow-lg hover:shadow-xl hover-lift text-sm font-medium"
               >
                 <Save className="w-4 h-4" />
-                Save
+                Save Results
               </button>
-            )}
-          </div>
+            )
+          }
+          className="min-h-[500px] flex flex-col"
+          noPadding
+        >
           <div className="flex-1 min-h-[400px]">
             {selectedEvent && selectedDivision && selectedType ? (
-              <div className="overflow-x-auto">
+              <div className="h-full overflow-x-auto">
               <SpreadsheetTable
                 division={selectedDivision}
                 type={selectedType}
@@ -1174,25 +1212,43 @@ export default function RacesPage() {
               </div>
             )}
           </div>
-        </div>
-      </div>
-    </div>
+        </SectionCard>
+      </PageLayout>
 
-    {/* Race Name Modal */}
-    {isTypeModalOpen && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-            Add Race Name
-          </h3>
-          <div className="mb-4">
+      {/* Race Name Modal */}
+      {isTypeModalOpen && (
+      <Modal
+        isOpen={isTypeModalOpen}
+        onClose={handleTypeModalCancel}
+        title="Add Race Name"
+        subtitle="Create a new race type for this division"
+        icon={Plus}
+        size="md"
+        footer={
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={handleTypeModalCancel}
+              className="px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleTypeModalSubmit}
+              className="px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all shadow-lg hover:shadow-xl hover-lift font-medium"
+            >
+              Add
+            </button>
+          </div>
+        }
+      >
+        <div className="mb-4">
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               Race Type
             </label>
             <select
               value={selectedRaceType}
               onChange={(e) => setSelectedRaceType(e.target.value as 'qualification' | 'heat' | 'final')}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary mb-3"
+              className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all mb-3"
               autoFocus
             >
               <option value="qualification">Qual</option>
@@ -1207,7 +1263,7 @@ export default function RacesPage() {
                 <select
                   value={selectedGroup}
                   onChange={(e) => setSelectedGroup(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       handleTypeModalSubmit();
@@ -1233,7 +1289,7 @@ export default function RacesPage() {
                 <select
                   value={selectedFinalType}
                   onChange={(e) => setSelectedFinalType(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       handleTypeModalSubmit();
@@ -1251,24 +1307,9 @@ export default function RacesPage() {
                 </select>
               </>
             )}
-          </div>
-          <div className="flex gap-3 justify-end">
-            <button
-              onClick={handleTypeModalCancel}
-              className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleTypeModalSubmit}
-              className="px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all shadow-md"
-            >
-              Add
-            </button>
-          </div>
         </div>
-      </div>
-    )}
+      </Modal>
+      )}
     </>
   );
 }
@@ -1294,6 +1335,21 @@ function SpreadsheetTable({
   const [dropdownPosition, setDropdownPosition] = useState<Record<number, { top: number; left: number; width: number }>>({});
   const blurTimeoutRef = useRef<Record<number, NodeJS.Timeout>>({});
   const inputRef = useRef<Record<number, HTMLInputElement | null>>({});
+  const portalRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    // Create portal container
+    const portalDiv = document.createElement('div');
+    portalDiv.id = 'dropdown-portal';
+    document.body.appendChild(portalDiv);
+    portalRef.current = portalDiv;
+
+    return () => {
+      if (portalRef.current && document.body.contains(portalRef.current)) {
+        document.body.removeChild(portalRef.current);
+      }
+    };
+  }, []);
   
   // Determine if this is a qualification race
   const isQualification = type?.toLowerCase().includes('qual') || type?.toLowerCase().includes('qualification');
@@ -1338,6 +1394,7 @@ function SpreadsheetTable({
   // Function to get matching drivers based on input
   const getMatchingDrivers = (input: string): any[] => {
     if (!input || input.trim().length < 1) return [];
+    if (!drivers || drivers.length === 0) return [];
     
     const lowerInput = input.toLowerCase().trim();
     return drivers.filter((driver) => {
@@ -1362,17 +1419,45 @@ function SpreadsheetTable({
     
     // Get matching drivers for suggestions
     const matches = getMatchingDrivers(value);
+    const shouldShow = matches.length > 0 && value.trim().length > 0;
+    
+    // Calculate and set dropdown position FIRST, before showing suggestions
+    const input = inputRef.current[index];
+    if (input) {
+      if (shouldShow) {
+        const rect = input.getBoundingClientRect();
+        // Set position immediately, not in requestAnimationFrame
+        setDropdownPosition(prev => ({ 
+          ...prev, 
+          [index]: { 
+            top: rect.bottom + 4, 
+            left: rect.left,
+            width: Math.max(rect.width, 300)
+          } 
+        }));
+      } else {
+        // Clear position when hiding suggestions to prevent stale positions
+        setDropdownPosition(prev => {
+          const newPos = { ...prev };
+          delete newPos[index];
+          return newPos;
+        });
+      }
+    }
+    
+    // Now set suggestions and show dropdown
     setSuggestions(prev => ({ ...prev, [index]: matches }));
-    setShowSuggestions(prev => ({ ...prev, [index]: matches.length > 0 && value.trim().length > 0 }));
+    setShowSuggestions(prev => ({ ...prev, [index]: shouldShow }));
     setActiveSuggestionIndex(prev => ({ ...prev, [index]: -1 }));
     
     // Ensure input stays focused
-    setTimeout(() => {
-      const input = inputRef.current[index];
-      if (input && document.activeElement !== input) {
-        input.focus();
-      }
-    }, 0);
+    if (input) {
+      setTimeout(() => {
+        if (document.activeElement !== input) {
+          input.focus();
+        }
+      }, 0);
+    }
     
     // Don't auto-fill - let user choose from dropdown
   };
@@ -1440,8 +1525,8 @@ function SpreadsheetTable({
   };
 
   return (
-    <div className="p-4" style={{ overflow: 'visible' }}>
-      <div className="overflow-x-auto" style={{ overflowY: 'visible' }}>
+    <div className="p-4">
+      <div>
         <table className="w-full border-collapse border border-slate-300 dark:border-slate-600">
           <thead className="bg-slate-100 dark:bg-slate-900 sticky top-0">
             <tr>
@@ -1490,17 +1575,19 @@ function SpreadsheetTable({
                       value={result.driverName || ''}
                       onChange={(e) => handleDriverNameChange(index, e.target.value)}
                       onFocus={(e) => {
-                        const matches = getMatchingDrivers(result.driverName || '');
-                        if (matches.length > 0) {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setDropdownPosition(prev => ({ 
-                            ...prev, 
-                            [index]: { 
-                              top: rect.bottom + window.scrollY + 4, 
-                              left: rect.left + window.scrollX,
-                              width: rect.width
-                            } 
-                          }));
+                        const value = result.driverName || '';
+                        const matches = getMatchingDrivers(value);
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        // getBoundingClientRect() already gives viewport coordinates for fixed positioning
+                        setDropdownPosition(prev => ({ 
+                          ...prev, 
+                          [index]: { 
+                            top: rect.bottom + 4, 
+                            left: rect.left,
+                            width: Math.max(rect.width, 300)
+                          } 
+                        }));
+                        if (matches.length > 0 && value.trim().length > 0) {
                           setShowSuggestions(prev => ({ ...prev, [index]: true }));
                           setSuggestions(prev => ({ ...prev, [index]: matches }));
                         }
@@ -1603,14 +1690,14 @@ function SpreadsheetTable({
                       className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:ring-1 focus:ring-blue-500"
                       placeholder="Name"
                     />
-                    {showSuggestions[index] && (suggestions[index] || []).length > 0 && dropdownPosition[index] && (
+                    {showSuggestions[index] && (suggestions[index] || []).length > 0 && dropdownPosition[index] && portalRef.current && createPortal(
                       <div 
                         data-dropdown-index={index}
-                        className="fixed bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl shadow-2xl overflow-y-auto" 
+                        className="fixed bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl shadow-2xl overflow-y-auto z-[9999]" 
                         style={{ 
-                          zIndex: 1000, 
                           maxHeight: '400px',
                           minWidth: '300px',
+                          width: `${dropdownPosition[index].width}px`,
                           top: `${dropdownPosition[index].top}px`,
                           left: `${dropdownPosition[index].left}px`
                         }}
@@ -1678,7 +1765,8 @@ function SpreadsheetTable({
                             </div>
                           );
                         })}
-                      </div>
+                      </div>,
+                      portalRef.current
                     )}
                   </div>
                 </td>

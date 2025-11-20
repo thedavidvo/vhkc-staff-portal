@@ -120,27 +120,6 @@ export async function initializeDatabase() {
     await sql`CREATE INDEX IF NOT EXISTS idx_teams_season_id ON teams(season_id)`;
 
     await sql`
-      CREATE TABLE IF NOT EXISTS race_result_records (
-        id TEXT PRIMARY KEY,
-        season_id TEXT NOT NULL,
-        round_id TEXT NOT NULL,
-        division TEXT NOT NULL,
-        race_type TEXT NOT NULL,
-        final_type TEXT,
-        driver_id TEXT NOT NULL,
-        driver_name TEXT NOT NULL,
-        position INTEGER NOT NULL,
-        fastest_lap TEXT,
-        points DECIMAL(10,2) NOT NULL,
-        rank INTEGER NOT NULL,
-        created_at TEXT NOT NULL
-      )
-    `;
-
-    await sql`CREATE INDEX IF NOT EXISTS idx_race_result_records_season_id ON race_result_records(season_id)`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_race_result_records_round_id ON race_result_records(round_id)`;
-
-    await sql`
       CREATE TABLE IF NOT EXISTS check_ins (
         id TEXT PRIMARY KEY,
         season_id TEXT,

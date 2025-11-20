@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Header from '@/components/Header';
+import PageLayout from '@/components/PageLayout';
+import SectionCard from '@/components/SectionCard';
 import { useSeason } from '@/components/SeasonContext';
 import { Division } from '@/types';
 import { getPointsForPosition } from '@/lib/pointsSystem';
-import { Loader2, Filter, Trophy, Search } from 'lucide-react';
+import { Loader2, Filter, Trophy, Search, FileText } from 'lucide-react';
 
 // Helper function to get division color
 const getDivisionColor = (division: Division) => {
@@ -150,7 +152,7 @@ export default function ResultsPage() {
                   divisionResult.results?.forEach((result: any) => {
                     allResults.push({
                       roundId: round.id,
-                      roundName: round.name,
+                      roundName: round.location || 'TBD',
                       roundNumber: round.roundNumber || 0,
                       date: round.date,
                       driverId: result.driverId,
@@ -310,38 +312,35 @@ export default function ResultsPage() {
 
   return (
     <>
-      <Header hideSearch />
-      <div className="p-4 md:p-6">
-        <div className="max-w-[95%] mx-auto">
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-6">
-            Race Results
-          </h1>
-
-          {/* Filters - Always show */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-4 mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Filter className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Filters</h2>
+      <PageLayout
+        title="Race Results"
+        subtitle="View and analyze race results across all rounds"
+        icon={FileText}
+      >
+        {/* Filters */}
+        <SectionCard
+          icon={Filter}
+          title="Filters"
+          className="mb-8"
+        >
+          {/* Driver Search */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Search Driver
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by driver name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+              />
             </div>
-            
-            {/* Driver Search */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Search Driver
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search by driver name..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* Round Filter - Dropdown (Single) */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -354,7 +353,7 @@ export default function ResultsPage() {
                 >
                   {rounds.map(round => (
                     <option key={round.id} value={round.id}>
-                      Round {round.roundNumber}: {round.name}
+                      Round {round.roundNumber}: {round.location || 'TBD'}
                     </option>
                   ))}
                 </select>
@@ -424,11 +423,15 @@ export default function ResultsPage() {
                 </select>
               </div>
             </div>
-          </div>
+        </SectionCard>
 
-          {/* Results Table - Always show */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <div className="overflow-x-auto">
+        {/* Results Table */}
+        <SectionCard
+          title="Race Results"
+          icon={Trophy}
+          noPadding
+        >
+          <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-50 dark:bg-slate-900">
                   <tr>
@@ -509,9 +512,8 @@ export default function ResultsPage() {
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
-      </div>
+        </SectionCard>
+      </PageLayout>
     </>
   );
 }

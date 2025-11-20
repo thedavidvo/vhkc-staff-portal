@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Save, Loader2 } from 'lucide-react';
+import { X, Save, Loader2, Edit } from 'lucide-react';
 import { Division } from '@/types';
+import Modal from '@/components/Modal';
 
 interface RoundPoint {
   id: string;
@@ -58,8 +59,8 @@ export default function RoundPointsEditModal({
         const roundsResponse = await fetch(`/api/rounds?seasonId=${seasonId}`);
         if (roundsResponse.ok) {
           const rounds = await roundsResponse.json();
-          const roundMap = new Map<string, { name: string; roundNumber: number }>(
-            rounds.map((r: any) => [r.id, { name: r.name, roundNumber: r.roundNumber }])
+          const roundMap = new Map<string, { location: string; roundNumber: number }>(
+            rounds.map((r: any) => [r.id, { location: r.location || 'TBD', roundNumber: r.roundNumber }])
           );
 
           // Map points to include round names and sort by round number
@@ -69,7 +70,7 @@ export default function RoundPointsEditModal({
               return {
                 id: point.id,
                 roundId: point.roundId,
-                roundName: roundInfo?.name || `Round ${point.roundNumber || ''}`,
+                roundName: roundInfo?.location || 'TBD',
                 roundNumber: roundInfo?.roundNumber || 0,
                 points: point.points || 0,
                 division: point.division || currentDivision,
@@ -166,28 +167,44 @@ export default function RoundPointsEditModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-              Edit Round Points
-            </h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-              {driverName} - {currentDivision} → {newDivision}
-            </p>
-          </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Edit Round Points"
+      subtitle={`${driverName} - ${currentDivision} → ${newDivision}`}
+      icon={Edit}
+      size="xl"
+      footer={
+        <div className="flex gap-3">
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-            aria-label="Close modal"
             disabled={saving}
+            className="flex-1 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving || roundPoints.length === 0}
+            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                Confirm Changes
+              </>
+            )}
           </button>
         </div>
-
-        <div className="flex-1 overflow-y-auto p-6">
+      }
+    >
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="flex flex-col items-center gap-4">
@@ -269,36 +286,7 @@ export default function RoundPointsEditModal({
               </div>
             </div>
           )}
-        </div>
-
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-200 dark:border-slate-700">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-            disabled={saving}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || loading}
-            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                Confirm Changes
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

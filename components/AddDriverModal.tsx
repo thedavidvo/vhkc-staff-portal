@@ -1,8 +1,9 @@
 'use client';
 
-import { X } from 'lucide-react';
+import { X, UserPlus, Save, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { Division, DriverStatus } from '@/types';
+import Modal from '@/components/Modal';
 
 interface AddDriverModalProps {
   isOpen: boolean;
@@ -115,22 +116,34 @@ export default function AddDriverModal({
   const age = calculateAge(dateString);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-            Add New Driver
-          </h2>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Add New Driver"
+      subtitle="Register a new driver to the system"
+      icon={UserPlus}
+      size="lg"
+      footer={
+        <div className="flex gap-3">
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-            aria-label="Close modal"
+            className="flex-1 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium"
           >
-            <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="add-driver-form"
+            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift flex items-center justify-center gap-2"
+          >
+            <Save className="w-4 h-4" />
+            Add Driver
           </button>
         </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+      }
+    >
+      <form id="add-driver-form" onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -140,7 +153,7 @@ export default function AddDriverModal({
                 type="text"
                 value={formData.firstName}
                 onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
                 placeholder="First Name"
               />
             </div>
@@ -152,7 +165,7 @@ export default function AddDriverModal({
                 type="text"
                 value={formData.lastName}
                 onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
                 placeholder="Last Name"
               />
             </div>
@@ -211,7 +224,7 @@ export default function AddDriverModal({
               required
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
               placeholder="driver@example.com"
             />
           </div>
@@ -231,7 +244,7 @@ export default function AddDriverModal({
                     const day = parseInt(e.target.value) || 0;
                     setFormData({ ...formData, dateOfBirth: { ...formData.dateOfBirth, day } });
                   }}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
                   placeholder="DD"
                 />
               </div>
@@ -245,7 +258,7 @@ export default function AddDriverModal({
                     const month = parseInt(e.target.value) || 0;
                     setFormData({ ...formData, dateOfBirth: { ...formData.dateOfBirth, month } });
                   }}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
                   placeholder="MM"
                 />
               </div>
@@ -259,7 +272,7 @@ export default function AddDriverModal({
                     const year = parseInt(e.target.value) || 0;
                     setFormData({ ...formData, dateOfBirth: { ...formData.dateOfBirth, year } });
                   }}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
                   placeholder="YYYY"
                 />
               </div>
@@ -279,7 +292,7 @@ export default function AddDriverModal({
               required
               value={formData.division}
               onChange={(e) => setFormData({ ...formData, division: e.target.value as Division })}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
             >
               <option value="Division 1">Division 1</option>
               <option value="Division 2">Division 2</option>
@@ -297,7 +310,7 @@ export default function AddDriverModal({
               type="text"
               value={formData.homeTrack}
               onChange={(e) => setFormData({ ...formData, homeTrack: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
               placeholder="Home Track (optional)"
             />
           </div>
@@ -327,24 +340,7 @@ export default function AddDriverModal({
               ))}
             </div>
           </div>
-
-          <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors font-medium"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-md"
-            >
-              Add Driver
-            </button>
-          </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

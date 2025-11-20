@@ -198,7 +198,7 @@ export default function RaceHistory({ races, drivers = [], points = [], rounds =
                   >
                     <div className="flex items-start justify-between mb-2">
                       <h4 className="font-semibold text-slate-900 dark:text-white">
-                        {race.name}
+                        Round {race.round || race.roundNumber || 'N/A'}
                       </h4>
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
                         race.status === 'completed' 

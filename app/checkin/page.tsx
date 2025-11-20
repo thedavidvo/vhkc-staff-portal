@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Header from '@/components/Header';
+import PageLayout from '@/components/PageLayout';
+import SectionCard from '@/components/SectionCard';
 import { useSeason } from '@/components/SeasonContext';
 import { Driver, Division, DriverStatus } from '@/types';
-import { Loader2, Edit, Save, X, CheckCircle2, Circle, Search, Filter, UserCheck, UserX, Users, UserRoundCheck, UserRoundX, UsersRound } from 'lucide-react';
+import { Loader2, Edit, Save, X, CheckCircle2, Circle, Search, Filter, UserCheck, UserX, Users, UserRoundCheck, UserRoundX, UsersRound, ClipboardCheck } from 'lucide-react';
 
 type DriverStatusFilter = 'all' | 'checkedIn' | 'notCheckedIn';
 
@@ -301,15 +303,13 @@ export default function CheckInPage() {
 
   return (
     <>
-      <Header hideSearch />
-      <div className="p-4 md:p-6">
-        <div className="max-w-[95%] mx-auto">
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-6">
-            Check In
-          </h1>
-
-          {/* Stats Boxes */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <PageLayout
+        title="Check In"
+        subtitle="Track driver attendance for each round"
+        icon={ClipboardCheck}
+      >
+        {/* Stats Boxes */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div
                   onClick={() => setStatusFilter('checkedIn')}
                   className={`bg-white dark:bg-slate-800 rounded-xl shadow-md border-2 p-6 cursor-pointer transition-all ${
@@ -374,11 +374,12 @@ export default function CheckInPage() {
                 </div>
               </div>
 
-          {/* Round Selection Section */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6 mb-6">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
-              Select Round
-            </h2>
+        {/* Round Selection Section */}
+        <SectionCard
+          title="Select Round"
+          icon={Circle}
+          className="mb-8"
+        >
             <div className="flex flex-wrap gap-3">
               {rounds.length === 0 ? (
                 <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -395,51 +396,59 @@ export default function CheckInPage() {
                         : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
                     }`}
                   >
-                    Round {round.roundNumber}: {round.name}
+                    Round {round.roundNumber}: {round.location || 'TBD'}
                   </button>
                 ))
               )}
             </div>
-          </div>
+        </SectionCard>
 
-          {selectedRound && (
-            <>
-              {/* Search and Filters */}
-              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-4 mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Search */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Search by driver name or alias..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
+        {selectedRound && (
+          <>
+            {/* Search and Filters */}
+            <SectionCard
+              icon={Filter}
+              title="Search & Filter"
+              className="mb-8"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Search */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by driver name or alias..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                  />
+                </div>
 
-                  {/* Division Filter */}
-                  <div className="relative">
-                    <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                    <select
-                      value={divisionFilter}
-                      onChange={(e) => setDivisionFilter(e.target.value as Division | 'all')}
-                      className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                    >
-                      <option value="all">All Divisions</option>
-                      <option value="Division 1">Division 1</option>
-                      <option value="Division 2">Division 2</option>
-                      <option value="Division 3">Division 3</option>
-                      <option value="Division 4">Division 4</option>
-                      <option value="New">New</option>
-                    </select>
-                  </div>
+                {/* Division Filter */}
+                <div className="relative">
+                  <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <select
+                    value={divisionFilter}
+                    onChange={(e) => setDivisionFilter(e.target.value as Division | 'all')}
+                    className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                  >
+                    <option value="all">All Divisions</option>
+                    <option value="Division 1">Division 1</option>
+                    <option value="Division 2">Division 2</option>
+                    <option value="Division 3">Division 3</option>
+                    <option value="Division 4">Division 4</option>
+                    <option value="New">New</option>
+                  </select>
                 </div>
               </div>
+            </SectionCard>
 
-              {/* Drivers List */}
-              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+            {/* Drivers List */}
+            <SectionCard
+              title={`Drivers (${filteredDrivers.length})`}
+              icon={Users}
+              noPadding
+            >
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-slate-50 dark:bg-slate-900">
@@ -557,11 +566,10 @@ export default function CheckInPage() {
                     </tbody>
                   </table>
                 </div>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+            </SectionCard>
+          </>
+        )}
+      </PageLayout>
 
       {/* Edit Driver Modal */}
       {editingDriver && (

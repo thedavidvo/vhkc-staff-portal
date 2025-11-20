@@ -30,7 +30,13 @@ export function SeasonProvider({ children }: { children: ReactNode }) {
       }
       const data = await response.json();
       setSeasons(data);
-      if (data.length > 0 && !selectedSeason) {
+      // If we have a selected season, update it with fresh data
+      if (selectedSeason) {
+        const updatedSelectedSeason = data.find((s: Season) => s.id === selectedSeason.id);
+        if (updatedSelectedSeason) {
+          setSelectedSeason(updatedSelectedSeason);
+        }
+      } else if (data.length > 0) {
         setSelectedSeason(data[0]);
       }
     } catch (error) {
@@ -75,13 +81,8 @@ export function SeasonProvider({ children }: { children: ReactNode }) {
         throw new Error('Failed to update season');
       }
       // Refresh seasons to get updated data from database
+      // refreshSeasons will automatically update selectedSeason if it matches
       await refreshSeasons();
-      // Update selected season with fresh data from the refreshed seasons
-      const refreshedSeasons = await fetch('/api/seasons').then(r => r.json());
-      const updatedSeason = refreshedSeasons.find((s: Season) => s.id === season.id);
-      if (updatedSeason && selectedSeason?.id === season.id) {
-        setSelectedSeason(updatedSeason);
-      }
     } catch (error) {
       console.error('Failed to update season:', error);
       throw error;

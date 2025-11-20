@@ -2,9 +2,11 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Header from '@/components/Header';
+import PageLayout from '@/components/PageLayout';
+import SectionCard from '@/components/SectionCard';
 import { useSeason } from '@/components/SeasonContext';
 import { Driver, Division } from '@/types';
-import { Search, Check, X, Loader2, ChevronDown } from 'lucide-react';
+import { Search, Check, X, Loader2, ChevronDown, ShieldCheck, Users, Sparkles } from 'lucide-react';
 import RoundPointsEditModal from '@/components/RoundPointsEditModal';
 
 interface PendingDivisionChange {
@@ -30,6 +32,24 @@ const getDivisionColor = (division: Division) => {
       return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
     default:
       return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
+  }
+};
+
+// Helper function to get division gradient
+const getDivisionGradient = (division: Division) => {
+  switch (division) {
+    case 'Division 1':
+      return 'from-blue-500 via-blue-600 to-blue-700';
+    case 'Division 2':
+      return 'from-pink-500 via-pink-600 to-rose-600';
+    case 'Division 3':
+      return 'from-orange-500 via-orange-600 to-amber-600';
+    case 'Division 4':
+      return 'from-yellow-500 via-yellow-600 to-amber-600';
+    case 'New':
+      return 'from-purple-500 via-purple-600 to-indigo-600';
+    default:
+      return 'from-slate-500 to-slate-600';
   }
 };
 
@@ -247,81 +267,84 @@ export default function DivisionsPage() {
 
   return (
     <>
-      <Header hideSearch />
-      <div className="p-6">
-        <div className="max-w-[95%] mx-auto">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-6">
-            Divisions Management
-          </h1>
+      <PageLayout
+        title="Divisions Management"
+        subtitle="Manage driver divisions and track performance changes"
+        icon={ShieldCheck}
+      >
+        {/* Division Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+          {(['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'] as Division[]).map(
+            (division) => {
+              const isSelected = divisionFilter === division;
+              return (
+                <button
+                  key={division}
+                  onClick={() => setDivisionFilter(isSelected ? 'all' : division)}
+                  className={`p-6 rounded-2xl transition-all duration-300 hover:scale-105 ${
+                    isSelected
+                      ? `bg-gradient-to-br ${getDivisionGradient(division)} text-white shadow-lg ring-4 ring-white dark:ring-slate-800`
+                      : 'glass shadow-modern hover:shadow-modern-lg'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className={`text-sm font-bold uppercase tracking-wider ${isSelected ? 'text-white/90' : 'text-slate-600 dark:text-slate-400'}`}>
+                      {division}
+                    </h3>
+                    <Users className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-slate-400'}`} />
+                  </div>
+                  <p className={`text-3xl font-black ${isSelected ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
+                    {driversByDivision[division].length}
+                  </p>
+                </button>
+              );
+            }
+          )}
+        </div>
 
-          {/* Search and Filter */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6 mb-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search driver by name"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                />
-              </div>
-              <select
-                value={divisionFilter}
-                onChange={(e) => setDivisionFilter(e.target.value as Division | 'all')}
-                className="px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all min-w-[180px]"
-              >
-                <option value="all">All Divisions</option>
-                <option value="Division 1">Division 1</option>
-                <option value="Division 2">Division 2</option>
-                <option value="Division 3">Division 3</option>
-                <option value="Division 4">Division 4</option>
-                <option value="New">New</option>
-              </select>
+        {/* Search and Filter */}
+        <SectionCard
+          icon={Search}
+          title="Search & Filter"
+          className="mb-8"
+        >
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search driver by name"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+              />
             </div>
+            <select
+              value={divisionFilter}
+              onChange={(e) => setDivisionFilter(e.target.value as Division | 'all')}
+              className="px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all min-w-[180px]"
+            >
+              <option value="all">All Divisions</option>
+              <option value="Division 1">Division 1</option>
+              <option value="Division 2">Division 2</option>
+              <option value="Division 3">Division 3</option>
+              <option value="Division 4">Division 4</option>
+              <option value="New">New</option>
+            </select>
           </div>
+        </SectionCard>
 
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Division Overview - Left Side */}
-            <div className="flex-shrink-0 w-full lg:w-72">
-              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
-                  Divisions
-                </h2>
-                <div className="space-y-3">
-                  {(['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'] as Division[]).map(
-                    (division) => (
-                      <div
-                        key={division}
-                        onClick={() => setDivisionFilter(divisionFilter === division ? 'all' : division)}
-                        className={`p-4 bg-slate-50 dark:bg-slate-900 rounded-lg cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] ${
-                          divisionFilter === division ? 'ring-2 ring-primary-500 ring-offset-2 bg-primary-50 dark:bg-primary-900/20' : ''
-                        }`}
-                      >
-                        <h3 className="font-semibold text-sm text-slate-900 dark:text-white mb-2">
-                          {division}
-                        </h3>
-                        <p className="text-xl font-bold text-primary-600 dark:text-primary-400">
-                          {driversByDivision[division].length} <span className="text-sm font-normal text-slate-600 dark:text-slate-400">drivers</span>
-                        </p>
-                      </div>
-                    )
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Driver Search Results - Middle */}
-            <div className="flex-1 min-w-0">
-              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[calc(100vh-220px)]">
-                <div className="p-5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex-shrink-0">
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                    Search Results <span className="text-sm font-normal text-slate-500 dark:text-slate-400">({filteredDrivers.length})</span>
-                  </h2>
-                </div>
-                <div className="overflow-x-auto flex-1 overflow-y-auto">
-                  <table className="w-full">
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Drivers Table - Middle */}
+          <div className="lg:col-span-2">
+            <SectionCard
+              title={`Search Results (${filteredDrivers.length})`}
+              icon={Users}
+              noPadding
+            >
+              <div className="overflow-x-auto max-h-[calc(100vh-400px)]">
+                <table className="w-full">
                     <thead className="bg-slate-50 dark:bg-slate-900 sticky top-0 z-10">
                       <tr>
                         <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider sticky left-0 bg-slate-50 dark:bg-slate-900 z-20 min-w-[200px]">
@@ -406,25 +429,25 @@ export default function DivisionsPage() {
                     </tbody>
                   </table>
                 </div>
-              </div>
-            </div>
+            </SectionCard>
+          </div>
 
-            {/* Confirm Division Change - Right Side */}
-            <div className="flex-shrink-0 w-full lg:w-[28rem]">
-              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[calc(100vh-220px)]">
-                <div className="p-5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex-shrink-0">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                      Confirm Division Changes
-                    </h2>
-                    {pendingChanges.length > 0 && (
-                      <span className="px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs font-semibold rounded-full">
-                        {pendingChanges.length}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex-1 overflow-y-auto p-5">
+          {/* Confirm Division Changes - Right Side */}
+          <div className="lg:col-span-1">
+            <SectionCard
+              title="Confirm Division Changes"
+              icon={Sparkles}
+              actions={
+                pendingChanges.length > 0 && (
+                  <span className="px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs font-semibold rounded-full">
+                    {pendingChanges.length}
+                  </span>
+                )
+              }
+              className="h-[calc(100vh-400px)] flex flex-col"
+              noPadding
+            >
+              <div className="flex-1 overflow-y-auto p-6">
                   {/* Promotions */}
                   {promotions.length > 0 && (
                     <div className="mb-6">
@@ -542,12 +565,11 @@ export default function DivisionsPage() {
                       </p>
                     </div>
                   )}
-                </div>
               </div>
-            </div>
+            </SectionCard>
           </div>
         </div>
-      </div>
+      </PageLayout>
 
       {/* Round Points Edit Modal */}
       {selectedChange && selectedSeason && (

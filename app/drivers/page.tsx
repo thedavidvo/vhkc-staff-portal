@@ -2,10 +2,12 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Header from '@/components/Header';
+import PageLayout from '@/components/PageLayout';
+import SectionCard from '@/components/SectionCard';
 import AddDriverModal from '@/components/AddDriverModal';
 import { useSeason } from '@/components/SeasonContext';
 import { Driver, Division, DriverStatus } from '@/types';
-import { Edit, Trash2, X, Save, User, Plus, Loader2 } from 'lucide-react';
+import { Edit, Trash2, X, Save, User, Plus, Loader2, Users, Search, Filter } from 'lucide-react';
 
 // Helper function to get division color
 const getDivisionColor = (division: Division) => {
@@ -301,81 +303,86 @@ export default function DriversPage() {
 
   return (
     <>
-      <Header hideSearch />
-      <div className="p-4 md:p-6">
-        <div className="max-w-[95%] mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
-              Drivers Management
-            </h1>
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-md"
-            >
-              <Plus className="w-5 h-5" />
-              Add Driver
-            </button>
+      <PageLayout
+        title="Drivers Management"
+        subtitle="Manage all registered drivers and their information"
+        icon={Users}
+        headerActions={
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift"
+          >
+            <Plus className="w-5 h-5" />
+            Add Driver
+          </button>
+        }
+      >
+      {/* Filters */}
+      <SectionCard
+        icon={Filter}
+        title="Filters & Search"
+        className="mb-8"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="lg:col-span-2 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search drivers by name or email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+            />
           </div>
+          <select
+            value={divisionFilter}
+            onChange={(e) => setDivisionFilter(e.target.value as Division | 'all')}
+            className="px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+          >
+            <option value="all">All Divisions</option>
+            <option value="Division 1">Division 1</option>
+            <option value="Division 2">Division 2</option>
+            <option value="Division 3">Division 3</option>
+            <option value="Division 4">Division 4</option>
+            <option value="New">New</option>
+          </select>
+          <select
+            value={teamFilter}
+            onChange={(e) => setTeamFilter(e.target.value)}
+            className="px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+          >
+            <option value="all">All Teams</option>
+            {teams.map((team) => (
+              <option key={team} value={team}>
+                {team}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mt-4">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as DriverStatus | 'all')}
+            className="px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+          >
+            <option value="all">All Status</option>
+            <option value="ACTIVE">Active</option>
+            <option value="INACTIVE">Inactive</option>
+            <option value="BANNED">Banned</option>
+          </select>
+        </div>
+      </SectionCard>
 
-          {/* Filters */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-4 mb-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
-                <input
-                  type="text"
-                  placeholder="Search drivers by name or email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-4 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <select
-                value={divisionFilter}
-                onChange={(e) => setDivisionFilter(e.target.value as Division | 'all')}
-                className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="all">All Divisions</option>
-                <option value="Division 1">Division 1</option>
-                <option value="Division 2">Division 2</option>
-                <option value="Division 3">Division 3</option>
-                <option value="Division 4">Division 4</option>
-                <option value="New">New</option>
-              </select>
-              <select
-                value={teamFilter}
-                onChange={(e) => setTeamFilter(e.target.value)}
-                className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="all">All Teams</option>
-                {teams.map((team) => (
-                  <option key={team} value={team}>
-                    {team}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as DriverStatus | 'all')}
-                className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="all">All Status</option>
-                <option value="ACTIVE">Active</option>
-                <option value="INACTIVE">Inactive</option>
-                <option value="BANNED">Banned</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Drivers List */}
-            <div className="lg:col-span-1">
-              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[calc(100vh-200px)]">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                    All Drivers ({filteredDrivers.length})
-                  </h2>
-                </div>
-                <div className="overflow-x-auto flex-1 overflow-y-auto">
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Drivers List */}
+        <SectionCard
+          title={`All Drivers (${filteredDrivers.length})`}
+          icon={Users}
+          noPadding
+          className="lg:col-span-1"
+        >
+          <div className="overflow-x-auto max-h-[calc(100vh-400px)]">
                   <table className="w-full">
                     <thead className="bg-slate-50 dark:bg-slate-900">
                       <tr>
@@ -451,13 +458,25 @@ export default function DriversPage() {
                     </tbody>
                   </table>
                 </div>
-              </div>
-            </div>
+          </SectionCard>
 
-            {/* Driver Details Panel */}
-            <div className="lg:col-span-1">
-              {selectedDriver ? (
-                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6">
+          {/* Driver Details Panel */}
+          <div className="lg:col-span-1">
+            {selectedDriver ? (
+              <SectionCard
+                title="Driver Details"
+                icon={User}
+                actions={
+                  !isEditing && (
+                    <button
+                      onClick={() => handleEdit(selectedDriver)}
+                      className="p-2 text-primary hover:bg-primary-100 dark:hover:bg-primary-900/30 rounded-xl transition-colors"
+                    >
+                      <Edit className="w-5 h-5" />
+                    </button>
+                  )
+                }
+              >
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white">
                       Driver Details
@@ -787,20 +806,23 @@ export default function DriversPage() {
                       </div>
                     </div>
                   )}
-                </div>
-              ) : (
-                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-8 text-center">
-                  <User className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                  <p className="text-slate-500 dark:text-slate-400">
+              </SectionCard>
+            ) : (
+              <SectionCard
+                title="Driver Details"
+                icon={User}
+              >
+                <div className="text-center py-12">
+                  <User className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+                  <p className="text-slate-500 dark:text-slate-400 text-lg">
                     Select a driver to view details
                   </p>
                 </div>
-              )}
-            </div>
-
+              </SectionCard>
+            )}
           </div>
         </div>
-      </div>
+      </PageLayout>
 
       <AddDriverModal
         isOpen={isAddModalOpen}

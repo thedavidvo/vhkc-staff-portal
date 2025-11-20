@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Header from '@/components/Header';
+import PageLayout from '@/components/PageLayout';
+import SectionCard from '@/components/SectionCard';
 import { useSeason } from '@/components/SeasonContext';
 import { Division } from '@/types';
-import { Trophy, Medal, Award, Loader2 } from 'lucide-react';
+import { Trophy, Medal, Award, Loader2, BarChart3, Users, UsersRound } from 'lucide-react';
 
 // Helper function to get division color
 const getDivisionColor = (division: Division) => {
@@ -21,6 +23,24 @@ const getDivisionColor = (division: Division) => {
       return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
     default:
       return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
+  }
+};
+
+// Helper function to get division gradient
+const getDivisionGradient = (division: Division) => {
+  switch (division) {
+    case 'Division 1':
+      return 'from-blue-500 via-blue-600 to-blue-700';
+    case 'Division 2':
+      return 'from-pink-500 via-pink-600 to-rose-600';
+    case 'Division 3':
+      return 'from-orange-500 via-orange-600 to-amber-600';
+    case 'Division 4':
+      return 'from-yellow-500 via-yellow-600 to-amber-600';
+    case 'New':
+      return 'from-purple-500 via-purple-600 to-indigo-600';
+    default:
+      return 'from-slate-500 to-slate-600';
   }
 };
 
@@ -121,7 +141,7 @@ export default function StandingsPage() {
           roundPoints.push({
             roundId: round.id,
             roundNumber: round.roundNumber || 0,
-            roundName: round.name,
+            roundName: round.location || 'TBD',
             location: round.location || round.address || 'TBA',
             points: roundTotal,
           });
@@ -264,7 +284,7 @@ export default function StandingsPage() {
         roundPointsMap[round.id] = {
           roundId: round.id,
           roundNumber: round.roundNumber || 0,
-          roundName: round.name || '',
+          roundName: round.location || 'TBD',
           location: round.location || round.address || 'TBA',
           points: 0
         };
@@ -322,67 +342,77 @@ export default function StandingsPage() {
 
   return (
     <>
-      <Header hideSearch />
-      <div className="p-4 md:p-6">
-        <div className="max-w-[95%] mx-auto">
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-3">
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
-                {viewMode === 'drivers' ? 'Driver Standings' : 'Team Standings'}
-              </h1>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setViewMode('drivers')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                    viewMode === 'drivers'
-                      ? 'bg-primary text-white shadow-md'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  Drivers
-                </button>
-                <button
-                  onClick={() => setViewMode('teams')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                    viewMode === 'teams'
-                      ? 'bg-primary text-white shadow-md'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  Teams
-                </button>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {divisions.map((div) => (
-                <button
-                  key={div}
-                  onClick={() => setSelectedDivision(div)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                    selectedDivision === div
-                      ? 'bg-primary text-white shadow-md'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  {div}
-                </button>
-              ))}
-            </div>
+      <PageLayout
+        title={viewMode === 'drivers' ? 'Driver Standings' : 'Team Standings'}
+        subtitle="View current standings across all divisions"
+        icon={BarChart3}
+        headerActions={
+          <div className="flex gap-2">
+            <button
+              onClick={() => setViewMode('drivers')}
+              className={`px-4 py-2.5 rounded-xl font-medium transition-all ${
+                viewMode === 'drivers'
+                  ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg'
+                  : 'glass text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <Users className="w-4 h-4 inline mr-2" />
+              Drivers
+            </button>
+            <button
+              onClick={() => setViewMode('teams')}
+              className={`px-4 py-2.5 rounded-xl font-medium transition-all ${
+                viewMode === 'teams'
+                  ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg'
+                  : 'glass text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <UsersRound className="w-4 h-4 inline mr-2" />
+              Teams
+            </button>
           </div>
+        }
+      >
+        {/* Division Filter */}
+        <SectionCard
+          title="Select Division"
+          className="mb-8"
+        >
+          <div className="flex flex-wrap gap-2">
+            {divisions.map((div) => (
+              <button
+                key={div}
+                onClick={() => setSelectedDivision(div)}
+                className={`px-4 py-2.5 rounded-xl font-medium transition-all ${
+                  selectedDivision === div
+                    ? `bg-gradient-to-r ${getDivisionGradient(div)} text-white shadow-lg`
+                    : 'glass text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                {div}
+              </button>
+            ))}
+          </div>
+        </SectionCard>
 
-          {viewMode === 'drivers' ? (
-            <div className="space-y-3">
-              {standings.length === 0 ? (
-                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-8 text-center">
+        {/* Standings Content */}
+        {viewMode === 'drivers' ? (
+          <SectionCard
+            title={`${selectedDivision} Driver Standings`}
+            icon={Users}
+          >
+            {standings.length === 0 ? (
+              <div className="text-center py-12">
                   <p className="text-slate-500 dark:text-slate-400">
                     No drivers found in {selectedDivision}
                   </p>
                 </div>
               ) : (
-                standings.map((driver) => (
+                <div className="space-y-3">
+                  {standings.map((driver) => (
                   <div
                     key={driver.id}
-                    className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-4"
+                    className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4"
                   >
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3 flex-shrink-0 w-64">
@@ -445,22 +475,27 @@ export default function StandingsPage() {
                       </div>
                     </div>
                   </div>
-                ))
+                  ))}
+                </div>
               )}
-            </div>
+            </SectionCard>
           ) : (
-            <div className="space-y-3">
+            <SectionCard
+              title={`${selectedDivision} Team Standings`}
+              icon={UsersRound}
+            >
               {teamStandings.length === 0 ? (
-                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-8 text-center">
+                <div className="text-center py-12">
                   <p className="text-slate-500 dark:text-slate-400">
                     No teams found in {selectedDivision}
                   </p>
                 </div>
               ) : (
-                teamStandings.map((team) => (
+                <div className="space-y-3">
+                  {teamStandings.map((team) => (
                   <div
                     key={team.name}
-                    className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-4"
+                    className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4"
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-3 flex-shrink-0 w-64">
@@ -528,12 +563,12 @@ export default function StandingsPage() {
                       </div>
                     </div>
                   </div>
-                ))
+                  ))}
+                </div>
               )}
-            </div>
+            </SectionCard>
           )}
-        </div>
-      </div>
+      </PageLayout>
     </>
   );
 }

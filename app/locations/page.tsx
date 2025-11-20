@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
-import { Plus, Trash2, MapPin, Loader2, X, Save, Edit } from 'lucide-react';
+import PageLayout from '@/components/PageLayout';
+import SectionCard from '@/components/SectionCard';
+import Modal from '@/components/Modal';
+import { Plus, Trash2, MapPin, Loader2, X, Save, Edit, Search } from 'lucide-react';
 import { Location } from '@/lib/dbService';
 
 export default function LocationsPage() {
@@ -160,39 +163,42 @@ export default function LocationsPage() {
 
   return (
     <>
-      <Header hideSearch />
-      <div className="p-6">
-        <div className="max-w-[95%] mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-              Locations
-            </h1>
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-md"
-            >
-              <Plus className="w-5 h-5" />
-              Add Location
-            </button>
+      <PageLayout
+        title="Locations"
+        subtitle="Manage race locations and venues"
+        icon={MapPin}
+        headerActions={
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift"
+          >
+            <Plus className="w-5 h-5" />
+            Add Location
+          </button>
+        }
+      >
+        {/* Search Bar */}
+        <SectionCard
+          icon={Search}
+          title="Search Locations"
+          className="mb-8"
+        >
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search locations by name or address..."
+              className="w-full px-4 py-2.5 pl-10 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+            />
           </div>
+        </SectionCard>
 
-          {/* Search Bar */}
-          <div className="mb-6">
-            <div className="relative">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search locations by name or address..."
-                className="w-full px-4 py-2 pl-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-            </div>
-          </div>
-
-          {/* Locations List */}
-          {filteredLocations.length === 0 ? (
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-12 text-center">
+        {/* Locations List */}
+        {filteredLocations.length === 0 ? (
+          <SectionCard>
+            <div className="text-center py-12">
               <MapPin className="w-16 h-16 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
               <p className="text-slate-600 dark:text-slate-400 text-lg">
                 {searchQuery ? 'No locations found matching your search.' : 'No locations added yet.'}
@@ -206,9 +212,14 @@ export default function LocationsPage() {
                 </button>
               )}
             </div>
-          ) : (
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
-              <div className="divide-y divide-slate-200 dark:divide-slate-700">
+          </SectionCard>
+        ) : (
+          <SectionCard
+            title={`Locations (${filteredLocations.length})`}
+            icon={MapPin}
+            noPadding
+          >
+            <div className="divide-y divide-slate-200 dark:divide-slate-700">
                 {filteredLocations.map((location) => (
                   <div
                     key={location.id}
@@ -290,38 +301,63 @@ export default function LocationsPage() {
                     </div>
                   </div>
                 ))}
-              </div>
             </div>
-          )}
-        </div>
-      </div>
+          </SectionCard>
+        )}
+      </PageLayout>
 
       {/* Add Location Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full">
-            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                Add Location
-              </h2>
-              <button
-                onClick={() => {
-                  setIsAddModalOpen(false);
-                  setNewLocation({ name: '', address: '' });
-                }}
-                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-              >
-                <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-              </button>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleAddLocation();
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setNewLocation({ name: '', address: '' });
+        }}
+        title="Add Location"
+        subtitle="Create a new race location"
+        icon={MapPin}
+        size="md"
+        footer={
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setIsAddModalOpen(false);
+                setNewLocation({ name: '', address: '' });
               }}
-              className="p-6 space-y-4"
+              className="flex-1 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium"
             >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="add-location-form"
+              disabled={saving}
+              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4" />
+                  Add Location
+                </>
+              )}
+            </button>
+          </div>
+        }
+      >
+        <form
+          id="add-location-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleAddLocation();
+          }}
+          className="space-y-4"
+        >
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Location Name <span className="text-red-500">*</span>
@@ -331,7 +367,7 @@ export default function LocationsPage() {
                   required
                   value={newLocation.name}
                   onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
                   placeholder="e.g., VHKC Main Track"
                 />
               </div>
@@ -343,44 +379,12 @@ export default function LocationsPage() {
                 <textarea
                   value={newLocation.address}
                   onChange={(e) => setNewLocation({ ...newLocation, address: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary min-h-[100px]"
+                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all min-h-[100px]"
                   placeholder="123 Racing Blvd, City, State 12345"
                 />
               </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAddModalOpen(false);
-                    setNewLocation({ name: '', address: '' });
-                  }}
-                  className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex-1 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Adding...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4" />
-                      Add Location
-                    </>
-                  )}
-                </button>
-              </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
     </>
   );
 }

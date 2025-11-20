@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Header from '@/components/Header';
+import PageLayout from '@/components/PageLayout';
+import SectionCard from '@/components/SectionCard';
 import { useSeason } from '@/components/SeasonContext';
 import { Division } from '@/types';
-import { Loader2, Save, X, ArrowUp, ArrowDown } from 'lucide-react';
+import { Loader2, Save, X, ArrowUp, ArrowDown, Trophy, Edit } from 'lucide-react';
 import { getPointsForPosition } from '@/lib/pointsSystem';
 
 // Helper function to get division color
@@ -202,7 +204,7 @@ export default function PointsPage() {
                       driverName: result.driverName || driver?.name || 'Unknown Driver',
                       division: result.division,
                       roundId: round.id,
-                      roundName: round.name,
+                      roundName: round.location || 'TBD',
                       roundNumber: round.roundNumber || 0,
                       position: result.position || result.gridPosition || 0,
                       overallPosition: overallPosition,
@@ -500,7 +502,7 @@ export default function PointsPage() {
                     driverName: result.driverName || driver?.name || 'Unknown Driver',
                     division: result.division,
                     roundId: round.id,
-                    roundName: round.name,
+                    roundName: round.location || 'TBD',
                     roundNumber: round.roundNumber || 0,
                     position: result.position || result.gridPosition || 0,
                     overallPosition: overallPosition,
@@ -557,46 +559,48 @@ export default function PointsPage() {
 
   return (
     <>
-      <Header hideSearch />
-      <div className="p-4 md:p-6">
-        <div className="max-w-[95%] mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
-              Points Management
-            </h1>
-            <div className="flex items-center gap-2">
-              {hasUnsavedChanges && (
-                <button
-                  onClick={handleCancelChanges}
-                  disabled={isSaving}
-                  className="px-4 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 transition-all font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  <X className="w-4 h-4" />
-                  Cancel Changes
-                </button>
-              )}
+      <PageLayout
+        title="Points Management"
+        subtitle="View and edit driver points across all rounds"
+        icon={Trophy}
+        headerActions={
+          <div className="flex items-center gap-2">
+            {hasUnsavedChanges && (
               <button
-                onClick={handleSaveAllChanges}
-                disabled={isSaving || filteredPoints.length === 0}
-                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                onClick={handleCancelChanges}
+                disabled={isSaving}
+                className="px-4 py-2.5 bg-slate-500 text-white rounded-xl hover:bg-slate-600 transition-all font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    Save Points ({filteredPoints.length})
-                  </>
-                )}
+                <X className="w-4 h-4" />
+                Cancel Changes
               </button>
-            </div>
+            )}
+            <button
+              onClick={handleSaveAllChanges}
+              disabled={isSaving || filteredPoints.length === 0}
+              className="px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  Save Points ({filteredPoints.length})
+                </>
+              )}
+            </button>
           </div>
-
-          {/* Filters */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-4 mb-6">
+        }
+      >
+        {/* Filters */}
+        <SectionCard
+          icon={Edit}
+          title="Filters"
+          className="mb-8"
+        >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -609,7 +613,7 @@ export default function PointsPage() {
                 >
                   {rounds.map(round => (
                     <option key={round.id} value={round.id}>
-                      Round {round.roundNumber}: {round.name}
+                      Round {round.roundNumber}: {round.location || 'TBD'}
                     </option>
                   ))}
                 </select>
@@ -650,10 +654,14 @@ export default function PointsPage() {
                 </select>
               </div>
             </div>
-          </div>
+        </SectionCard>
 
-          {/* Points Table */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+        {/* Points Table */}
+        <SectionCard
+          title="Points Table"
+          icon={Trophy}
+          noPadding
+        >
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-50 dark:bg-slate-900">
@@ -761,9 +769,8 @@ export default function PointsPage() {
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
-      </div>
+        </SectionCard>
+      </PageLayout>
     </>
   );
 }
