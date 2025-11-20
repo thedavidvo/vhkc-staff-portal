@@ -290,6 +290,7 @@ export default function EditSeasonModal({
             setEditingRound(null);
           }}
           onLocationAdded={onLocationAdded}
+          isEditing={currentSeason.rounds.some(r => r.id === editingRound.id)}
         />
       )}
     </div>
@@ -302,9 +303,10 @@ interface RoundFormProps {
   onSave: (round: Round) => void;
   onCancel: () => void;
   onLocationAdded?: (locationName: string, address: string) => void;
+  isEditing?: boolean;
 }
 
-function RoundForm({ round, locations, onSave, onCancel, onLocationAdded }: RoundFormProps) {
+function RoundForm({ round, locations, onSave, onCancel, onLocationAdded, isEditing = false }: RoundFormProps) {
   const [formData, setFormData] = useState<Round>(round);
   const [showManualLocation, setShowManualLocation] = useState(false);
   const [manualLocation, setManualLocation] = useState('');
@@ -320,7 +322,7 @@ function RoundForm({ round, locations, onSave, onCancel, onLocationAdded }: Roun
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full">
         <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
           <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-            {round.id.startsWith('round-') ? 'Add Round' : 'Edit Round'}
+            {isEditing ? 'Edit Round' : 'Add Round'}
           </h3>
           <button
             onClick={onCancel}
@@ -474,19 +476,6 @@ function RoundForm({ round, locations, onSave, onCancel, onLocationAdded }: Roun
                 </div>
               </div>
             )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Address
-            </label>
-            <input
-              type="text"
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="123 Racing Blvd, City, State 12345"
-            />
           </div>
 
           <div>

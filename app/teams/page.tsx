@@ -469,8 +469,8 @@ export default function TeamsPage() {
   return (
     <>
       <Header hideSearch />
-      <div className="py-4 md:py-6">
-        <div className="max-w-[95%] mx-auto px-4 md:px-6">
+      <div className="p-6">
+        <div className="max-w-[95%] mx-auto">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
               Teams Management
@@ -538,9 +538,7 @@ export default function TeamsPage() {
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="max-w-[95%] mx-auto">
           {filteredTeams.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-slate-600 dark:text-slate-400 text-lg mb-4">
@@ -558,47 +556,50 @@ export default function TeamsPage() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-1 gap-y-6 justify-items-center">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredTeams.map((team) => {
               const teamDrivers = getTeamDrivers(team);
               const availableDrivers = getAvailableDrivers(team);
               return (
                 <div
                   key={team.id}
-                  className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6 w-full max-w-xl"
+                  className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6 hover:shadow-lg transition-shadow flex flex-col"
                 >
-                  <div className="flex flex-col gap-2 mb-4">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                  <div className="flex items-start justify-between mb-4 pb-4 border-b border-slate-200 dark:border-slate-700">
+                    <div className="flex-1 min-w-0">
+                      <h2 className="text-xl font-bold text-slate-900 dark:text-white truncate">
                         {team.name}
                       </h2>
-                      {team.division && (
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getDivisionColor(team.division)}`}>
-                          {team.division}
-                        </span>
-                      )}
                     </div>
+                    {team.division && (
+                      <span className={`ml-3 px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap flex-shrink-0 ${getDivisionColor(team.division)}`}>
+                        {team.division}
+                      </span>
+                    )}
                   </div>
 
-                  <div className="space-y-3 mb-4">
+                  <div className="flex-1 space-y-4 mb-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                        Team Members
-                      </h3>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-500 dark:text-slate-400">
-                          {teamDrivers.length} drivers
+                        <Users className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                          Team Members
+                        </h3>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          ({teamDrivers.length}/3)
                         </span>
+                      </div>
+                      <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleEditTeam(team)}
-                          className="p-1.5 text-primary hover:bg-primary-100 dark:hover:bg-primary-900 rounded transition-colors"
+                          className="p-1.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors"
                           title="Edit team"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteTeam(team.id)}
-                          className="p-1.5 text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded transition-colors"
+                          className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
                           title="Delete team"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -610,14 +611,15 @@ export default function TeamsPage() {
                         {teamDrivers.map((driver) => (
                           <div
                             key={driver.id}
-                            className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-900 rounded-lg"
+                            className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors"
                           >
-                            <span className="text-sm text-slate-900 dark:text-white">
+                            <span className="text-sm font-medium text-slate-900 dark:text-white">
                               {driver.name}
                             </span>
                             <button
                               onClick={() => handleRemoveDriver(team.id, driver.id)}
-                              className="p-1 text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded"
+                              className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                              title="Remove driver"
                             >
                               <X className="w-4 h-4" />
                             </button>
@@ -625,16 +627,18 @@ export default function TeamsPage() {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
-                        No drivers in team
-                      </p>
+                      <div className="p-4 text-center bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                          No drivers in team
+                        </p>
+                      </div>
                     )}
                   </div>
 
                   {teamDrivers.length < 3 && (
-                    <div>
+                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Add Driver ({teamDrivers.length}/3)
+                        Add Driver
                       </label>
                       <div className="relative">
                         <input
@@ -647,10 +651,10 @@ export default function TeamsPage() {
                               [team.id]: e.target.value,
                             });
                           }}
-                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                          className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                         />
                         {(driverSearchQuery[team.id] || '').trim() && (
-                          <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                          <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg shadow-xl max-h-48 overflow-y-auto">
                             {(() => {
                               const filtered = getFilteredDriversForTeam(team, driverSearchQuery[team.id] || '');
                               return filtered.length > 0 ? (
@@ -706,10 +710,12 @@ export default function TeamsPage() {
                     </div>
                   )}
                   {teamDrivers.length >= 3 && (
-                    <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                      <p className="text-sm text-green-800 dark:text-green-200">
-                        Team is full (3/3 drivers)
-                      </p>
+                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                      <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                        <p className="text-sm font-medium text-green-800 dark:text-green-200 text-center">
+                          ✓ Team is full (3/3 drivers)
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>

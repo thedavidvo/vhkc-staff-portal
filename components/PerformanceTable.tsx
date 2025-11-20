@@ -148,7 +148,7 @@ export default function PerformanceTable({ drivers }: PerformanceTableProps) {
                   </div>
                 </td>
                 <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 py-1 text-xs font-semibold rounded-full bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200">
+                  <span className="px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200">
                     {driver.division}
                   </span>
                 </td>

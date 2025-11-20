@@ -270,7 +270,7 @@ export default function SeasonPage() {
                             </div>
                           )}
                           <div className="mt-2">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
                               round.status === 'completed' 
                                 ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
                                 : round.status === 'upcoming'
@@ -480,7 +480,7 @@ export default function SeasonPage() {
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Status
                 </label>
-                <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full ${
+                <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full whitespace-nowrap ${
                   selectedRound.status === 'completed' 
                     ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
                     : selectedRound.status === 'upcoming'

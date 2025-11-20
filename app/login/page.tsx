@@ -52,11 +52,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: '#0C0C36' }}>
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6" style={{ backgroundColor: '#0C0C36' }}>
       <div className="w-full max-w-md">
         {/* Logo */}
-        <div className="flex justify-center mb-8">
-          <div className="relative w-32 h-32">
+        <div className="flex justify-center mb-6 sm:mb-8">
+          <div className="relative w-24 h-24 sm:w-32 sm:h-32">
             <img
               src="/vhkc-logo.png"
               alt="VHKC Staff Portal"
@@ -68,24 +68,24 @@ export default function LoginPage() {
         </div>
 
         {/* Login Card */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 sm:p-8">
+          <div className="text-center mb-6 sm:mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
               Welcome Back
             </h1>
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
               Sign in to access the VHKC Staff Portal
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
             {/* Username Field */}
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 Username
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
                 <input
                   id="username"
                   type="text"
@@ -94,7 +94,8 @@ export default function LoginPage() {
                   placeholder="Enter your username"
                   required
                   autoComplete="username"
-                  className="w-full pl-10 pr-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  className="w-full pl-9 sm:pl-10 pr-4 py-3 sm:py-3.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm sm:text-base text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  style={{ minHeight: '48px' }}
                 />
               </div>
             </div>
@@ -105,7 +106,7 @@ export default function LoginPage() {
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
                 <input
                   id="password"
                   type="password"
@@ -114,7 +115,8 @@ export default function LoginPage() {
                   placeholder="Enter your password"
                   required
                   autoComplete="current-password"
-                  className="w-full pl-10 pr-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  className="w-full pl-9 sm:pl-10 pr-4 py-3 sm:py-3.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm sm:text-base text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  style={{ minHeight: '48px' }}
                 />
               </div>
             </div>
@@ -130,7 +132,8 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all shadow-md font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 sm:py-3.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 active:scale-98 transition-all shadow-md font-medium disabled:opacity-50 disabled:cursor-not-allowed text-base sm:text-lg"
+              style={{ minHeight: '48px' }}
             >
               {isLoading ? (
                 <>
@@ -139,7 +142,7 @@ export default function LoginPage() {
                 </>
               ) : (
                 <>
-                  <LogIn className="w-5 h-5" />
+                  <LogIn className="w-5 h-5 sm:w-6 sm:h-6" />
                   <span>Sign In</span>
                 </>
               )}

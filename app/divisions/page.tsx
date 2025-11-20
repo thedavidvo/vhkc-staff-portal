@@ -5,6 +5,7 @@ import Header from '@/components/Header';
 import { useSeason } from '@/components/SeasonContext';
 import { Driver, Division } from '@/types';
 import { Search, Check, X, Loader2, ChevronDown } from 'lucide-react';
+import RoundPointsEditModal from '@/components/RoundPointsEditModal';
 
 interface PendingDivisionChange {
   driverId: string;
@@ -12,9 +13,6 @@ interface PendingDivisionChange {
   currentDivision: Division;
   newDivision: Division;
   type: 'promotion' | 'demotion';
-  currentLatestPoints?: number;
-  adjustedPoints?: number;
-  latestRoundName?: string;
 }
 
 // Helper function to get division color
@@ -84,6 +82,8 @@ export default function DivisionsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [divisionFilter, setDivisionFilter] = useState<Division | 'all'>('all');
   const [pendingChanges, setPendingChanges] = useState<PendingDivisionChange[]>([]);
+  const [pointsModalOpen, setPointsModalOpen] = useState(false);
+  const [selectedChange, setSelectedChange] = useState<PendingDivisionChange | null>(null);
 
   // Fetch drivers from API
   useEffect(() => {
@@ -131,7 +131,7 @@ export default function DivisionsPage() {
     return filtered;
   }, [drivers, searchQuery, divisionFilter]);
 
-  const handleDivisionChange = async (driverId: string, newDiv: Division) => {
+  const handleDivisionChange = (driverId: string, newDiv: Division) => {
     const driver = drivers.find((d) => d.id === driverId);
     if (!driver) return;
 
@@ -148,58 +148,6 @@ export default function DivisionsPage() {
     const newIndex = divisionOrder.indexOf(newDiv);
     const type = newIndex > currentIndex ? 'promotion' : 'demotion';
 
-    // Calculate the adjusted points for the latest round
-    let currentLatestPoints: number | undefined;
-    let adjustedPoints: number | undefined;
-    let latestRoundName: string | undefined;
-
-    if (selectedSeason) {
-      try {
-        // Fetch driver's points
-        const pointsResponse = await fetch(
-          `/api/points?driverId=${driverId}&seasonId=${selectedSeason.id}`
-        );
-        
-        if (pointsResponse.ok) {
-          const driverPoints = await pointsResponse.json();
-          
-          if (driverPoints && driverPoints.length > 0) {
-            // Fetch rounds to find the latest round
-            const roundsResponse = await fetch(`/api/rounds?seasonId=${selectedSeason.id}`);
-            if (roundsResponse.ok) {
-              const rounds = await roundsResponse.json();
-              const roundMap = new Map<string, { number: number; name: string }>(
-                rounds.map((r: any) => [r.id, { number: r.roundNumber, name: r.name }])
-              );
-
-              // Sort to find latest round
-              const sortedPoints = [...driverPoints].sort((a: any, b: any) => {
-                const aRoundNum = Number(roundMap.get(a.roundId)?.number || 0);
-                const bRoundNum = Number(roundMap.get(b.roundId)?.number || 0);
-                return bRoundNum - aRoundNum;
-              });
-
-              const latestPoint = sortedPoints[0];
-              currentLatestPoints = latestPoint.points;
-              latestRoundName = roundMap.get(latestPoint.roundId)?.name;
-
-              // Find the previous round (second latest)
-              if (sortedPoints.length > 1) {
-                const previousPoint = sortedPoints[1];
-                const multiplier = type === 'promotion' ? 0.66 : 1.66;
-                adjustedPoints = Math.min(previousPoint.points * multiplier, 75);
-              } else {
-                // If only one round, keep the points the same
-                adjustedPoints = currentLatestPoints;
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Failed to calculate adjusted points:', error);
-      }
-    }
-
     // Check if this driver already has a pending change
     const existingIndex = pendingChanges.findIndex((p) => p.driverId === driverId);
     
@@ -209,9 +157,6 @@ export default function DivisionsPage() {
       currentDivision: driver.division,
       newDivision: newDiv,
       type,
-      currentLatestPoints,
-      adjustedPoints,
-      latestRoundName,
     };
     
     if (existingIndex >= 0) {
@@ -225,121 +170,31 @@ export default function DivisionsPage() {
     }
   };
 
-  const handleConfirmChange = async (pendingChange: PendingDivisionChange) => {
+  const handleConfirmChange = (pendingChange: PendingDivisionChange) => {
     if (!selectedSeason) return;
-
-    try {
-      // Find the driver
-      const driver = drivers.find(d => d.id === pendingChange.driverId);
-      if (!driver) return;
-
-      // Update driver division via API
-      const updatedDriver = {
-        ...driver,
-        division: pendingChange.newDivision,
-        lastUpdated: new Date().toISOString().split('T')[0],
-      };
-
-      const response = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedDriver),
-      });
-
-      if (response.ok) {
-        // Recalculate points based on promotion/demotion
-        await recalculateDriverPoints(pendingChange);
-
-        // Update local state
-        setDrivers(
-          drivers.map((d) =>
-            d.id === pendingChange.driverId ? updatedDriver : d
-          )
-        );
-        // Remove from pending changes
-        setPendingChanges(pendingChanges.filter((p) => p.driverId !== pendingChange.driverId));
-      } else {
-        alert('Failed to update driver division. Please try again.');
-      }
-    } catch (error) {
-      console.error('Failed to update driver division:', error);
-      alert('Failed to update driver division. Please try again.');
-    }
+    
+    // Open the modal to edit round points
+    setSelectedChange(pendingChange);
+    setPointsModalOpen(true);
   };
 
-  const recalculateDriverPoints = async (pendingChange: PendingDivisionChange) => {
-    if (!selectedSeason) return;
+  const handleModalSave = async () => {
+    if (!selectedChange || !selectedSeason) return;
 
+    // Refresh drivers list
     try {
-      // Fetch driver's points for this season
-      const pointsResponse = await fetch(
-        `/api/points?driverId=${pendingChange.driverId}&seasonId=${selectedSeason.id}`
-      );
-      
-      if (!pointsResponse.ok) return;
-      
-      const driverPoints = await pointsResponse.json();
-      if (!driverPoints || driverPoints.length === 0) return;
-
-      // Fetch rounds to get round numbers for sorting
-      const roundsResponse = await fetch(`/api/rounds?seasonId=${selectedSeason.id}`);
-      if (!roundsResponse.ok) return;
-      
-      const rounds = await roundsResponse.json();
-      const roundMap = new Map(rounds.map((r: any) => [r.id, r.roundNumber]));
-
-      // Sort points by round number (descending to get latest first)
-      const sortedPoints = driverPoints.sort((a: any, b: any) => {
-        const aRoundNum = Number(roundMap.get(a.roundId) || 0);
-        const bRoundNum = Number(roundMap.get(b.roundId) || 0);
-        return bRoundNum - aRoundNum;
-      });
-
-      // Only recalculate the latest round (first in sorted array)
-      if (sortedPoints.length > 1) {
-        const latestPoint = sortedPoints[0];
-        const previousPoint = sortedPoints[1];
-
-        // Calculate multiplier based on promotion/demotion
-        const multiplier = pendingChange.type === 'promotion' ? 0.66 : 1.66;
-        const maxPoints = 75;
-
-        // Calculate new points based on previous round
-        const calculatedPoints = Math.min(previousPoint.points * multiplier, maxPoints);
-
-        // Update the points record for the latest round only
-        const updatedPoint = {
-          ...latestPoint,
-          points: calculatedPoints,
-          division: pendingChange.newDivision,
-        };
-
-        await fetch('/api/points', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedPoint),
-        });
-
-        console.log(`Points recalculated for latest round: ${previousPoint.points} × ${multiplier} = ${calculatedPoints}`);
-      } else {
-        // If only one round exists, just update the division
-        const latestPoint = sortedPoints[0];
-        const updatedPoint = {
-          ...latestPoint,
-          division: pendingChange.newDivision,
-        };
-
-        await fetch('/api/points', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedPoint),
-        });
-
-        console.log('Only one round exists, division updated without point recalculation');
+      const response = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setDrivers(data);
       }
     } catch (error) {
-      console.error('Failed to recalculate points:', error);
+      console.error('Failed to refresh drivers:', error);
     }
+
+    // Remove from pending changes
+    setPendingChanges(pendingChanges.filter((p) => p.driverId !== selectedChange.driverId));
+    setSelectedChange(null);
   };
 
   const handleDeclineChange = (driverId: string) => {
@@ -376,7 +231,7 @@ export default function DivisionsPage() {
     return (
       <>
         <Header hideSearch />
-        <div className="p-4 md:p-6">
+        <div className="p-6">
           <div className="max-w-[95%] mx-auto">
             <div className="flex items-center justify-center min-h-[400px]">
               <div className="flex flex-col items-center gap-4">
@@ -393,14 +248,14 @@ export default function DivisionsPage() {
   return (
     <>
       <Header hideSearch />
-      <div className="p-4 md:p-6">
+      <div className="p-6">
         <div className="max-w-[95%] mx-auto">
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-6">
             Divisions Management
           </h1>
 
           {/* Search and Filter */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-4 mb-6">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6 mb-6">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -409,13 +264,13 @@ export default function DivisionsPage() {
                   placeholder="Search driver by name"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full pl-10 pr-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                 />
               </div>
               <select
                 value={divisionFilter}
                 onChange={(e) => setDivisionFilter(e.target.value as Division | 'all')}
-                className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                className="px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all min-w-[180px]"
               >
                 <option value="all">All Divisions</option>
                 <option value="Division 1">Division 1</option>
@@ -428,26 +283,26 @@ export default function DivisionsPage() {
           </div>
 
           <div className="flex flex-col lg:flex-row gap-6">
-            {/* Division Overview - Left Side (Wider, auto-height) */}
-            <div className="flex-shrink-0 w-full lg:w-64">
-              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-4">
-                <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-3">
+            {/* Division Overview - Left Side */}
+            <div className="flex-shrink-0 w-full lg:w-72">
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
                   Divisions
                 </h2>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {(['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'] as Division[]).map(
                     (division) => (
                       <div
                         key={division}
                         onClick={() => setDivisionFilter(divisionFilter === division ? 'all' : division)}
-                        className={`p-3 bg-slate-50 dark:bg-slate-900 rounded-lg cursor-pointer transition-all hover:shadow-md ${
-                          divisionFilter === division ? 'ring-2 ring-primary ring-offset-1' : ''
+                        className={`p-4 bg-slate-50 dark:bg-slate-900 rounded-lg cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] ${
+                          divisionFilter === division ? 'ring-2 ring-primary-500 ring-offset-2 bg-primary-50 dark:bg-primary-900/20' : ''
                         }`}
                       >
-                        <h3 className="font-semibold text-sm text-slate-900 dark:text-white mb-1">
+                        <h3 className="font-semibold text-sm text-slate-900 dark:text-white mb-2">
                           {division}
                         </h3>
-                        <p className="text-xl font-bold text-primary">
+                        <p className="text-xl font-bold text-primary-600 dark:text-primary-400">
                           {driversByDivision[division].length} <span className="text-sm font-normal text-slate-600 dark:text-slate-400">drivers</span>
                         </p>
                       </div>
@@ -459,75 +314,95 @@ export default function DivisionsPage() {
 
             {/* Driver Search Results - Middle */}
             <div className="flex-1 min-w-0">
-              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[calc(100vh-200px)]">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-700">
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[calc(100vh-220px)]">
+                <div className="p-5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex-shrink-0">
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                    Search Results ({filteredDrivers.length})
+                    Search Results <span className="text-sm font-normal text-slate-500 dark:text-slate-400">({filteredDrivers.length})</span>
                   </h2>
                 </div>
                 <div className="overflow-x-auto flex-1 overflow-y-auto">
                   <table className="w-full">
                     <thead className="bg-slate-50 dark:bg-slate-900 sticky top-0 z-10">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase sticky left-0 bg-slate-50 dark:bg-slate-900 z-20">
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider sticky left-0 bg-slate-50 dark:bg-slate-900 z-20 min-w-[200px]">
                           Name
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase sticky left-[200px] bg-slate-50 dark:bg-slate-900 z-20 w-40">
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider sticky left-[200px] bg-slate-50 dark:bg-slate-900 z-20 w-48">
                           Current Division
                         </th>
-                        <th className="px-12 py-3 text-center text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                        <th className="px-6 py-4 text-center text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                           Change To
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                      {filteredDrivers.map((driver) => {
-                        const pendingChange = pendingChanges.find((p) => p.driverId === driver.id);
-                        return (
-                          <tr
-                            key={driver.id}
-                            className={`hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${
-                              pendingChange ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
-                            }`}
-                          >
-                            <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white sticky left-0 bg-white dark:bg-slate-800 z-10">
-                              {driver.name}
-                            </td>
-                            <td className="px-4 py-3 text-sm sticky left-[200px] bg-white dark:bg-slate-800 z-10 w-40">
-                              <span className={`px-3 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap inline-block ${getDivisionColor(driver.division)}`}>
-                                {driver.division}
-                              </span>
-                            </td>
-                            <td className="px-12 py-3 text-sm text-center">
-                              {(() => {
-                                const selectedDivision = pendingChange?.newDivision || driver.division;
-                                return (
-                                  <div className="relative inline-block">
-                                    <select
-                                      value={selectedDivision}
-                                      onChange={(e) => {
-                                        const newDiv = e.target.value as Division;
-                                        handleDivisionChange(driver.id, newDiv);
-                                      }}
-                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                    >
-                                      <option value="Division 1">Division 1</option>
-                                      <option value="Division 2">Division 2</option>
-                                      <option value="Division 3">Division 3</option>
-                                      <option value="Division 4">Division 4</option>
-                                      <option value="New">New</option>
-                                    </select>
-                                    <div className={`px-3 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap inline-flex items-center gap-1 ${getDivisionColor(selectedDivision)} pointer-events-none`}>
-                                      <span>{selectedDivision}</span>
-                                      <ChevronDown className="w-3 h-3" style={{ color: 'inherit' }} />
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-slate-800">
+                      {filteredDrivers.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="px-6 py-12 text-center">
+                            <p className="text-slate-500 dark:text-slate-400">
+                              No drivers found matching your search criteria.
+                            </p>
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredDrivers.map((driver) => {
+                          const pendingChange = pendingChanges.find((p) => p.driverId === driver.id);
+                          return (
+                            <tr
+                              key={driver.id}
+                              className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${
+                                pendingChange ? 'bg-amber-50 dark:bg-amber-900/10' : ''
+                              }`}
+                            >
+                              <td className={`px-6 py-4 text-sm font-medium text-slate-900 dark:text-white sticky left-0 z-10 ${
+                                pendingChange 
+                                  ? 'bg-amber-50 dark:bg-amber-900/10 border-l-4 border-l-amber-400' 
+                                  : 'bg-white dark:bg-slate-800'
+                              }`}>
+                                {driver.name}
+                              </td>
+                              <td className={`px-6 py-4 text-sm sticky left-[200px] z-10 w-48 ${
+                                pendingChange 
+                                  ? 'bg-amber-50 dark:bg-amber-900/10' 
+                                  : 'bg-white dark:bg-slate-800'
+                              }`}>
+                                <span className={`px-3 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap inline-block ${getDivisionColor(driver.division)}`}>
+                                  {driver.division}
+                                </span>
+                              </td>
+                              <td className={`px-6 py-4 text-sm text-center ${
+                                pendingChange ? 'bg-amber-50 dark:bg-amber-900/10' : ''
+                              }`}>
+                                {(() => {
+                                  const selectedDivision = pendingChange?.newDivision || driver.division;
+                                  return (
+                                    <div className="relative inline-block">
+                                      <select
+                                        value={selectedDivision}
+                                        onChange={(e) => {
+                                          const newDiv = e.target.value as Division;
+                                          handleDivisionChange(driver.id, newDiv);
+                                        }}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                      >
+                                        <option value="Division 1">Division 1</option>
+                                        <option value="Division 2">Division 2</option>
+                                        <option value="Division 3">Division 3</option>
+                                        <option value="Division 4">Division 4</option>
+                                        <option value="New">New</option>
+                                      </select>
+                                      <div className={`px-3 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap inline-flex items-center gap-1 ${getDivisionColor(selectedDivision)} pointer-events-none`}>
+                                        <span>{selectedDivision}</span>
+                                        <ChevronDown className="w-3 h-3" style={{ color: 'inherit' }} />
+                                      </div>
                                     </div>
-                                  </div>
-                                );
-                              })()}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                                  );
+                                })()}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -535,61 +410,64 @@ export default function DivisionsPage() {
             </div>
 
             {/* Confirm Division Change - Right Side */}
-            <div className="flex-shrink-0 w-full lg:w-80">
-              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[calc(100vh-200px)]">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                    Confirm Division Changes
-                  </h2>
+            <div className="flex-shrink-0 w-full lg:w-[28rem]">
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[calc(100vh-220px)]">
+                <div className="p-5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex-shrink-0">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                      Confirm Division Changes
+                    </h2>
+                    {pendingChanges.length > 0 && (
+                      <span className="px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs font-semibold rounded-full">
+                        {pendingChanges.length}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4">
+                <div className="flex-1 overflow-y-auto p-5">
                   {/* Promotions */}
                   {promotions.length > 0 && (
-                    <div className="mb-4">
-                      <h3 className="text-sm font-semibold text-green-700 dark:text-green-400 mb-2">
+                    <div className="mb-6">
+                      <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
                         Promotions ({promotions.length})
                       </h3>
-                      <div className="space-y-1.5">
+                      <div className="space-y-3">
                         {promotions.map((change) => (
                           <div
                             key={change.driverId}
-                            className="p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg"
+                            className="p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
                           >
-                            <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-start justify-between gap-3">
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                                <p className="text-sm font-semibold text-slate-900 dark:text-white truncate mb-3">
                                   {change.driverName}
                                 </p>
-                                <p className="text-xs text-slate-600 dark:text-slate-400">
-                                  {change.currentDivision} → {change.newDivision}
-                                </p>
-                                {change.latestRoundName && change.currentLatestPoints !== undefined && change.adjustedPoints !== undefined && (
-                                  <div className="mt-1 text-xs text-slate-700 dark:text-slate-300">
-                                    <p className="font-semibold">{change.latestRoundName}:</p>
-                                    <p>
-                                      <span className="text-slate-500 dark:text-slate-400">Current:</span> {change.currentLatestPoints.toFixed(2)} pts
-                                      {' → '}
-                                      <span className="text-green-600 dark:text-green-400 font-semibold">
-                                        Adjusted: {change.adjustedPoints.toFixed(2)} pts
-                                      </span>
-                                    </p>
-                                  </div>
-                                )}
+                                <div className="flex items-center gap-2">
+                                  <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getDivisionColor(change.currentDivision)}`}>
+                                    {change.currentDivision}
+                                  </span>
+                                  <span className="text-slate-300 dark:text-slate-600 text-sm">→</span>
+                                  <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getDivisionColor(change.newDivision)}`}>
+                                    {change.newDivision}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="flex gap-1.5 flex-shrink-0">
+                              <div className="flex gap-2 flex-shrink-0">
                                 <button
                                   onClick={() => handleConfirmChange(change)}
-                                  className="p-1.5 bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
+                                  className="p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
                                   aria-label="Confirm"
+                                  title="Confirm"
                                 >
-                                  <Check className="w-3.5 h-3.5" />
+                                  <Check className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => handleDeclineChange(change.driverId)}
-                                  className="p-1.5 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                                  className="p-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg transition-colors"
                                   aria-label="Decline"
+                                  title="Decline"
                                 >
-                                  <X className="w-3.5 h-3.5" />
+                                  <X className="w-4 h-4" />
                                 </button>
                               </div>
                             </div>
@@ -602,50 +480,46 @@ export default function DivisionsPage() {
                   {/* Demotions */}
                   {demotions.length > 0 && (
                     <div>
-                      <h3 className="text-sm font-semibold text-red-700 dark:text-red-400 mb-2">
+                      <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
                         Demotions ({demotions.length})
                       </h3>
-                      <div className="space-y-1.5">
+                      <div className="space-y-3">
                         {demotions.map((change) => (
                           <div
                             key={change.driverId}
-                            className="p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"
+                            className="p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
                           >
-                            <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-start justify-between gap-3">
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                                <p className="text-sm font-semibold text-slate-900 dark:text-white truncate mb-3">
                                   {change.driverName}
                                 </p>
-                                <p className="text-xs text-slate-600 dark:text-slate-400">
-                                  {change.currentDivision} → {change.newDivision}
-                                </p>
-                                {change.latestRoundName && change.currentLatestPoints !== undefined && change.adjustedPoints !== undefined && (
-                                  <div className="mt-1 text-xs text-slate-700 dark:text-slate-300">
-                                    <p className="font-semibold">{change.latestRoundName}:</p>
-                                    <p>
-                                      <span className="text-slate-500 dark:text-slate-400">Current:</span> {change.currentLatestPoints.toFixed(2)} pts
-                                      {' → '}
-                                      <span className="text-red-600 dark:text-red-400 font-semibold">
-                                        Adjusted: {change.adjustedPoints.toFixed(2)} pts
-                                      </span>
-                                    </p>
-                                  </div>
-                                )}
+                                <div className="flex items-center gap-2">
+                                  <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getDivisionColor(change.currentDivision)}`}>
+                                    {change.currentDivision}
+                                  </span>
+                                  <span className="text-slate-300 dark:text-slate-600 text-sm">→</span>
+                                  <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getDivisionColor(change.newDivision)}`}>
+                                    {change.newDivision}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="flex gap-1.5 flex-shrink-0">
+                              <div className="flex gap-2 flex-shrink-0">
                                 <button
                                   onClick={() => handleConfirmChange(change)}
-                                  className="p-1.5 bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
+                                  className="p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
                                   aria-label="Confirm"
+                                  title="Confirm"
                                 >
-                                  <Check className="w-3.5 h-3.5" />
+                                  <Check className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => handleDeclineChange(change.driverId)}
-                                  className="p-1.5 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                                  className="p-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg transition-colors"
                                   aria-label="Decline"
+                                  title="Decline"
                                 >
-                                  <X className="w-3.5 h-3.5" />
+                                  <X className="w-4 h-4" />
                                 </button>
                               </div>
                             </div>
@@ -656,8 +530,16 @@ export default function DivisionsPage() {
                   )}
 
                   {pendingChanges.length === 0 && (
-                    <div className="text-center py-6 text-slate-500 dark:text-slate-400 text-sm">
-                      No pending division changes
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700/50 flex items-center justify-center mb-4">
+                        <Check className="w-8 h-8 text-slate-400 dark:text-slate-500" />
+                      </div>
+                      <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                        No pending changes
+                      </p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                        Select a division change to see it here
+                      </p>
                     </div>
                   )}
                 </div>
@@ -666,6 +548,24 @@ export default function DivisionsPage() {
           </div>
         </div>
       </div>
+
+      {/* Round Points Edit Modal */}
+      {selectedChange && selectedSeason && (
+        <RoundPointsEditModal
+          isOpen={pointsModalOpen}
+          onClose={() => {
+            setPointsModalOpen(false);
+            setSelectedChange(null);
+          }}
+          driverId={selectedChange.driverId}
+          driverName={selectedChange.driverName}
+          currentDivision={selectedChange.currentDivision}
+          newDivision={selectedChange.newDivision}
+          seasonId={selectedSeason.id}
+          onSave={handleModalSave}
+          type={selectedChange.type}
+        />
+      )}
     </>
   );
 }

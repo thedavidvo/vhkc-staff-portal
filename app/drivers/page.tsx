@@ -4,8 +4,8 @@ import { useState, useMemo, useEffect } from 'react';
 import Header from '@/components/Header';
 import AddDriverModal from '@/components/AddDriverModal';
 import { useSeason } from '@/components/SeasonContext';
-import { Driver, Division, DriverStatus, RaceResult } from '@/types';
-import { Edit, Trash2, X, Save, User, Clock, Trophy, MapPin, Calendar, Plus, Loader2 } from 'lucide-react';
+import { Driver, Division, DriverStatus } from '@/types';
+import { Edit, Trash2, X, Save, User, Plus, Loader2 } from 'lucide-react';
 
 // Helper function to get division color
 const getDivisionColor = (division: Division) => {
@@ -95,34 +95,6 @@ const formatStatus = (status: string): string => {
   return status.charAt(0) + status.slice(1).toLowerCase();
 };
 
-// TODO: Replace with API call to fetch race history for a driver
-const getDriverRaceHistory = (driverId: string, races: any[]): RaceResult[] => {
-  const history: RaceResult[] = [];
-  
-  races
-    .filter((race) => race.status === 'completed' && race.results)
-    .forEach((race) => {
-      race.results?.forEach((divisionResult: any) => {
-        const driverResult = divisionResult.results.find((r: any) => r.driverId === driverId);
-        if (driverResult) {
-          history.push({
-            raceId: race.id,
-            raceName: race.name,
-            trackName: race.location,
-            season: race.season,
-            round: race.round,
-            position: driverResult.position,
-            qualificationTime: `1:${(Math.floor(Math.random() * 5) + 15).toString().padStart(2, '0')}.${Math.floor(Math.random() * 99).toString().padStart(2, '0')}`, // Mock qualification time
-            fastestLap: driverResult.fastestLap,
-            points: driverResult.points,
-            date: race.date,
-          });
-        }
-      });
-    });
-  
-  return history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-};
 
 export default function DriversPage() {
   const { selectedSeason } = useSeason();
@@ -181,13 +153,6 @@ export default function DriversPage() {
     });
   }, [drivers, searchQuery, divisionFilter, teamFilter, statusFilter]);
 
-  // TODO: Fetch races from API
-  const [races] = useState<any[]>([]);
-  
-  const selectedDriverRaceHistory = useMemo(() => {
-    if (!selectedDriver) return [];
-    return getDriverRaceHistory(selectedDriver.id, races);
-  }, [selectedDriver, races]);
 
   const handleEdit = (driver: Driver) => {
     setSelectedDriver(driver);
@@ -401,7 +366,7 @@ export default function DriversPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Drivers List */}
             <div className="lg:col-span-1">
               <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[calc(100vh-200px)]">
@@ -455,7 +420,7 @@ export default function DriversPage() {
                             {driver.teamName || 'No Team'}
                           </td>
                           <td className="px-4 py-3 text-sm">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(driver.status)}`}>
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getStatusColor(driver.status)}`}>
                               {driver.status}
                             </span>
                           </td>
@@ -816,7 +781,7 @@ export default function DriversPage() {
                       </div>
                       <div>
                         <p className="text-sm text-slate-600 dark:text-slate-400">Status</p>
-                        <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedDriver.status)}`}>
+                        <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getStatusColor(selectedDriver.status)}`}>
                           {selectedDriver.status}
                         </span>
                       </div>
@@ -833,67 +798,6 @@ export default function DriversPage() {
               )}
             </div>
 
-            {/* Race History Panel */}
-            <div className="lg:col-span-1">
-              {selectedDriver ? (
-                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6">
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-                    Racing History
-                  </h2>
-                  {selectedDriverRaceHistory.length === 0 ? (
-                    <p className="text-slate-500 dark:text-slate-400 text-center py-8">
-                      No race history available
-                    </p>
-                  ) : (
-                    <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                      {selectedDriverRaceHistory.map((race, index) => (
-                        <div
-                          key={`${race.raceId}-${index}`}
-                          className="border border-slate-200 dark:border-slate-700 rounded-lg p-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 mb-0.5">
-                                <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                                  {race.raceName}
-                                </h3>
-                                {race.position === 1 && (
-                                  <Trophy className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                                )}
-                              </div>
-                              <p className="text-xs text-slate-600 dark:text-slate-400 truncate">
-                                {race.trackName} • {race.season} R{race.round}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
-                              <span className="text-sm font-bold text-slate-900 dark:text-white">
-                                P{race.position}
-                              </span>
-                              <span className="text-xs text-slate-600 dark:text-slate-400">
-                                {race.points}pts
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-500">
-                            <span>Fastest: {race.fastestLap}</span>
-                            {race.qualificationTime && (
-                              <span>Qual: {race.qualificationTime}</span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-8 text-center">
-                  <User className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                  <p className="text-slate-500 dark:text-slate-400">
-                    Select a driver to view race history
-                  </p>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>

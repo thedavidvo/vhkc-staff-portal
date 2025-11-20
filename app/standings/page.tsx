@@ -101,8 +101,9 @@ export default function StandingsPage() {
         // Calculate points per round for this driver from the points table
         const roundPoints: Array<{ roundId: string; roundNumber: number; roundName: string; location: string; points: number }> = [];
         
-        // Get all points for this driver
-        const driverPoints = points.filter((p: any) => p.driverId === driver.id && p.division === selectedDivision);
+        // Get all points for this driver (regardless of division they raced in)
+        // This ensures drivers who were promoted/demoted can see their historical points
+        const driverPoints = points.filter((p: any) => p.driverId === driver.id);
         
         // Create a map of roundId -> total points for this driver
         const pointsByRound: Record<string, number> = {};
@@ -474,7 +475,7 @@ export default function StandingsPage() {
                             {team.name}
                           </h3>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getDivisionColor(team.division)}`}>
+                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(team.division)}`}>
                               {team.division}
                             </span>
                             {(() => {

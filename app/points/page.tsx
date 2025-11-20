@@ -716,7 +716,7 @@ export default function PointsPage() {
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getDivisionColor(point.division)}`}>
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(point.division)}`}>
                               {point.division}
                             </span>
                           </td>
@@ -727,7 +727,7 @@ export default function PointsPage() {
                             {point.position || '-'}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getRaceTypeBadgeColor(point.raceType || 'qualification', point.finalType)}`}>
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getRaceTypeBadgeColor(point.raceType || 'qualification', point.finalType)}`}>
                               {point.raceType === 'final' && point.finalType 
                                 ? `Final ${point.finalType.toUpperCase()}` 
                                 : point.raceType ? point.raceType.charAt(0).toUpperCase() + point.raceType.slice(1) 

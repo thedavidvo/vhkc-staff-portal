@@ -14,20 +14,21 @@ interface StatCardProps {
 function StatCard({ title, value, icon: Icon, gradient, onClick }: StatCardProps) {
   return (
     <div 
-      className={`bg-white dark:bg-slate-800 rounded-xl shadow-md hover:shadow-lg transition-shadow p-6 border border-slate-200 dark:border-slate-700 ${onClick ? 'cursor-pointer' : ''}`}
+      className={`bg-white dark:bg-slate-800 rounded-xl shadow-md hover:shadow-lg transition-all p-4 sm:p-6 border border-slate-200 dark:border-slate-700 ${onClick ? 'cursor-pointer active:scale-95' : ''}`}
       onClick={onClick}
+      style={onClick ? { minHeight: '44px' } : undefined}
     >
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-slate-600 dark:text-slate-400 text-sm font-medium mb-1">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-slate-600 dark:text-slate-400 text-xs sm:text-sm font-medium mb-1">
             {title}
           </p>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white">
+          <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
             {value}
           </p>
         </div>
-        <div className={`p-3 rounded-lg ${gradient}`}>
-          <Icon className="w-6 h-6 text-white" />
+        <div className={`p-2 sm:p-3 rounded-lg flex-shrink-0 ${gradient}`}>
+          <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
         </div>
       </div>
     </div>

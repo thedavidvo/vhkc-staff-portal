@@ -949,52 +949,46 @@ export default function RacesPage() {
   return (
     <>
     <Header hideSearch />
-      <div className="p-4 md:p-6 flex flex-col h-[calc(100vh-4rem)]">
-      <div className="max-w-[95%] mx-auto flex flex-col flex-1 min-h-0 w-full">
+      <div className="p-4 md:p-6 flex flex-col min-h-screen">
+      <div className="max-w-[95%] mx-auto flex flex-col w-full">
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-6">
           Races Management
         </h1>
         <div className="grid grid-cols-12 gap-6 mb-6 flex-shrink-0">
           {/* Panel 1: Event */}
-          <div className="col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <div className="p-2 border-b border-slate-200 dark:border-slate-700">
+          <div className="col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[300px]">
+            <div className="p-2 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
               <h2 className="text-base font-bold text-slate-900 dark:text-white">Event</h2>
             </div>
-            <div className="overflow-y-auto max-h-[calc(100vh-200px)]">
+            <div className="p-2 overflow-y-auto flex-1 min-h-0">
               {races.length > 0 ? (
-                <div className="divide-y divide-slate-200 dark:divide-slate-700">
+                <div className="space-y-1">
                   {races.map((race) => (
-                    <div
+                    <button
                       key={race.id}
-                    onClick={async () => {
-                      // Fetch race results for this round
-                      const results = await fetchRaceResults(race.id);
-                      setSelectedEvent({ ...race, results });
-                      setSelectedDivision('Division 1');
-                      setSelectedType(null);
-                      setDriverResults([]);
-                      // Reset the load flag so types will be loaded from results
-                      shouldLoadResultsRef.current = true;
-                      // Don't clear types here - let the useEffect populate them from results
-                    }}
-                      className={`p-2 cursor-pointer transition-colors ${
+                      onClick={async () => {
+                        // Fetch race results for this round
+                        const results = await fetchRaceResults(race.id);
+                        setSelectedEvent({ ...race, results });
+                        setSelectedDivision('Division 1');
+                        setSelectedType(null);
+                        setDriverResults([]);
+                        // Reset the load flag so types will be loaded from results
+                        shouldLoadResultsRef.current = true;
+                        // Don't clear types here - let the useEffect populate them from results
+                      }}
+                      className={`w-full text-left p-2 rounded-lg transition-colors text-sm ${
                         selectedEvent?.id === race.id
-                          ? 'bg-primary-50 dark:bg-primary-900/20'
-                          : 'hover:bg-slate-50 dark:hover:bg-slate-700'
+                          ? 'bg-primary-500 text-white'
+                          : 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600'
                       }`}
                     >
-                      <h3 className="font-semibold text-slate-900 dark:text-white text-sm">
-                        {race.name}
-                      </h3>
-                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
+                      <div className="font-medium">{race.name}</div>
+                      <div className="text-sm mt-0.5 opacity-75">
                         Round {race.roundNumber || race.round}
-                      </p>
-                      {race.date && (
-                        <p className="text-sm text-slate-500 dark:text-slate-500 mt-0.5">
-                          {new Date(race.date).toLocaleDateString()}
-                        </p>
-                      )}
-                    </div>
+                        {race.date && ` • ${new Date(race.date).toLocaleDateString()}`}
+                      </div>
+                    </button>
                   ))}
                 </div>
               ) : (
@@ -1006,11 +1000,11 @@ export default function RacesPage() {
           </div>
 
           {/* Panel 2: Division */}
-          <div className="col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <div className="p-2 border-b border-slate-200 dark:border-slate-700">
+          <div className="col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[300px]">
+            <div className="p-2 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
               <h2 className="text-base font-bold text-slate-900 dark:text-white">Division</h2>
             </div>
-            <div className="p-2">
+            <div className="p-2 overflow-y-auto flex-1 min-h-0">
               {selectedEvent ? (
                 <div className="space-y-1">
                   {availableDivisions.map((division) => {
@@ -1076,8 +1070,8 @@ export default function RacesPage() {
           </div>
 
           {/* Panel 3: Race Name */}
-          <div className="col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <div className="p-2 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+          <div className="col-span-4 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[300px]">
+            <div className="p-2 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between flex-shrink-0">
               <h2 className="text-base font-bold text-slate-900 dark:text-white">Race Name</h2>
               <button
                 onClick={handleAddType}
@@ -1087,7 +1081,7 @@ export default function RacesPage() {
                 Add
               </button>
             </div>
-            <div className="p-2">
+            <div className="p-2 overflow-y-auto flex-1 min-h-0">
               {selectedEvent && selectedDivision ? (
                 <div className="space-y-1">
                   {types.length > 0 ? (
@@ -1138,13 +1132,13 @@ export default function RacesPage() {
         </div>
 
         {/* Race Results Panel - Moved to Bottom */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col flex-1 min-h-0">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col min-h-[500px]">
           <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between flex-shrink-0">
             <div>
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">Race Results</h2>
-              {selectedEvent && selectedDivision && (
+              {selectedEvent && selectedDivision && selectedType && (
                 <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                  {selectedEvent.name} • Round {selectedEvent.roundNumber || selectedEvent.round} • {selectedDivision}
+                  {selectedEvent.name} • Round {selectedEvent.roundNumber || selectedEvent.round} • {selectedDivision} • {selectedType}
                 </p>
               )}
             </div>
@@ -1158,8 +1152,9 @@ export default function RacesPage() {
               </button>
             )}
           </div>
-          <div className="flex-1 min-h-0" style={{ overflowY: 'auto', overflowX: 'visible' }}>
+          <div className="flex-1 min-h-[400px]">
             {selectedEvent && selectedDivision && selectedType ? (
+              <div className="overflow-x-auto">
               <SpreadsheetTable
                 division={selectedDivision}
                 type={selectedType}
@@ -1168,6 +1163,7 @@ export default function RacesPage() {
                 onBatchUpdate={handleBatchUpdateDriverResult}
                 drivers={drivers}
               />
+              </div>
             ) : (
               <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-sm">
                 {!selectedEvent
@@ -1321,12 +1317,23 @@ function SpreadsheetTable({
     : ['driverName', 'driverAlias', 'division', 'kartNumber', 'gridPosition', 'overallPosition', 'fastestLap'];
 
   // Merge saved results with default rows
-  const rowsToDisplay = [...defaultRows];
-  results.forEach((result, index) => {
-    if (index < 3) {
-      rowsToDisplay[index] = result;
-    }
-  });
+  // Use results if available, otherwise use default rows
+  const rowsToDisplay = results.length > 0 ? [...results] : [...defaultRows];
+  // Ensure at least 3 rows are displayed
+  while (rowsToDisplay.length < 3) {
+    rowsToDisplay.push({
+      driverId: `temp-${Date.now()}-${rowsToDisplay.length}`,
+      driverAlias: '',
+      driverName: '',
+      division: division,
+      kartNumber: '',
+      gridPosition: rowsToDisplay.length + 1,
+      position: rowsToDisplay.length + 1,
+      overallPosition: rowsToDisplay.length + 1,
+      fastestLap: '',
+      points: 0,
+    });
+  }
 
   // Function to get matching drivers based on input
   const getMatchingDrivers = (input: string): any[] => {
@@ -1434,9 +1441,6 @@ function SpreadsheetTable({
 
   return (
     <div className="p-4" style={{ overflow: 'visible' }}>
-      <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
-        Race Results - {division}{type ? ` - ${type}` : ''}
-      </h3>
       <div className="overflow-x-auto" style={{ overflowY: 'visible' }}>
         <table className="w-full border-collapse border border-slate-300 dark:border-slate-600">
           <thead className="bg-slate-100 dark:bg-slate-900 sticky top-0">
@@ -1552,23 +1556,45 @@ function SpreadsheetTable({
                           setShowSuggestions(prev => ({ ...prev, [index]: false }));
                           const nextFieldIndex = fields.indexOf('driverName') + 1;
                           if (nextFieldIndex < fields.length) {
+                            const nextField = fields[nextFieldIndex];
                             const nextInput = document.querySelector(
-                              `input[data-row="${index}"][data-field="${fields[nextFieldIndex]}"]`
-                            ) as HTMLInputElement;
+                              `input[data-row="${index}"][data-field="${nextField}"], select[data-row="${index}"][data-field="${nextField}"]`
+                            ) as HTMLInputElement | HTMLSelectElement;
                             nextInput?.focus();
                           } else if (index < rowsToDisplay.length - 1) {
                             const nextRowInput = document.querySelector(
                               `input[data-row="${index + 1}"][data-field="driverName"]`
                             ) as HTMLInputElement;
                             nextRowInput?.focus();
+                          } else {
+                            // Last row, create new row and move to it
+                            onUpdate(index, 'driverName', result.driverName || '', true);
+                            setTimeout(() => {
+                              const newRowInput = document.querySelector(
+                                `input[data-row="${index + 1}"][data-field="driverName"]`
+                              ) as HTMLInputElement;
+                              newRowInput?.focus();
+                            }, 0);
                           }
                         } else if (e.key === 'Enter' && !currentSuggestions.length) {
                           e.preventDefault();
-                          if (index < rowsToDisplay.length - 1) {
+                          const isLastRow = index >= rowsToDisplay.length - 1;
+                          if (!isLastRow) {
                             const nextRowInput = document.querySelector(
                               `input[data-row="${index + 1}"][data-field="driverName"]`
                             ) as HTMLInputElement;
                             nextRowInput?.focus();
+                          } else {
+                            // Last row, create new row and move to it
+                            onUpdate(index, 'driverName', result.driverName || '', true);
+                            setTimeout(() => {
+                              const newRowInput = document.querySelector(
+                                `input[data-row="${index + 1}"][data-field="driverName"]`
+                              ) as HTMLInputElement;
+                              if (newRowInput) {
+                                newRowInput.focus();
+                              }
+                            }, 100);
                           }
                         }
                       }}
@@ -1621,7 +1647,7 @@ function SpreadsheetTable({
                                       </div>
                                     )}
                                   </div>
-                                  <div className={`px-3 py-1 rounded-full text-xs font-semibold ${getDivisionColor(driver.division)}`}>
+                                  <div className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${getDivisionColor(driver.division)}`}>
                                     {driver.division}
                                   </div>
                                 </div>
@@ -1677,15 +1703,38 @@ function SpreadsheetTable({
                         e.preventDefault();
                         const nextFieldIndex = fields.indexOf('driverAlias') + 1;
                         if (nextFieldIndex < fields.length) {
-                          const nextInput = document.querySelector(
-                            `input[data-row="${index}"][data-field="${fields[nextFieldIndex]}"]`
-                          ) as HTMLInputElement;
-                          nextInput?.focus();
-                        } else if (index < rowsToDisplay.length - 1) {
-                          const nextRowInput = document.querySelector(
-                            `input[data-row="${index + 1}"][data-field="driverName"]`
-                          ) as HTMLInputElement;
-                          nextRowInput?.focus();
+                          const nextField = fields[nextFieldIndex];
+                          const row = e.currentTarget.closest('tr');
+                          const nextInput = row?.querySelector(
+                            `input[data-field="${nextField}"], select[data-field="${nextField}"]`
+                          ) as HTMLInputElement | HTMLSelectElement;
+                          if (nextInput) {
+                            nextInput.focus();
+                          } else {
+                            const fallbackInput = document.querySelector(
+                              `input[data-row="${index}"][data-field="${nextField}"], select[data-row="${index}"][data-field="${nextField}"]`
+                            ) as HTMLInputElement | HTMLSelectElement;
+                            fallbackInput?.focus();
+                          }
+                        } else {
+                          const isLastRow = index >= rowsToDisplay.length - 1;
+                          if (!isLastRow) {
+                            const nextRowInput = document.querySelector(
+                              `input[data-row="${index + 1}"][data-field="driverName"]`
+                            ) as HTMLInputElement;
+                            nextRowInput?.focus();
+                          } else {
+                            // Last row, create new row and move to it
+                            onUpdate(index, 'driverAlias', result.driverAlias || '', true);
+                            setTimeout(() => {
+                              const newRowInput = document.querySelector(
+                                `input[data-row="${index + 1}"][data-field="driverName"]`
+                              ) as HTMLInputElement;
+                              if (newRowInput) {
+                                newRowInput.focus();
+                              }
+                            }, 100);
+                          }
                         }
                       } else if (e.key === 'Enter') {
                         e.preventDefault();
@@ -1708,6 +1757,87 @@ function SpreadsheetTable({
                     <select
                       value={result.division || division}
                       onChange={(e) => onUpdate(index, 'division', e.target.value as Division)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Tab') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const nextFieldIndex = fields.indexOf('division') + 1;
+                          if (nextFieldIndex < fields.length) {
+                            const nextField = fields[nextFieldIndex];
+                            // Use a more specific selector within the same row
+                            const row = e.currentTarget.closest('tr');
+                            const nextInput = row?.querySelector(
+                              `input[data-field="${nextField}"], select[data-field="${nextField}"]`
+                            ) as HTMLInputElement | HTMLSelectElement;
+                            if (nextInput) {
+                              nextInput.focus();
+                            } else {
+                              // Fallback to document query
+                              const fallbackInput = document.querySelector(
+                                `input[data-row="${index}"][data-field="${nextField}"], select[data-row="${index}"][data-field="${nextField}"]`
+                              ) as HTMLInputElement | HTMLSelectElement;
+                              fallbackInput?.focus();
+                            }
+                          } else {
+                            const isLastRow = index >= rowsToDisplay.length - 1;
+                            if (!isLastRow) {
+                              const nextRowInput = document.querySelector(
+                                `input[data-row="${index + 1}"][data-field="driverName"]`
+                              ) as HTMLInputElement;
+                              nextRowInput?.focus();
+                            } else {
+                              // Last row, create new row and move to it
+                              onUpdate(index, 'division', result.division || division, true);
+                              setTimeout(() => {
+                                const newRowInput = document.querySelector(
+                                  `input[data-row="${index + 1}"][data-field="driverName"]`
+                                ) as HTMLInputElement;
+                                if (newRowInput) {
+                                  newRowInput.focus();
+                                }
+                              }, 100);
+                            }
+                          }
+                        } else if (e.key === 'Enter') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const nextFieldIndex = fields.indexOf('division') + 1;
+                          if (nextFieldIndex < fields.length) {
+                            const nextField = fields[nextFieldIndex];
+                            const row = e.currentTarget.closest('tr');
+                            const nextInput = row?.querySelector(
+                              `input[data-field="${nextField}"], select[data-field="${nextField}"]`
+                            ) as HTMLInputElement | HTMLSelectElement;
+                            if (nextInput) {
+                              nextInput.focus();
+                            } else {
+                              const fallbackInput = document.querySelector(
+                                `input[data-row="${index}"][data-field="${nextField}"], select[data-row="${index}"][data-field="${nextField}"]`
+                              ) as HTMLInputElement | HTMLSelectElement;
+                              fallbackInput?.focus();
+                            }
+                          } else {
+                            const isLastRow = index >= rowsToDisplay.length - 1;
+                            if (!isLastRow) {
+                              const nextRowInput = document.querySelector(
+                                `input[data-row="${index + 1}"][data-field="driverName"]`
+                              ) as HTMLInputElement;
+                              nextRowInput?.focus();
+                            } else {
+                              // Last row, create new row and move to it
+                              onUpdate(index, 'division', result.division || division, true);
+                              setTimeout(() => {
+                                const newRowInput = document.querySelector(
+                                  `input[data-row="${index + 1}"][data-field="driverName"]`
+                                ) as HTMLInputElement;
+                                if (newRowInput) {
+                                  newRowInput.focus();
+                                }
+                              }, 100);
+                            }
+                          }
+                        }
+                      }}
                       data-row={index}
                       data-field="division"
                       className={`px-3 py-1.5 pr-8 rounded-full border-none outline-none text-xs font-semibold transition-all duration-200 cursor-pointer appearance-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${getDivisionColor((result.division || division) as Division)} [&>option]:bg-white [&>option]:dark:bg-slate-800 [&>option]:text-slate-900 [&>option]:dark:text-white [&>option]:font-normal`}
@@ -1734,36 +1864,60 @@ function SpreadsheetTable({
                     onKeyDown={(e) => {
                       if (e.key === 'Tab') {
                         e.preventDefault();
-                        if (index === rowsToDisplay.length - 1) {
-                          onUpdate(index, 'kartNumber', result.kartNumber || '', true);
-                        }
                         const nextFieldIndex = fields.indexOf('kartNumber') + 1;
                         if (nextFieldIndex < fields.length) {
-                          const nextInput = e.currentTarget.parentElement?.parentElement?.querySelector(
-                            `input[data-field="${fields[nextFieldIndex]}"]`
-                          ) as HTMLInputElement;
-                          nextInput?.focus();
-                        } else if (index < rowsToDisplay.length - 1) {
-                          const nextRowInput = document.querySelector(
-                            `input[data-row="${index + 1}"][data-field="driverAlias"]`
-                          ) as HTMLInputElement;
-                          nextRowInput?.focus();
+                          const nextField = fields[nextFieldIndex];
+                          const row = e.currentTarget.closest('tr');
+                          const nextInput = row?.querySelector(
+                            `input[data-field="${nextField}"], select[data-field="${nextField}"]`
+                          ) as HTMLInputElement | HTMLSelectElement;
+                          if (nextInput) {
+                            nextInput.focus();
+                          } else {
+                            const fallbackInput = document.querySelector(
+                              `input[data-row="${index}"][data-field="${nextField}"], select[data-row="${index}"][data-field="${nextField}"]`
+                            ) as HTMLInputElement | HTMLSelectElement;
+                            fallbackInput?.focus();
+                          }
+                        } else {
+                          const isLastRow = index >= rowsToDisplay.length - 1;
+                          if (!isLastRow) {
+                            const nextRowInput = document.querySelector(
+                              `input[data-row="${index + 1}"][data-field="driverName"]`
+                            ) as HTMLInputElement;
+                            nextRowInput?.focus();
+                          } else {
+                            // Last row, create new row and move to it
+                            onUpdate(index, 'kartNumber', result.kartNumber || '', true);
+                            setTimeout(() => {
+                              const newRowInput = document.querySelector(
+                                `input[data-row="${index + 1}"][data-field="driverName"]`
+                              ) as HTMLInputElement;
+                              if (newRowInput) {
+                                newRowInput.focus();
+                              }
+                            }, 100);
+                          }
                         }
                       } else if (e.key === 'Enter') {
                         e.preventDefault();
-                        if (index < rowsToDisplay.length - 1) {
+                        const isLastRow = index >= rowsToDisplay.length - 1;
+                        if (!isLastRow) {
                           const nextRowInput = document.querySelector(
-                            `input[data-row="${index + 1}"][data-field="kartNumber"]`
+                            `input[data-row="${index + 1}"][data-field="driverName"]`
                           ) as HTMLInputElement;
                           nextRowInput?.focus();
                         } else {
+                          // Last row, create new row and move to it
                           onUpdate(index, 'kartNumber', result.kartNumber || '', true);
                           setTimeout(() => {
                             const newRowInput = document.querySelector(
-                              `input[data-row="${index + 1}"][data-field="kartNumber"]`
+                              `input[data-row="${index + 1}"][data-field="driverName"]`
                             ) as HTMLInputElement;
-                            newRowInput?.focus();
-                          }, 0);
+                            if (newRowInput) {
+                              newRowInput.focus();
+                            }
+                          }, 100);
                         }
                       }
                     }}
@@ -1783,36 +1937,60 @@ function SpreadsheetTable({
                         onKeyDown={(e) => {
                           if (e.key === 'Tab') {
                             e.preventDefault();
-                            if (index === rowsToDisplay.length - 1) {
-                              onUpdate(index, 'gridPosition', result.gridPosition || 0, true);
-                            }
                             const nextFieldIndex = fields.indexOf('gridPosition') + 1;
                             if (nextFieldIndex < fields.length) {
-                              const nextInput = e.currentTarget.parentElement?.parentElement?.querySelector(
-                                `input[data-field="${fields[nextFieldIndex]}"]`
-                              ) as HTMLInputElement;
-                              nextInput?.focus();
-                            } else if (index < rowsToDisplay.length - 1) {
-                              const nextRowInput = document.querySelector(
-                                `input[data-row="${index + 1}"][data-field="driverAlias"]`
-                              ) as HTMLInputElement;
-                              nextRowInput?.focus();
+                              const nextField = fields[nextFieldIndex];
+                              const row = e.currentTarget.closest('tr');
+                              const nextInput = row?.querySelector(
+                                `input[data-field="${nextField}"], select[data-field="${nextField}"]`
+                              ) as HTMLInputElement | HTMLSelectElement;
+                              if (nextInput) {
+                                nextInput.focus();
+                              } else {
+                                const fallbackInput = document.querySelector(
+                                  `input[data-row="${index}"][data-field="${nextField}"], select[data-row="${index}"][data-field="${nextField}"]`
+                                ) as HTMLInputElement | HTMLSelectElement;
+                                fallbackInput?.focus();
+                              }
+                            } else {
+                              const isLastRow = index >= rowsToDisplay.length - 1;
+                              if (!isLastRow) {
+                                const nextRowInput = document.querySelector(
+                                  `input[data-row="${index + 1}"][data-field="driverName"]`
+                                ) as HTMLInputElement;
+                                nextRowInput?.focus();
+                              } else {
+                                // Last row, create new row and move to it
+                                onUpdate(index, 'gridPosition', result.gridPosition || 0, true);
+                                setTimeout(() => {
+                                  const newRowInput = document.querySelector(
+                                    `input[data-row="${index + 1}"][data-field="driverName"]`
+                                  ) as HTMLInputElement;
+                                  if (newRowInput) {
+                                    newRowInput.focus();
+                                  }
+                                }, 100);
+                              }
                             }
                           } else if (e.key === 'Enter') {
                             e.preventDefault();
-                            if (index < rowsToDisplay.length - 1) {
+                            const isLastRow = index >= rowsToDisplay.length - 1;
+                            if (!isLastRow) {
                               const nextRowInput = document.querySelector(
-                                `input[data-row="${index + 1}"][data-field="gridPosition"]`
+                                `input[data-row="${index + 1}"][data-field="driverName"]`
                               ) as HTMLInputElement;
                               nextRowInput?.focus();
                             } else {
+                              // Last row, create new row and move to it
                               onUpdate(index, 'gridPosition', result.gridPosition || 0, true);
                               setTimeout(() => {
                                 const newRowInput = document.querySelector(
-                                  `input[data-row="${index + 1}"][data-field="gridPosition"]`
+                                  `input[data-row="${index + 1}"][data-field="driverName"]`
                                 ) as HTMLInputElement;
-                                newRowInput?.focus();
-                              }, 0);
+                                if (newRowInput) {
+                                  newRowInput.focus();
+                                }
+                              }, 100);
                             }
                           }
                         }}
@@ -1830,36 +2008,60 @@ function SpreadsheetTable({
                         onKeyDown={(e) => {
                           if (e.key === 'Tab') {
                             e.preventDefault();
-                            if (index === rowsToDisplay.length - 1) {
-                              onUpdate(index, 'overallPosition', result.overallPosition || 0, true);
-                            }
                             const nextFieldIndex = fields.indexOf('overallPosition') + 1;
                             if (nextFieldIndex < fields.length) {
-                              const nextInput = e.currentTarget.parentElement?.parentElement?.querySelector(
-                                `input[data-field="${fields[nextFieldIndex]}"]`
-                              ) as HTMLInputElement;
-                              nextInput?.focus();
-                            } else if (index < rowsToDisplay.length - 1) {
-                              const nextRowInput = document.querySelector(
-                                `input[data-row="${index + 1}"][data-field="driverAlias"]`
-                              ) as HTMLInputElement;
-                              nextRowInput?.focus();
+                              const nextField = fields[nextFieldIndex];
+                              const row = e.currentTarget.closest('tr');
+                              const nextInput = row?.querySelector(
+                                `input[data-field="${nextField}"], select[data-field="${nextField}"]`
+                              ) as HTMLInputElement | HTMLSelectElement;
+                              if (nextInput) {
+                                nextInput.focus();
+                              } else {
+                                const fallbackInput = document.querySelector(
+                                  `input[data-row="${index}"][data-field="${nextField}"], select[data-row="${index}"][data-field="${nextField}"]`
+                                ) as HTMLInputElement | HTMLSelectElement;
+                                fallbackInput?.focus();
+                              }
+                            } else {
+                              const isLastRow = index >= rowsToDisplay.length - 1;
+                              if (!isLastRow) {
+                                const nextRowInput = document.querySelector(
+                                  `input[data-row="${index + 1}"][data-field="driverName"]`
+                                ) as HTMLInputElement;
+                                nextRowInput?.focus();
+                              } else {
+                                // Last row, create new row and move to it
+                                onUpdate(index, 'overallPosition', result.overallPosition || 0, true);
+                                setTimeout(() => {
+                                  const newRowInput = document.querySelector(
+                                    `input[data-row="${index + 1}"][data-field="driverName"]`
+                                  ) as HTMLInputElement;
+                                  if (newRowInput) {
+                                    newRowInput.focus();
+                                  }
+                                }, 100);
+                              }
                             }
                           } else if (e.key === 'Enter') {
                             e.preventDefault();
-                            if (index < rowsToDisplay.length - 1) {
+                            const isLastRow = index >= rowsToDisplay.length - 1;
+                            if (!isLastRow) {
                               const nextRowInput = document.querySelector(
-                                `input[data-row="${index + 1}"][data-field="overallPosition"]`
+                                `input[data-row="${index + 1}"][data-field="driverName"]`
                               ) as HTMLInputElement;
                               nextRowInput?.focus();
                             } else {
+                              // Last row, create new row and move to it
                               onUpdate(index, 'overallPosition', result.overallPosition || 0, true);
                               setTimeout(() => {
                                 const newRowInput = document.querySelector(
-                                  `input[data-row="${index + 1}"][data-field="overallPosition"]`
+                                  `input[data-row="${index + 1}"][data-field="driverName"]`
                                 ) as HTMLInputElement;
-                                newRowInput?.focus();
-                              }, 0);
+                                if (newRowInput) {
+                                  newRowInput.focus();
+                                }
+                              }, 100);
                             }
                           }
                         }}
@@ -1879,31 +2081,44 @@ function SpreadsheetTable({
                     onKeyDown={(e) => {
                       if (e.key === 'Tab') {
                         e.preventDefault();
-                        if (index === rowsToDisplay.length - 1) {
-                          onUpdate(index, 'fastestLap', result.fastestLap || '', true);
-                        }
                         // Last field, move to next row first field
-                        if (index < rowsToDisplay.length - 1) {
+                        const isLastRow = index >= rowsToDisplay.length - 1;
+                        if (!isLastRow) {
                           const nextRowInput = document.querySelector(
-                            `input[data-row="${index + 1}"][data-field="driverAlias"]`
-                          ) as HTMLInputElement;
-                          nextRowInput?.focus();
-                        }
-                      } else if (e.key === 'Enter') {
-                        e.preventDefault();
-                        if (index < rowsToDisplay.length - 1) {
-                          const nextRowInput = document.querySelector(
-                            `input[data-row="${index + 1}"][data-field="fastestLap"]`
+                            `input[data-row="${index + 1}"][data-field="driverName"]`
                           ) as HTMLInputElement;
                           nextRowInput?.focus();
                         } else {
+                          // Last row, create new row and move to it
                           onUpdate(index, 'fastestLap', result.fastestLap || '', true);
                           setTimeout(() => {
                             const newRowInput = document.querySelector(
-                              `input[data-row="${index + 1}"][data-field="fastestLap"]`
+                              `input[data-row="${index + 1}"][data-field="driverName"]`
                             ) as HTMLInputElement;
-                            newRowInput?.focus();
-                          }, 0);
+                            if (newRowInput) {
+                              newRowInput.focus();
+                            }
+                          }, 100);
+                        }
+                      } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const isLastRow = index >= rowsToDisplay.length - 1;
+                        if (!isLastRow) {
+                          const nextRowInput = document.querySelector(
+                            `input[data-row="${index + 1}"][data-field="driverName"]`
+                          ) as HTMLInputElement;
+                          nextRowInput?.focus();
+                        } else {
+                          // Last row, create new row and move to it
+                          onUpdate(index, 'fastestLap', result.fastestLap || '', true);
+                          setTimeout(() => {
+                            const newRowInput = document.querySelector(
+                              `input[data-row="${index + 1}"][data-field="driverName"]`
+                            ) as HTMLInputElement;
+                            if (newRowInput) {
+                              newRowInput.focus();
+                            }
+                          }, 100);
                         }
                       }
                     }}

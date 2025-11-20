@@ -21,6 +21,7 @@ import {
   Menu,
   X,
   ClipboardCheck,
+  MapPin,
 } from 'lucide-react';
 
 interface NavItem {
@@ -40,6 +41,10 @@ const navItems: NavItem[] = [
   { name: 'Divisions', href: '/divisions', icon: ShieldCheck },
   { name: 'Standings', href: '/standings', icon: BarChart3 },
   { name: 'Teams', href: '/teams', icon: UsersRound },
+];
+
+const bottomNavItems: NavItem[] = [
+  { name: 'Locations', href: '/locations', icon: MapPin },
 ];
 
 const comingSoonItems: NavItem[] = [
@@ -79,8 +84,9 @@ export default function Sidebar() {
       {/* Mobile menu button */}
       <button
         onClick={() => setIsMobileOpen(!isMobileOpen)}
-        className="md:hidden fixed top-4 left-4 z-50 p-2 bg-slate-900 text-white rounded-lg shadow-lg"
+        className="md:hidden fixed top-3 left-3 z-[60] p-3 bg-slate-900 text-white rounded-lg shadow-lg hover:bg-slate-800 active:scale-95 transition-all"
         aria-label="Toggle menu"
+        style={{ minWidth: '44px', minHeight: '44px' }}
       >
         {isMobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
       </button>
@@ -88,18 +94,16 @@ export default function Sidebar() {
       {/* Overlay for mobile */}
       {isMobileOpen && (
         <div
-          className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40 animate-fadeIn"
           onClick={() => setIsMobileOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`bg-gradient-to-b from-slate-900 to-slate-800 text-white transition-all duration-300 ease-in-out ${
-          isCollapsed ? 'w-20' : 'w-64'
-        } ${
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        } flex flex-col h-screen fixed left-0 top-0 z-40 shadow-xl`}
+        className={`bg-gradient-to-b from-slate-900 to-slate-800 text-white transition-all duration-300 ease-in-out flex flex-col h-screen fixed left-0 top-0 z-50 shadow-xl
+        ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        ${isCollapsed ? 'w-[280px] md:w-20' : 'w-[280px] md:w-64'}`}
       >
         <div className="p-4 flex items-center justify-between border-b border-slate-700">
           <Link
@@ -145,11 +149,47 @@ export default function Sidebar() {
                   key={item.href}
                   href={item.href}
                   onClick={handleLinkClick}
-                  className={`relative flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out ${
+                  className={`relative flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out active:scale-95 ${
                     isActive
                       ? 'bg-primary text-white shadow-lg'
                       : 'text-slate-300 hover:bg-slate-700 hover:text-white'
                   }`}
+                  style={{ minHeight: '44px' }}
+                >
+                  <Icon 
+                    className={`w-5 h-5 flex-shrink-0 transition-all duration-300 ${
+                      isActive ? 'scale-105' : 'scale-100'
+                    }`} 
+                  />
+                  {(!isCollapsed || (mounted && isMobile)) && (
+                    <span className="font-medium transition-opacity duration-300">
+                      {item.name}
+                    </span>
+                  )}
+                  {isActive && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-white rounded-r-full transition-all duration-300" />
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+          
+          {/* Bottom Navigation Items */}
+          <div className="pt-4 border-t border-slate-700">
+            {bottomNavItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={handleLinkClick}
+                  className={`relative flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out active:scale-95 ${
+                    isActive
+                      ? 'bg-primary text-white shadow-lg'
+                      : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                  }`}
+                  style={{ minHeight: '44px' }}
                 >
                   <Icon 
                     className={`w-5 h-5 flex-shrink-0 transition-all duration-300 ${
@@ -170,7 +210,7 @@ export default function Sidebar() {
           </div>
           
           {/* Coming Soon Section */}
-          <div className="mt-auto pt-4 border-t border-slate-700">
+          <div className="pt-4 border-t border-slate-700">
             {(!isCollapsed || (mounted && isMobile)) && (
               <div className="px-4 py-2 mb-2">
                 <span className="text-xs text-slate-400 uppercase font-semibold">Coming Soon</span>

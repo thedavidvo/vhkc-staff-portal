@@ -16,10 +16,10 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   return (
     <div className="flex min-h-screen overflow-x-hidden">
       <Sidebar />
-      <main className={`flex-1 transition-all duration-300 w-full ${
+      <main className={`flex-1 transition-all duration-300 w-full ml-0 ${
         isCollapsed ? 'md:ml-20' : 'md:ml-64'
       }`}>
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pt-16 md:pt-0">
           {children}
         </div>
       </main>
