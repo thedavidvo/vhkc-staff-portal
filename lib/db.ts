@@ -155,6 +155,24 @@ export async function initializeDatabase() {
     await sql`CREATE INDEX IF NOT EXISTS idx_points_round_id ON points(round_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_points_driver_id ON points(driver_id)`;
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS division_changes (
+        id TEXT PRIMARY KEY,
+        season_id TEXT NOT NULL,
+        round_id TEXT NOT NULL,
+        driver_id TEXT NOT NULL,
+        driver_name TEXT NOT NULL,
+        from_division TEXT NOT NULL,
+        to_division TEXT NOT NULL,
+        change_type TEXT NOT NULL CHECK (change_type IN ('promotion', 'demotion')),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    await sql`CREATE INDEX IF NOT EXISTS idx_division_changes_round_id ON division_changes(round_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_division_changes_driver_id ON division_changes(driver_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_division_changes_season_id ON division_changes(season_id)`;
+
     console.log('✓ Database tables initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);

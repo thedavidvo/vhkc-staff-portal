@@ -335,11 +335,6 @@ export default function ReportsPage() {
       return;
     }
 
-    if (raceResults.length === 0) {
-      alert('No race results found for this round. Please ensure race results have been entered.');
-      return;
-    }
-
     console.log('Generating PDF with:', {
       round: selectedRound,
       raceResultsCount: raceResults.length,
@@ -399,10 +394,9 @@ export default function ReportsPage() {
       doc.setFillColor(15, 23, 42); // Dark slate
       doc.rect(0, 0, pageWidth, pageHeight, 'F');
       
-      // Add logo centered at top (maintain aspect ratio)
+      // Calculate dimensions for logo and text elements
       let logoWidth = 0;
       let logoHeight = 0;
-      let logoY = 60;
       
       if (logoInfo) {
         try {
@@ -418,8 +412,33 @@ export default function ReportsPage() {
             logoHeight = maxHeight;
             logoWidth = maxHeight * aspectRatio;
           }
-          
+        } catch (e) {
+          console.warn('Error calculating logo dimensions:', e);
+        }
+      }
+      
+      // Calculate total height of all content elements
+      const logoSpace = logoInfo ? logoHeight : 0;
+      const spacingAfterLogo = logoInfo ? 20 : 0;
+      const mainTitleHeight = 32; // Font size for main title
+      const subtitleSpacing = 20; // Space between main title and subtitle
+      const subtitleHeight = 18; // Font size for subtitle
+      const infoSpacing = 25; // Space between subtitle and info paragraph
+      const infoParagraphHeight = 20; // Font size for info paragraph
+      
+      const totalContentHeight = logoSpace + spacingAfterLogo + mainTitleHeight + subtitleSpacing + 
+                                 subtitleHeight + infoSpacing + infoParagraphHeight;
+      
+      // Calculate starting Y position to center all content vertically
+      const startY = (pageHeight / 2) - (totalContentHeight / 2);
+      let currentY = startY;
+      
+      // Add logo centered on page (maintain aspect ratio)
+      if (logoInfo) {
+        try {
+          const logoY = currentY;
           doc.addImage(logoInfo.dataUrl, 'PNG', pageWidth / 2 - logoWidth / 2, logoY, logoWidth, logoHeight);
+          currentY += logoHeight + spacingAfterLogo;
         } catch (e) {
           console.warn('Error adding logo to cover:', e);
         }
@@ -432,15 +451,13 @@ export default function ReportsPage() {
       // For now using helvetica bold as fallback
       doc.setFont('helvetica', 'bold');
       const mainTitle = `VHKC RACE RESULTS`;
-      const textStartY = logoInfo ? (logoY + logoHeight + 20) : 120;
-      
-      doc.text(mainTitle, pageWidth / 2, textStartY, { align: 'center' });
+      doc.text(mainTitle, pageWidth / 2, currentY, { align: 'center' });
+      currentY += mainTitleHeight + subtitleSpacing;
       
       doc.setFontSize(18);
       doc.setFont('helvetica', 'normal');
-      doc.text('OFFICIAL REPORT', pageWidth / 2, textStartY + 20, { align: 'center' });
-      
-      let currentY = textStartY + 45; // Start position after "OFFICIAL REPORT"
+      doc.text('OFFICIAL REPORT', pageWidth / 2, currentY, { align: 'center' });
+      currentY += subtitleHeight + infoSpacing;
       
       // Build paragraph-style text with reduced spacing
       doc.setFontSize(20);
@@ -637,6 +654,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
           columnStyles[colIndex] = { 
             cellWidth: columnWidth, 
             font: 'helvetica',
+            halign: 'left', // Explicitly set left alignment for all columns
             overflow: 'ellipsize', // Prevent wrapping by using ellipsize
           };
           colIndex++;
@@ -669,7 +687,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
           },
           // Custom styles for badge cells will override these
           alternateRowStyles: {
-            fillColor: [249, 250, 251] // Very light gray
+            fillColor: [249, 250, 251] // Very light gray for alternate rows
           },
           columnStyles: columnStyles,
           margin: { left: 20, right: 20, top: tableYPos },
@@ -684,9 +702,27 @@ Thank you once again for your involvement with VHKC. We look forward to continui
             font: 'helvetica' // Using helvetica as closest to Futura
           },
           didParseCell: (data: any) => {
+            // Ensure all body cells have left alignment unless they're special columns (rank, division, group)
+            if (data.section === 'body') {
+              const isRankColumn = useRank && data.column.index === 0;
+              const isDivisionColumn = divisionColumnIndex !== undefined && data.column.index === divisionColumnIndex;
+              const columnName = headColumns[data.column.index] || '';
+              const isDivisionColumnByName = typeof columnName === 'string' && columnName.toLowerCase().includes('division');
+              const isGroupColumn = groupColumnIndex !== undefined && data.column.index === groupColumnIndex;
+              
+              // Set left alignment for regular columns (not rank, division, or group columns)
+              if (!isRankColumn && !isDivisionColumn && !isDivisionColumnByName && !isGroupColumn) {
+                data.cell.styles.halign = 'left';
+              }
+            }
+            
             // Ensure division and group header columns have blue color like other headers
             if (data.section === 'head') {
-              if ((divisionColumnIndex !== undefined && data.column.index === divisionColumnIndex) ||
+              const isDivisionColumn = divisionColumnIndex !== undefined && data.column.index === divisionColumnIndex;
+              const columnName = headColumns[data.column.index] || '';
+              const isDivisionColumnByName = typeof columnName === 'string' && columnName.toLowerCase().includes('division');
+              
+              if (isDivisionColumn || isDivisionColumnByName ||
                   (groupColumnIndex !== undefined && data.column.index === groupColumnIndex)) {
                 // Keep the same header styling as other columns (dark slate background, white text)
                 data.cell.styles.fillColor = [15, 23, 42]; // Dark slate (same as other headers)
@@ -695,7 +731,12 @@ Thank you once again for your involvement with VHKC. We look forward to continui
             }
             
             // Apply division color badging if this is a division column (body cells only)
-            if (data.section === 'body' && divisionColumnIndex !== undefined && data.column.index === divisionColumnIndex) {
+            // Check if it's the specified division column, or if it's a "Division" column in promotions/demotions tables
+            const isDivisionColumn = divisionColumnIndex !== undefined && data.column.index === divisionColumnIndex;
+            const columnName = headColumns[data.column.index] || '';
+            const isDivisionColumnByName = typeof columnName === 'string' && columnName.toLowerCase().includes('division');
+            
+            if (data.section === 'body' && (isDivisionColumn || (isDivisionColumnByName && data.table.body.length > 0))) {
               // Get division value from cell text
               const divisionValue = Array.isArray(data.cell.text) ? data.cell.text[0] : data.cell.text;
               if (divisionValue && typeof divisionValue === 'string' && divisionValue.trim()) {
@@ -709,7 +750,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
                 data.cell.styles.fontStyle = 'bold';
                 data.cell.styles.fontSize = baseFontSize * 0.95;
                 data.cell.styles.cellPadding = { top: badgePadding, bottom: badgePadding, left: badgePadding, right: badgePadding };
-                data.cell.styles.halign = 'center';
+                data.cell.styles.halign = 'left';
                 data.cell.styles.valign = 'middle';
                 data.cell.styles.lineWidth = 0;
                 (data.cell as any).isBadge = true;
@@ -732,7 +773,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
                   data.cell.styles.fontStyle = 'bold';
                   data.cell.styles.fontSize = baseFontSize * 0.95;
                   data.cell.styles.cellPadding = { top: badgePadding, bottom: badgePadding, left: badgePadding, right: badgePadding };
-                  data.cell.styles.halign = 'center';
+                  data.cell.styles.halign = 'left';
                   data.cell.styles.valign = 'middle';
                   data.cell.styles.lineWidth = 0;
                   (data.cell as any).isBadge = true;
@@ -766,7 +807,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
                 const textPaddingY = (data.cell.styles.fontSize || 6.5) * 0.35;
                 const badgeW = Math.min(textWidth + textPaddingX * 2, cellW - (paddingLeft + paddingRight) - 0.5);
                 const badgeH = Math.min((data.cell.styles.fontSize || 6.5) + textPaddingY * 2, cellH - (paddingTop + paddingBottom) - 0.5);
-                const badgeX = cellX + (cellW - badgeW) / 2;
+                const badgeX = cellX + paddingLeft;
                 const badgeY = cellY + (cellH - badgeH) / 2;
                 
                 // For true pill shape (rounded-full), radius must be exactly half the height
@@ -1237,6 +1278,59 @@ Thank you once again for your involvement with VHKC. We look forward to continui
         );
       }
 
+      // Promotions and Demotions Section
+      if (selectedRoundId && selectedSeason?.id) {
+        try {
+          const changesResponse = await fetch(`/api/division-changes?roundId=${selectedRoundId}`);
+          if (changesResponse.ok) {
+            const changes = await changesResponse.json();
+            
+            // Filter by selected division - only show drivers that were initially in the selected division
+            let filteredChanges = changes;
+            if (selectedDivision !== 'All') {
+              filteredChanges = changes.filter((c: any) => c.fromDivision === selectedDivision);
+            }
+            
+            const promotions = filteredChanges.filter((c: any) => c.changeType === 'promotion');
+            const demotions = filteredChanges.filter((c: any) => c.changeType === 'demotion');
+            
+            if (promotions.length > 0) {
+              await addTable(
+                'Promotions',
+                promotions,
+                ['Driver Name', 'From Division', 'To Division'],
+                (item: any) => [
+                  item.driverName,
+                  item.fromDivision,
+                  item.toDivision,
+                ],
+                true, // useRank
+                2 // From Division column index (0: #, 1: Driver Name, 2: From Division)
+                // To Division will be detected automatically by column name
+              );
+            }
+            
+            if (demotions.length > 0) {
+              await addTable(
+                'Demotions',
+                demotions,
+                ['Driver Name', 'From Division', 'To Division'],
+                (item: any) => [
+                  item.driverName,
+                  item.fromDivision,
+                  item.toDivision,
+                ],
+                true, // useRank
+                2 // From Division column index (0: #, 1: Driver Name, 2: From Division)
+                // To Division will be detected automatically by column name
+              );
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to fetch division changes:', error);
+        }
+      }
+
       // Team Standings - Aggregate points by team
       const teamStandingsMap = new Map<string, { teamName: string; totalPoints: number; driverCount: number }>();
       
@@ -1430,7 +1524,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
           {/* Export Button */}
           <button
             onClick={generatePDF}
-            disabled={!selectedRoundId || raceResults.length === 0 || exporting}
+            disabled={!selectedRoundId || exporting}
             className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all shadow-lg hover:shadow-xl hover-lift font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {exporting ? (

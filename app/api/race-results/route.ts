@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRaceResultsByRound, addRaceResult, updateRaceResult, deleteRaceResultsByRaceType } from '@/lib/dbService';
+import { getRaceResultsByRound, addRaceResult, updateRaceResult, deleteRaceResultsByRaceType, deleteRaceResult, deletePointsByRaceResult } from '@/lib/dbService';
 import { cache } from '@/lib/cache';
 
 export async function GET(request: NextRequest) {
@@ -144,17 +144,29 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const roundId = searchParams.get('roundId');
     const raceType = searchParams.get('raceType');
+    const driverId = searchParams.get('driverId');
+    const finalType = searchParams.get('finalType');
     
-    if (!roundId || !raceType) {
-      return NextResponse.json({ error: 'roundId and raceType required' }, { status: 400 });
+    if (!roundId) {
+      return NextResponse.json({ error: 'roundId required' }, { status: 400 });
     }
     
-    await deleteRaceResultsByRaceType(roundId, raceType);
+    if (driverId) {
+      await deleteRaceResult(roundId, driverId, raceType ?? undefined, finalType ?? undefined);
+      // Also delete associated points
+      await deletePointsByRaceResult(roundId, driverId, raceType ?? undefined, finalType ?? undefined);
+    } else {
+      if (!raceType) {
+        return NextResponse.json({ error: 'raceType required when driverId is not provided' }, { status: 400 });
+      }
+      await deleteRaceResultsByRaceType(roundId, raceType);
+    }
     
     // Invalidate cache for this round and related caches
     cache.invalidate(`race-results:${roundId}`);
     cache.invalidate(`round-results:${roundId}`);
     cache.invalidatePattern('drivers:');
+    cache.invalidatePattern('points:');
     
     return NextResponse.json({ success: true });
   } catch (error) {

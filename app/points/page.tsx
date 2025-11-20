@@ -6,7 +6,7 @@ import PageLayout from '@/components/PageLayout';
 import SectionCard from '@/components/SectionCard';
 import { useSeason } from '@/components/SeasonContext';
 import { Division } from '@/types';
-import { Loader2, Save, X, ArrowUp, ArrowDown, Trophy, Edit } from 'lucide-react';
+import { Loader2, Save, X, ArrowUp, ArrowDown, Trophy, Edit, Trash2 } from 'lucide-react';
 import { getPointsForPosition } from '@/lib/pointsSystem';
 
 // Helper function to get division color
@@ -291,8 +291,17 @@ export default function PointsPage() {
     // Calculate overall position across all race types within each group
     const pointsWithOverallPosition: DriverPoints[] = [];
     Object.values(grouped).forEach(group => {
-      // Check if this group has heat races (for points calculation)
-      const hasHeatRace = group.some(p => p.raceType === 'heat');
+      // Check if heat races exist for this round/division combination in the original data
+      // (not just in the filtered group, because user might be filtering by race type)
+      const firstPoint = group[0];
+      if (!firstPoint) return;
+      
+      // Check original driverPoints data to see if heat races exist for this round/division
+      const hasHeatRace = driverPoints.some(p => 
+        p.roundId === firstPoint.roundId && 
+        p.division === firstPoint.division &&
+        p.raceType === 'heat'
+      );
       
       // Sort by points (considering edits) - this allows dynamic movement when editing
       // Points take priority over race type when editing
@@ -336,6 +345,7 @@ export default function PointsPage() {
           finalPoints = savedPoints[key];
         } else {
           // Only recalculate if no edits or saved values exist
+          // Use major points for final if heat race exists, minor points for heat if heat race exists
           const raceType = point.raceType || 'qualification';
           finalPoints = getPointsForPosition(
             newOverallPosition,
@@ -539,6 +549,83 @@ export default function PointsPage() {
     }
   };
 
+  // Handler to delete points
+  const handleDeletePoints = async (point: DriverPoints) => {
+    if (!selectedSeason) {
+      alert('No season selected');
+      return;
+    }
+
+    const confirmMsg = `Are you sure you want to delete points for ${point.driverName} in Round ${point.roundNumber} (${point.raceType}${point.finalType ? ` ${point.finalType}` : ''})?`;
+    if (!confirm(confirmMsg)) {
+      return;
+    }
+
+    try {
+      // First, fetch the actual points from the database to get the real ID
+      const pointsResponse = await fetch(`/api/points?roundId=${point.roundId}`);
+      if (!pointsResponse.ok) {
+        throw new Error('Failed to fetch points');
+      }
+
+      const allPoints = await pointsResponse.json();
+      
+      // Find the point that matches this driver, race type, and final type
+      const matchingPoint = allPoints.find((p: any) => 
+        p.driverId === point.driverId &&
+        p.raceType === (point.raceType || 'qualification') &&
+        (p.finalType || '') === (point.finalType || '')
+      );
+
+      if (!matchingPoint || !matchingPoint.id) {
+        // Point doesn't exist in database yet, just remove from local state
+        setDriverPoints(prev => prev.filter(p => 
+          !(p.driverId === point.driverId && 
+            p.roundId === point.roundId &&
+            p.raceType === point.raceType &&
+            (p.finalType || '') === (point.finalType || ''))
+        ));
+        alert('Points removed from view (were not saved in database)');
+        return;
+      }
+
+      // Delete using the actual ID
+      const deleteResponse = await fetch(`/api/points?id=${matchingPoint.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!deleteResponse.ok) {
+        throw new Error('Failed to delete points');
+      }
+
+      // Remove from local state
+      setDriverPoints(prev => prev.filter(p => 
+        !(p.driverId === point.driverId && 
+          p.roundId === point.roundId &&
+          p.raceType === point.raceType &&
+          (p.finalType || '') === (point.finalType || ''))
+      ));
+
+      // Clear any editing state for this point
+      const key = `${point.driverId}-${point.roundId}-${point.raceType}-${point.finalType || ''}`;
+      setEditingPoints(prev => {
+        const updated = { ...prev };
+        delete updated[key];
+        return updated;
+      });
+      setSavedPoints(prev => {
+        const updated = { ...prev };
+        delete updated[key];
+        return updated;
+      });
+
+      alert('Points deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting points:', error);
+      alert('Failed to delete points. Please try again.');
+    }
+  };
+
   if (loading) {
     return (
       <>
@@ -690,12 +777,15 @@ export default function PointsPage() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                       Total Points
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                   {filteredPoints.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+                      <td colSpan={9} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
                         No points data found. Adjust your filters or add race results.
                       </td>
                     </tr>
@@ -761,6 +851,15 @@ export default function PointsPage() {
                           </td>
                           <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white">
                             {totalPoints}
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => handleDeletePoints(point)}
+                              className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/40 rounded-lg transition-colors"
+                              title="Delete points"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </td>
                         </tr>
                       );

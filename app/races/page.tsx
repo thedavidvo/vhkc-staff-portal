@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Header from '@/components/Header';
 import PageLayout from '@/components/PageLayout';
@@ -32,35 +32,67 @@ const getDivisionColor = (division: Division) => {
 // Helper function to parse race name for sorting
 // Returns { type: 'qual'|'heat'|'final', order: number }
 const parseRaceNameForSorting = (raceName: string): { type: string; order: number } => {
-  const upperName = raceName.toUpperCase();
+  const upperName = raceName.toUpperCase().trim();
   
   // Determine race type order: Qual = 1, Heat = 2, Final = 3
   let typeOrder = 0;
   let groupOrder = 0;
   
-  if (upperName.startsWith('QUAL')) {
+  // Handle Qualification races - look for "QUAL" at start or "QUALIFICATION"
+  if (upperName.startsWith('QUAL') || upperName.startsWith('QUALIFICATION')) {
     typeOrder = 1;
-    // Extract group number (e.g., "Qual Group 1" -> 1)
+    // Extract group number (e.g., "Qual Group 1", "Qualification Group 2" -> 1, 2)
     const groupMatch = raceName.match(/Group\s+(\d+)/i);
     if (groupMatch) {
       groupOrder = parseInt(groupMatch[1], 10);
+    } else {
+      // Fallback: try to extract any number from the name
+      const numberMatch = raceName.match(/(\d+)/);
+      if (numberMatch) {
+        groupOrder = parseInt(numberMatch[1], 10);
+      }
     }
-  } else if (upperName.startsWith('HEAT')) {
+  } 
+  // Handle Heat races - look for "HEAT" at start
+  else if (upperName.startsWith('HEAT')) {
     typeOrder = 2;
-    // Extract final type letter (e.g., "Heat A" -> 1 for A)
-    const letterMatch = raceName.match(/\s+([A-F])$/i);
+    // Extract final type letter (e.g., "Heat A", "Heat B" -> 1, 2)
+    // Match letter A-Z at the end (after space or dash, or standalone)
+    const letterMatch = raceName.match(/\s+([A-Z])$/i) || raceName.match(/-([A-Z])$/i) || raceName.match(/([A-Z])$/i);
     if (letterMatch) {
       const letter = letterMatch[1].toUpperCase();
-      groupOrder = letter.charCodeAt(0) - 64; // A=1, B=2, etc.
+      groupOrder = letter.charCodeAt(0) - 64; // A=1, B=2, C=3, etc.
+    } else {
+      // Fallback: try to match any single letter at the end
+      const anyLetterMatch = raceName.match(/([A-Z])$/i);
+      if (anyLetterMatch) {
+        const letter = anyLetterMatch[1].toUpperCase();
+        groupOrder = letter.charCodeAt(0) - 64;
+      }
     }
-  } else if (upperName.startsWith('FINAL')) {
+  } 
+  // Handle Final races - look for "FINAL" at start
+  else if (upperName.startsWith('FINAL')) {
     typeOrder = 3;
-    // Extract final type letter (e.g., "Final A" -> 1 for A)
-    const letterMatch = raceName.match(/\s+([A-F])$/i);
+    // Extract final type letter (e.g., "Final A", "Final B" -> 1, 2)
+    // Match letter A-Z at the end (after space or dash, or standalone)
+    const letterMatch = raceName.match(/\s+([A-Z])$/i) || raceName.match(/-([A-Z])$/i) || raceName.match(/([A-Z])$/i);
     if (letterMatch) {
       const letter = letterMatch[1].toUpperCase();
-      groupOrder = letter.charCodeAt(0) - 64; // A=1, B=2, etc.
+      groupOrder = letter.charCodeAt(0) - 64; // A=1, B=2, C=3, etc.
+    } else {
+      // Fallback: try to match any single letter at the end
+      const anyLetterMatch = raceName.match(/([A-Z])$/i);
+      if (anyLetterMatch) {
+        const letter = anyLetterMatch[1].toUpperCase();
+        groupOrder = letter.charCodeAt(0) - 64;
+      }
     }
+  }
+  // If no match, assign a high order so unknown types go to the end
+  else {
+    typeOrder = 999;
+    groupOrder = 0;
   }
   
   return { type: typeOrder.toString(), order: groupOrder };
@@ -82,53 +114,174 @@ const sortRaceNames = (raceNames: string[]): string[] => {
   });
 };
 
+type ParsedRaceSelection = {
+  raceType: 'qualification' | 'heat' | 'final';
+  finalType: string;
+};
+
+const parseRaceSelection = (typeName?: string | null): ParsedRaceSelection => {
+  let raceType: ParsedRaceSelection['raceType'] = 'qualification';
+  let finalType = '';
+  
+  if (!typeName) {
+    return { raceType, finalType };
+  }
+  
+  const normalized = typeName.trim();
+  const upperType = normalized.toUpperCase();
+  
+  if (upperType.startsWith('QUAL')) {
+    raceType = 'qualification';
+    const groupMatch = normalized.match(/GROUP\s+(\d+)/i);
+    if (groupMatch) {
+      finalType = groupMatch[1];
+    }
+  } else if (upperType.startsWith('HEAT')) {
+    raceType = 'heat';
+    const letterMatch = normalized.match(/([A-F])$/i);
+    if (letterMatch) {
+      finalType = letterMatch[1].toUpperCase();
+    }
+  } else if (upperType.startsWith('FINAL')) {
+    raceType = 'final';
+    const letterMatch = normalized.match(/([A-F])$/i);
+    if (letterMatch) {
+      finalType = letterMatch[1].toUpperCase();
+    }
+  } else {
+    const match = normalized.match(/-?\s*(qualification|qual|heat|final)\s*([A-F1-6])?$/i);
+    if (match) {
+      const typeStr = match[1].toLowerCase();
+      if (typeStr.includes('qual')) {
+        raceType = 'qualification';
+      } else if (typeStr.includes('heat')) {
+        raceType = 'heat';
+      } else if (typeStr.includes('final')) {
+        raceType = 'final';
+      }
+      if (match[2]) {
+        finalType = match[2].toUpperCase();
+      }
+    }
+  }
+  
+  return { raceType, finalType };
+};
+
+const filterDivisionResultsBySelection = (
+  divisionResults: any[],
+  selection?: string | null
+) => {
+  if (!selection) return divisionResults;
+  
+  const { raceType, finalType } = parseRaceSelection(selection);
+  let filtered = divisionResults.filter(
+    (r: any) => (r.raceType || 'qualification').toLowerCase() === raceType.toLowerCase()
+  );
+  
+  if (raceType === 'qualification' && finalType) {
+    filtered = filtered.filter((r: any) => (r.finalType || '') === finalType);
+  } else if ((raceType === 'heat' || raceType === 'final') && finalType) {
+    filtered = filtered.filter(
+      (r: any) => (r.finalType || '').toUpperCase() === finalType.toUpperCase()
+    );
+  }
+  
+  if (filtered.length === 0) {
+    filtered = divisionResults.filter((r: any) => {
+      if (r.raceName === selection) {
+        return true;
+      }
+      // Fallback to normalize legacy formats "Race (type)"
+      const oldFormatMatch = (r.raceName || '').match(/^(.+)\s*\((\w+)\)$/);
+      if (oldFormatMatch) {
+        const capitalizedRaceType =
+          oldFormatMatch[2].charAt(0).toUpperCase() + oldFormatMatch[2].slice(1);
+        const normalizedName = `${oldFormatMatch[1]} - ${capitalizedRaceType}`;
+        return normalizedName === selection;
+      }
+      return false;
+    });
+  }
+  
+  return filtered;
+};
+
 export default function RacesPage() {
   const { selectedSeason } = useSeason();
   const [rounds, setRounds] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
+  const fetchDriversOnly = useCallback(async () => {
+    if (!selectedSeason) {
+      setDrivers([]);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
+      if (response.ok) {
+        const driversData = await response.json();
+        setDrivers(driversData);
+      }
+    } catch (error) {
+      console.error('Failed to fetch drivers:', error);
+    }
+  }, [selectedSeason]);
+  
+  const fetchRoundsAndDrivers = useCallback(async () => {
+    if (!selectedSeason) {
+      setRounds([]);
+      setDrivers([]);
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const [roundsResponse] = await Promise.all([
+        fetch(`/api/rounds?seasonId=${selectedSeason.id}`),
+      ]);
+      
+      if (roundsResponse.ok) {
+        const data = await roundsResponse.json();
+        const sortedRounds = data.sort((a: any, b: any) => {
+          const dateA = new Date(a.date || 0).getTime();
+          const dateB = new Date(b.date || 0).getTime();
+          return dateA - dateB;
+        });
+        setRounds(sortedRounds);
+      }
+      
+      await fetchDriversOnly();
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedSeason, fetchDriversOnly]);
+  
   // Fetch rounds and drivers from API
   useEffect(() => {
-    const fetchData = async () => {
-      if (!selectedSeason) {
-        setRounds([]);
-        setDrivers([]);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const [roundsResponse, driversResponse] = await Promise.all([
-          fetch(`/api/rounds?seasonId=${selectedSeason.id}`),
-          fetch(`/api/drivers?seasonId=${selectedSeason.id}`),
-        ]);
-        
-        if (roundsResponse.ok) {
-          const data = await roundsResponse.json();
-          // Sort rounds by date
-          const sortedRounds = data.sort((a: any, b: any) => {
-            const dateA = new Date(a.date || 0).getTime();
-            const dateB = new Date(b.date || 0).getTime();
-            return dateA - dateB;
-          });
-          setRounds(sortedRounds);
-        }
-        
-        if (driversResponse.ok) {
-          const driversData = await driversResponse.json();
-          setDrivers(driversData);
-        }
-      } catch (error) {
-        console.error('Failed to fetch data:', error);
-      } finally {
-        setLoading(false);
-      }
+    fetchRoundsAndDrivers();
+  }, [fetchRoundsAndDrivers]);
+  
+  // Refresh drivers when another tab updates them or when window refocuses
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleDriversUpdated = () => {
+      fetchDriversOnly();
     };
-
-    fetchData();
-  }, [selectedSeason]);
+    
+    window.addEventListener('vhkc:drivers-updated', handleDriversUpdated);
+    window.addEventListener('focus', handleDriversUpdated);
+    
+    return () => {
+      window.removeEventListener('vhkc:drivers-updated', handleDriversUpdated);
+      window.removeEventListener('focus', handleDriversUpdated);
+    };
+  }, [fetchDriversOnly]);
   
   // Convert rounds to races format
   const races = useMemo(() => {
@@ -156,6 +309,32 @@ export default function RacesPage() {
   const [selectedFinalType, setSelectedFinalType] = useState<string>('A');
   const [selectedGroup, setSelectedGroup] = useState<string>('1');
   const shouldLoadResultsRef = useRef(true); // Track if we should load results from saved data
+
+  const generateEmptyResult = useCallback(
+    (rowIndex: number): DriverRaceResult => {
+      const fallbackDivision = (selectedDivision || 'Division 1') as Division;
+      return {
+        driverId: `temp-${Date.now()}-${rowIndex}-${Math.random().toString(36).slice(2, 7)}`,
+        driverAlias: '',
+        driverName: '',
+        division: fallbackDivision,
+        kartNumber: '',
+        gridPosition: rowIndex + 1,
+        position: rowIndex + 1,
+        overallPosition: rowIndex + 1,
+        fastestLap: '',
+        points: 0,
+      };
+    },
+    [selectedDivision]
+  );
+
+  // Always ensure at least one editable row exists so the user can start typing
+  useEffect(() => {
+    if (driverResults.length === 0) {
+      setDriverResults([generateEmptyResult(0)]);
+    }
+  }, [driverResults.length, generateEmptyResult]);
 
   // Fetch race results for a specific round
   const fetchRaceResults = async (roundId: string) => {
@@ -458,33 +637,7 @@ export default function RacesPage() {
     
     if (!selectedEvent) return;
     
-    // Extract race type from typeName
-    // New format: "Qual Group 1", "Heat A", "Final A"
-    // Old format: "Race Name - qualification"
-    let raceType: string | null = null;
-    const upperType = typeName.toUpperCase();
-    
-    // Check for new format (no hyphen)
-    if (upperType.startsWith('QUAL')) {
-      raceType = 'qualification';
-    } else if (upperType.startsWith('HEAT')) {
-      raceType = 'heat';
-    } else if (upperType.startsWith('FINAL')) {
-      raceType = 'final';
-    } else {
-      // Fallback to old format with hyphen (e.g., "Race Name - Qualification" -> "qualification")
-      const match = typeName.match(/-?\s*(\w+)$/);
-      if (match) {
-        const typeStr = match[1].toLowerCase();
-        if (typeStr.includes('qual')) {
-          raceType = 'qualification';
-        } else if (typeStr.includes('heat')) {
-          raceType = 'heat';
-        } else if (typeStr.includes('final')) {
-          raceType = 'final';
-        }
-      }
-    }
+    const { raceType } = parseRaceSelection(typeName);
     
     if (raceType && selectedEvent) {
       try {
@@ -561,17 +714,7 @@ export default function RacesPage() {
       
       // Ensure the array is large enough
       while (updated.length <= index) {
-        updated.push({
-          driverId: `temp-${Date.now()}-${updated.length}`,
-          driverAlias: '',
-          driverName: '',
-          kartNumber: '',
-          gridPosition: updated.length + 1,
-          position: updated.length + 1,
-          overallPosition: updated.length + 1,
-          fastestLap: '',
-          points: 0,
-        });
+        updated.push(generateEmptyResult(updated.length));
       }
       
       // Update the specific field
@@ -582,18 +725,7 @@ export default function RacesPage() {
       const hasData = value && (value.toString().trim().length > 0);
       
       if (isLastRow && (hasData || forceAddRow)) {
-        const newResult: DriverRaceResult = {
-          driverId: `temp-${Date.now()}-${updated.length}`,
-          driverAlias: '',
-          driverName: '',
-          kartNumber: '',
-          gridPosition: updated.length + 1,
-          position: updated.length + 1,
-          overallPosition: updated.length + 1,
-          fastestLap: '',
-          points: 0,
-        };
-        updated.push(newResult);
+        updated.push(generateEmptyResult(updated.length));
       }
       
       return updated;
@@ -607,17 +739,7 @@ export default function RacesPage() {
       
       // Ensure the array is large enough
       while (updated.length <= index) {
-        updated.push({
-          driverId: `temp-${Date.now()}-${updated.length}`,
-          driverAlias: '',
-          driverName: '',
-          kartNumber: '',
-          gridPosition: updated.length + 1,
-          position: updated.length + 1,
-          overallPosition: updated.length + 1,
-          fastestLap: '',
-          points: 0,
-        });
+        updated.push(generateEmptyResult(updated.length));
       }
       
       // Update all fields at once
@@ -628,22 +750,82 @@ export default function RacesPage() {
       const hasData = Object.values(updates).some(v => v && v.toString().trim().length > 0);
       
       if (isLastRow && (hasData || forceAddRow)) {
-        const newResult: DriverRaceResult = {
-          driverId: `temp-${Date.now()}-${updated.length}`,
-          driverAlias: '',
-          driverName: '',
-          kartNumber: '',
-          gridPosition: updated.length + 1,
-          position: updated.length + 1,
-          overallPosition: updated.length + 1,
-          fastestLap: '',
-          points: 0,
-        };
-        updated.push(newResult);
+        updated.push(generateEmptyResult(updated.length));
       }
       
       return updated;
     });
+  };
+  
+  const reindexDriverResults = (results: DriverRaceResult[]) => {
+    return results.map((row, idx) => ({
+      ...row,
+      gridPosition: idx + 1,
+      overallPosition: idx + 1,
+    }));
+  };
+
+  const handleDeleteRow = async (index: number, row?: DriverRaceResult) => {
+    const rowToDelete = row || driverResults[index];
+    
+    setDriverResults((prev) => {
+      const updated = [...prev];
+      if (index >= 0 && index < updated.length) {
+        updated.splice(index, 1);
+      }
+      if (updated.length === 0) {
+        updated.push(generateEmptyResult(0));
+      }
+      return reindexDriverResults(updated);
+    });
+    
+    if (
+      !selectedEvent ||
+      !selectedDivision ||
+      !selectedType ||
+      !rowToDelete ||
+      !rowToDelete.driverId ||
+      rowToDelete.driverId.startsWith('temp-')
+    ) {
+      shouldLoadResultsRef.current = false;
+      return;
+    }
+    
+    const { raceType, finalType } = parseRaceSelection(selectedType);
+    
+    try {
+      const params = new URLSearchParams({
+        roundId: selectedEvent.id,
+        driverId: rowToDelete.driverId,
+      });
+      if (raceType) params.set('raceType', raceType);
+      if (finalType) params.set('finalType', finalType);
+      
+      const response = await fetch(`/api/race-results?${params.toString()}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete race result');
+      }
+      
+      const refreshedResults = await fetchRaceResults(selectedEvent.id);
+      setSelectedEvent({ ...selectedEvent, results: refreshedResults });
+      
+      const divisionResults = refreshedResults.find((r: any) => r.division === selectedDivision)?.results || [];
+      const filteredResults = filterDivisionResultsBySelection(divisionResults, selectedType);
+      setDriverResults(filteredResults.length > 0 ? [...filteredResults] : []);
+      shouldLoadResultsRef.current = false;
+    } catch (error) {
+      console.error('Error deleting race result:', error);
+      alert('Failed to delete race result. Please try again.');
+      const refreshedResults = await fetchRaceResults(selectedEvent.id);
+      setSelectedEvent({ ...selectedEvent, results: refreshedResults });
+      const divisionResults = refreshedResults.find((r: any) => r.division === selectedDivision)?.results || [];
+      const filteredResults = filterDivisionResultsBySelection(divisionResults, selectedType);
+      setDriverResults(filteredResults.length > 0 ? [...filteredResults] : []);
+      shouldLoadResultsRef.current = false;
+    }
   };
 
   const getDivisionResults = () => {
@@ -676,47 +858,7 @@ export default function RacesPage() {
         return;
       }
       
-      let raceType = 'qualification';
-      let finalType = '';
-      const upperType = selectedType.toUpperCase();
-      
-      // Check for new format (no hyphen)
-      if (upperType.startsWith('QUAL')) {
-        raceType = 'qualification';
-        // Extract group number for qual (e.g., "Qual Group 1" -> group is "1")
-        // Store group number in finalType for qualification races
-        const groupMatch = selectedType.match(/Group\s+(\d+)/i);
-        if (groupMatch) {
-          finalType = groupMatch[1]; // Store group number in finalType
-        }
-      } else if (upperType.startsWith('HEAT')) {
-        raceType = 'heat';
-        // Extract final type letter (e.g., "Heat A" -> "A")
-        const letterMatch = selectedType.match(/\s+([A-F])$/i);
-        if (letterMatch) {
-          finalType = letterMatch[1].toUpperCase();
-        }
-      } else if (upperType.startsWith('FINAL')) {
-        raceType = 'final';
-        // Extract final type letter (e.g., "Final A" -> "A")
-        const letterMatch = selectedType.match(/\s+([A-F])$/i);
-        if (letterMatch) {
-          finalType = letterMatch[1].toUpperCase();
-        }
-      } else {
-        // Fallback to old format with hyphen (e.g., "Race Name - Qualification" -> "qualification")
-        const match = selectedType.match(/-?\s*(\w+)$/);
-        if (match) {
-          const typeStr = match[1].toLowerCase();
-          if (typeStr.includes('qual')) {
-            raceType = 'qualification';
-          } else if (typeStr.includes('heat')) {
-            raceType = 'heat';
-          } else if (typeStr.includes('final')) {
-            raceType = 'final';
-          }
-        }
-      }
+      const { raceType, finalType } = parseRaceSelection(selectedType);
       
       // Determine if there's a heat race (check if there are multiple race types for this round)
       const hasHeatRace = types.length > 1 || raceType === 'heat';
@@ -918,34 +1060,7 @@ export default function RacesPage() {
             
             // Reload driver results for the current division and selected type
             const divisionResults = refreshedResults.find((r: any) => r.division === selectedDivision)?.results || [];
-            
-            // Filter by the raceType and finalType that were just saved
-            let filteredResults = divisionResults.filter((r: any) => {
-              // Match by raceType and finalType that we just saved
-              const matchesRaceType = r.raceType?.toLowerCase() === raceType.toLowerCase();
-              
-              // For qualification, match by finalType (which contains the group number)
-              if (raceType === 'qualification') {
-                return matchesRaceType && r.finalType === finalType;
-              }
-              
-              // For heat and final, match by finalType (which contains the letter)
-              if (raceType === 'heat' || raceType === 'final') {
-                return matchesRaceType && r.finalType?.toUpperCase() === finalType.toUpperCase();
-              }
-              
-              // Fallback: just match raceType
-              return matchesRaceType;
-            });
-            
-            // Also match by raceName if available (for backward compatibility)
-            if (selectedType && filteredResults.length === 0) {
-              filteredResults = divisionResults.filter((r: any) => {
-                // Try to match by exact raceName
-                return r.raceName === selectedType;
-              });
-            }
-            
+            const filteredResults = filterDivisionResultsBySelection(divisionResults, selectedType);
             setDriverResults([...filteredResults]);
             // Prevent the useEffect from reloading results
             shouldLoadResultsRef.current = false;
@@ -1199,6 +1314,7 @@ export default function RacesPage() {
                 results={driverResults}
                 onUpdate={handleUpdateDriverResult}
                 onBatchUpdate={handleBatchUpdateDriverResult}
+                onDeleteRow={handleDeleteRow}
                 drivers={drivers}
               />
               </div>
@@ -1320,6 +1436,7 @@ function SpreadsheetTable({
   results,
   onUpdate,
   onBatchUpdate,
+  onDeleteRow,
   drivers,
 }: {
   division: Division;
@@ -1327,6 +1444,7 @@ function SpreadsheetTable({
   results: DriverRaceResult[];
   onUpdate: (index: number, field: keyof DriverRaceResult, value: string | number, forceAddRow?: boolean) => void;
   onBatchUpdate?: (index: number, updates: Partial<DriverRaceResult>, forceAddRow?: boolean) => void;
+  onDeleteRow?: (index: number, row: DriverRaceResult) => void;
   drivers: any[];
 }) {
   const [suggestions, setSuggestions] = useState<Record<number, any[]>>({});
@@ -1353,6 +1471,7 @@ function SpreadsheetTable({
   
   // Determine if this is a qualification race
   const isQualification = type?.toLowerCase().includes('qual') || type?.toLowerCase().includes('qualification');
+  const showRowActions = Boolean(onDeleteRow);
   
   // Default to 3 rows
   const defaultRows: DriverRaceResult[] = Array.from({ length: 3 }, (_, i) => ({
@@ -1530,6 +1649,11 @@ function SpreadsheetTable({
         <table className="w-full border-collapse border border-slate-300 dark:border-slate-600">
           <thead className="bg-slate-100 dark:bg-slate-900 sticky top-0">
             <tr>
+              {showRowActions && (
+                <th className="px-2 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800 w-12">
+                  
+                </th>
+              )}
               <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
                 Driver Name
               </th>
@@ -1565,9 +1689,23 @@ function SpreadsheetTable({
           <tbody className="bg-white dark:bg-slate-800">
             {rowsToDisplay.map((result, index) => (
               <tr
-                key={result.driverId}
+                key={`${result.driverId}-${index}`}
                 className="hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
               >
+                {showRowActions && (
+                  <td className="px-2 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 align-middle">
+                    {onDeleteRow && (
+                      <button
+                        type="button"
+                        onClick={() => onDeleteRow(index, result)}
+                        className="p-1.5 rounded-md text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/40 transition-colors"
+                        title="Delete row"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </td>
+                )}
                 <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-visible">
                   <div className="relative">
                     <input

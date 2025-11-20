@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Save, Loader2, Edit } from 'lucide-react';
-import { Division } from '@/types';
+import { Division, Round } from '@/types';
 import Modal from '@/components/Modal';
 
 interface RoundPoint {
@@ -24,6 +24,7 @@ interface RoundPointsEditModalProps {
   seasonId: string;
   onSave: () => void;
   type: 'promotion' | 'demotion';
+  rounds?: Round[];
 }
 
 export default function RoundPointsEditModal({
@@ -36,17 +37,75 @@ export default function RoundPointsEditModal({
   seasonId,
   onSave,
   type,
+  rounds = [],
 }: RoundPointsEditModalProps) {
   const [roundPoints, setRoundPoints] = useState<RoundPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editedPoints, setEditedPoints] = useState<Record<string, number>>({});
+  const [selectedRoundId, setSelectedRoundId] = useState<string>('');
+  const [allRounds, setAllRounds] = useState<Round[]>([]);
 
   useEffect(() => {
     if (isOpen && driverId && seasonId) {
       fetchRoundPoints();
+      fetchRounds();
     }
   }, [isOpen, driverId, seasonId]);
+
+  const fetchRounds = async () => {
+    if (rounds && rounds.length > 0) {
+      setAllRounds(rounds);
+      // Auto-select the most recently completed round, or the latest round if none completed
+      const completedRounds = rounds
+        .filter((r) => r.status === 'completed')
+        .sort((a, b) => {
+          const dateA = new Date(a.date || '').getTime();
+          const dateB = new Date(b.date || '').getTime();
+          return dateB - dateA;
+        });
+      
+      if (completedRounds.length > 0) {
+        setSelectedRoundId(completedRounds[0].id);
+      } else {
+        // If no completed rounds, use the latest round by round number
+        const sortedRounds = [...rounds].sort((a, b) => (b.roundNumber || 0) - (a.roundNumber || 0));
+        if (sortedRounds.length > 0) {
+          setSelectedRoundId(sortedRounds[0].id);
+        }
+      }
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/rounds?seasonId=${seasonId}`);
+      if (response.ok) {
+        const fetchedRounds = await response.json();
+        setAllRounds(fetchedRounds);
+        
+        // Auto-select the most recently completed round
+        const completedRounds = fetchedRounds
+          .filter((r: any) => r.status === 'completed')
+          .sort((a: any, b: any) => {
+            const dateA = new Date(a.date || '').getTime();
+            const dateB = new Date(b.date || '').getTime();
+            return dateB - dateA;
+          });
+        
+        if (completedRounds.length > 0) {
+          setSelectedRoundId(completedRounds[0].id);
+        } else {
+          // If no completed rounds, use the latest round by round number
+          const sortedRounds = [...fetchedRounds].sort((a: any, b: any) => (b.roundNumber || 0) - (a.roundNumber || 0));
+          if (sortedRounds.length > 0) {
+            setSelectedRoundId(sortedRounds[0].id);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch rounds:', error);
+    }
+  };
 
   const fetchRoundPoints = async () => {
     try {
@@ -104,6 +163,11 @@ export default function RoundPointsEditModal({
 
   const handleSave = async () => {
     try {
+      if (!selectedRoundId) {
+        alert('Please select a round for this division change');
+        return;
+      }
+      
       setSaving(true);
       
       // Fetch the full driver object first
@@ -117,6 +181,18 @@ export default function RoundPointsEditModal({
       if (!driver) {
         throw new Error('Driver not found');
       }
+      
+      // Determine change type (promotion or demotion)
+      const divisionOrder: Record<Division, number> = {
+        'Division 1': 1,
+        'Division 2': 2,
+        'Division 3': 3,
+        'Division 4': 4,
+        'New': 5,
+      };
+      const fromOrder = divisionOrder[currentDivision];
+      const toOrder = divisionOrder[newDivision];
+      const changeType = toOrder < fromOrder ? 'promotion' : 'demotion';
       
       // Update driver division
       const updatedDriver = {
@@ -154,6 +230,31 @@ export default function RoundPointsEditModal({
 
       await Promise.all(updatePromises);
       
+      // Create division change record
+      const changeId = `division-change-${driverId}-${Date.now()}`;
+      const divisionChange = {
+        id: changeId,
+        seasonId: seasonId,
+        roundId: selectedRoundId,
+        driverId: driverId,
+        driverName: driverName,
+        fromDivision: currentDivision,
+        toDivision: newDivision,
+        changeType: changeType,
+        createdAt: new Date().toISOString(),
+      };
+      
+      // Save division change
+      const changeResponse = await fetch('/api/division-changes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(divisionChange),
+      });
+      
+      if (!changeResponse.ok) {
+        console.warn('Failed to save division change record, but driver division was updated');
+      }
+      
       onSave();
       onClose();
     } catch (error) {
@@ -187,7 +288,7 @@ export default function RoundPointsEditModal({
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving || roundPoints.length === 0}
+            disabled={saving || !selectedRoundId}
             className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {saving ? (
@@ -212,19 +313,51 @@ export default function RoundPointsEditModal({
                 <p className="text-slate-600 dark:text-slate-400">Loading rounds...</p>
               </div>
             </div>
-          ) : roundPoints.length === 0 ? (
-            <div className="text-center py-12 text-slate-500 dark:text-slate-400">
-              No rounds found for this driver.
-            </div>
           ) : (
             <div className="space-y-4">
-              <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4 mb-4">
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Modify the overall points for each round below. Changes will be saved when you click "Confirm Changes".
-                </p>
+              <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4 mb-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">
+                    Select Round for Division Change *
+                  </label>
+                  <select
+                    value={selectedRoundId}
+                    onChange={(e) => setSelectedRoundId(e.target.value)}
+                    className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                  >
+                    <option value="">Select a round...</option>
+                    {allRounds
+                      .sort((a, b) => (a.roundNumber || 0) - (b.roundNumber || 0))
+                      .map((round) => (
+                        <option key={round.id} value={round.id}>
+                          Round {round.roundNumber}: {round.location || round.name || 'TBD'} {round.status === 'completed' ? '(Completed)' : ''}
+                        </option>
+                      ))}
+                  </select>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    This division change will be recorded for the selected round.
+                  </p>
+                </div>
               </div>
               
-              <div className="overflow-x-auto">
+              {roundPoints.length === 0 ? (
+                <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-6 text-center">
+                  <p className="text-slate-600 dark:text-slate-400 mb-2">
+                    No round points found for this driver.
+                  </p>
+                  <p className="text-sm text-slate-500 dark:text-slate-500">
+                    You can still confirm the division change by selecting a round above.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4 mb-4">
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      Modify the overall points for each round below. Changes will be saved when you click "Confirm Changes".
+                    </p>
+                  </div>
+                  
+                  <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-slate-50 dark:bg-slate-900">
                     <tr>
@@ -283,7 +416,9 @@ export default function RoundPointsEditModal({
                     })}
                   </tbody>
                 </table>
-              </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
     </Modal>

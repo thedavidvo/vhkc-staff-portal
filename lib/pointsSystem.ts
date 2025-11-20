@@ -58,8 +58,8 @@ export type PointsType = 'standard' | 'major' | 'minor';
 /**
  * Get points for a position based on race type
  * @param position - The finishing position (1-based)
- * @param raceType - The type of race: 'qualification' (standard), 'heat' (minor), or 'final' (standard/major)
- * @param hasHeatRace - Whether there is a heat race (if true and raceType is 'qualification', use minor points)
+ * @param raceType - The type of race: 'qualification' (0 points), 'heat' (minor), or 'final' (standard/major)
+ * @param hasHeatRace - Whether there is a heat race (if true and raceType is 'final', use major points)
  * @returns The points awarded for this position
  */
 export function getPointsForPosition(
@@ -86,14 +86,13 @@ export function getPointsForPosition(
     return pointsEntry.minor;
   }
 
-  // Qualification races: use minor points ONLY if heat race exists, otherwise use standard points
-  // Minor points are only used when a heat race exists in the same round/division
-  if (hasHeatRace && raceType === 'qualification') {
-    return pointsEntry.minor;
+  // Qualification races: no points awarded
+  if (raceType === 'qualification') {
+    return 0;
   }
 
-  // Default: standard points for qualification when no heat race exists
-  return pointsEntry.standard;
+  // Default: no points
+  return 0;
 }
 
 /**

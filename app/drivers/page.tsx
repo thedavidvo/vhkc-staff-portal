@@ -111,6 +111,11 @@ export default function DriversPage() {
   const [editForm, setEditForm] = useState<Partial<Driver>>({});
   const [dateOfBirth, setDateOfBirth] = useState<{ day: number; month: number; year: number }>({ day: 0, month: 0, year: 0 });
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const notifyDriversUpdated = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('vhkc:drivers-updated'));
+    }
+  };
 
   // Fetch drivers from API
   useEffect(() => {
@@ -195,6 +200,7 @@ export default function DriversPage() {
         setSelectedDriver(updatedDriver);
         setIsEditing(false);
         setDateOfBirth({ day: 0, month: 0, year: 0 });
+        notifyDriversUpdated();
       } else {
         alert('Failed to update driver. Please try again.');
       }
@@ -273,6 +279,7 @@ export default function DriversPage() {
           setDrivers([...drivers, newDriver]);
         }
         setIsAddModalOpen(false);
+        notifyDriversUpdated();
       } else {
         const errorData = await response.json();
         alert(`Failed to add driver: ${errorData.error || 'Unknown error'}`);

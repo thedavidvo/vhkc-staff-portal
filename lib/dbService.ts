@@ -403,11 +403,28 @@ export async function updateRaceResult(
   `;
 }
 
-export async function deleteRaceResult(roundId: string, driverId: string, raceType?: string): Promise<void> {
-  if (raceType) {
-    await sql`DELETE FROM race_results WHERE round_id = ${roundId} AND driver_id = ${driverId} AND race_type = ${raceType}`;
+export async function deleteRaceResult(roundId: string, driverId: string, raceType?: string, finalType?: string): Promise<void> {
+  if (raceType && finalType !== undefined) {
+    await sql`
+      DELETE FROM race_results 
+      WHERE round_id = ${roundId} 
+        AND driver_id = ${driverId} 
+        AND race_type = ${raceType}
+        AND (final_type = ${finalType} OR (final_type IS NULL AND ${finalType} = ''))
+    `;
+  } else if (raceType) {
+    await sql`
+      DELETE FROM race_results 
+      WHERE round_id = ${roundId} 
+        AND driver_id = ${driverId} 
+        AND race_type = ${raceType}
+    `;
   } else {
-    await sql`DELETE FROM race_results WHERE round_id = ${roundId} AND driver_id = ${driverId}`;
+    await sql`
+      DELETE FROM race_results 
+      WHERE round_id = ${roundId} 
+        AND driver_id = ${driverId}
+    `;
   }
 }
 
@@ -665,5 +682,88 @@ export async function deletePointsByRound(roundId: string): Promise<void> {
 
 export async function deletePointsByDriver(driverId: string): Promise<void> {
   await sql`DELETE FROM points WHERE driver_id = ${driverId}`;
+}
+
+export async function deletePointsByRaceResult(roundId: string, driverId: string, raceType?: string, finalType?: string): Promise<void> {
+  if (raceType && finalType) {
+    await sql`DELETE FROM points WHERE round_id = ${roundId} AND driver_id = ${driverId} AND race_type = ${raceType} AND final_type = ${finalType || null}`;
+  } else if (raceType) {
+    await sql`DELETE FROM points WHERE round_id = ${roundId} AND driver_id = ${driverId} AND race_type = ${raceType} AND (final_type IS NULL OR final_type = '')`;
+  } else {
+    await sql`DELETE FROM points WHERE round_id = ${roundId} AND driver_id = ${driverId}`;
+  }
+}
+
+// ============================================================================
+// DIVISION CHANGES (PROMOTIONS/DEMOTIONS) OPERATIONS
+// ============================================================================
+
+export interface DivisionChange {
+  id: string;
+  seasonId: string;
+  roundId: string;
+  driverId: string;
+  driverName: string;
+  fromDivision: Division;
+  toDivision: Division;
+  changeType: 'promotion' | 'demotion';
+  createdAt: string;
+}
+
+export async function addDivisionChange(change: DivisionChange): Promise<void> {
+  await sql`
+    INSERT INTO division_changes (
+      id, season_id, round_id, driver_id, driver_name,
+      from_division, to_division, change_type, created_at
+    ) VALUES (
+      ${change.id}, ${change.seasonId}, ${change.roundId}, ${change.driverId},
+      ${change.driverName}, ${change.fromDivision}, ${change.toDivision},
+      ${change.changeType}, ${change.createdAt || new Date().toISOString()}
+    )
+  `;
+}
+
+export async function getDivisionChangesByRound(roundId: string): Promise<DivisionChange[]> {
+  const changes = await sql`
+    SELECT * FROM division_changes 
+    WHERE round_id = ${roundId}
+    ORDER BY created_at DESC
+  ` as any[];
+  
+  return changes.map((c: any) => ({
+    id: c.id,
+    seasonId: c.season_id,
+    roundId: c.round_id,
+    driverId: c.driver_id,
+    driverName: c.driver_name,
+    fromDivision: c.from_division as Division,
+    toDivision: c.to_division as Division,
+    changeType: c.change_type as 'promotion' | 'demotion',
+    createdAt: c.created_at || '',
+  }));
+}
+
+export async function getDivisionChangesBySeason(seasonId: string): Promise<DivisionChange[]> {
+  const changes = await sql`
+    SELECT * FROM division_changes 
+    WHERE season_id = ${seasonId}
+    ORDER BY created_at DESC
+  ` as any[];
+  
+  return changes.map((c: any) => ({
+    id: c.id,
+    seasonId: c.season_id,
+    roundId: c.round_id,
+    driverId: c.driver_id,
+    driverName: c.driver_name,
+    fromDivision: c.from_division as Division,
+    toDivision: c.to_division as Division,
+    changeType: c.change_type as 'promotion' | 'demotion',
+    createdAt: c.created_at || '',
+  }));
+}
+
+export async function deleteDivisionChange(id: string): Promise<void> {
+  await sql`DELETE FROM division_changes WHERE id = ${id}`;
 }
 

@@ -98,6 +98,7 @@ const getDivisionSelectColors = (division: Division) => {
 export default function DivisionsPage() {
   const { selectedSeason } = useSeason();
   const [drivers, setDrivers] = useState<any[]>([]);
+  const [rounds, setRounds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [divisionFilter, setDivisionFilter] = useState<Division | 'all'>('all');
@@ -129,6 +130,28 @@ export default function DivisionsPage() {
     };
 
     fetchDrivers();
+  }, [selectedSeason]);
+
+  // Fetch rounds from API
+  useEffect(() => {
+    const fetchRounds = async () => {
+      if (!selectedSeason) {
+        setRounds([]);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/rounds?seasonId=${selectedSeason.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setRounds(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch rounds:', error);
+      }
+    };
+
+    fetchRounds();
   }, [selectedSeason]);
 
   const filteredDrivers = useMemo(() => {
@@ -586,6 +609,7 @@ export default function DivisionsPage() {
           seasonId={selectedSeason.id}
           onSave={handleModalSave}
           type={selectedChange.type}
+          rounds={rounds}
         />
       )}
     </>
