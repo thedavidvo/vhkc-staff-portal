@@ -208,42 +208,42 @@ export default function RacesPage() {
   // Fetch rounds and drivers from API
   useEffect(() => {
     const fetchData = async () => {
-      if (!selectedSeason) {
-        setRounds([]);
-        setDrivers([]);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
+    if (!selectedSeason) {
+      setRounds([]);
+      setDrivers([]);
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      setLoading(true);
         const [roundsResponse, driversResponse] = await Promise.all([
-          fetch(`/api/rounds?seasonId=${selectedSeason.id}`),
+        fetch(`/api/rounds?seasonId=${selectedSeason.id}`),
           fetch(`/api/drivers?seasonId=${selectedSeason.id}`),
-        ]);
-        
-        if (roundsResponse.ok) {
-          const data = await roundsResponse.json();
+      ]);
+      
+      if (roundsResponse.ok) {
+        const data = await roundsResponse.json();
           // Sort rounds by date
-          const sortedRounds = data.sort((a: any, b: any) => {
-            const dateA = new Date(a.date || 0).getTime();
-            const dateB = new Date(b.date || 0).getTime();
-            return dateA - dateB;
-          });
-          setRounds(sortedRounds);
-        }
-        
+        const sortedRounds = data.sort((a: any, b: any) => {
+          const dateA = new Date(a.date || 0).getTime();
+          const dateB = new Date(b.date || 0).getTime();
+          return dateA - dateB;
+        });
+        setRounds(sortedRounds);
+      }
+      
         if (driversResponse.ok) {
           const driversData = await driversResponse.json();
           setDrivers(driversData);
         }
-      } catch (error) {
-        console.error('Failed to fetch data:', error);
-      } finally {
-        setLoading(false);
-      }
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+    } finally {
+      setLoading(false);
+    }
     };
-
+  
     fetchData();
   }, [selectedSeason]);
   
@@ -274,6 +274,7 @@ export default function RacesPage() {
   const [selectedFinalType, setSelectedFinalType] = useState<string>('A');
   const [selectedGroup, setSelectedGroup] = useState<string>('1');
   const shouldLoadResultsRef = useRef(true); // Track if we should load results from saved data
+  const focusAfterSortRef = useRef<{ rowIdentifier: string; field: keyof DriverRaceResult } | null>(null); // Track row to focus after sorting
 
   // Fetch race results for a specific round
   const fetchRaceResults = async (roundId: string, resultsSheetId?: string) => {
@@ -341,7 +342,7 @@ export default function RacesPage() {
         if (!divisionResult && isOpenDivision(selectedDivision)) {
           divisionResult = selectedEvent.results.find((r: any) => r.division === 'Open');
         }
-        if (divisionResult && divisionResult.results) {
+      if (divisionResult && divisionResult.results) {
           const { raceType, finalType } = parseRaceSelection(selectedType);
           const matchingResult = divisionResult.results.find((r: any) => 
             (r.raceType || 'qualification').toLowerCase() === raceType.toLowerCase() &&
@@ -581,34 +582,34 @@ export default function RacesPage() {
             loadSheetResults();
           } else {
             // Fallback to division-based filtering
-            if (typeRaceType) {
-              const filteredResults = divisionResults.filter((r: any) => {
-                // Compare raceType in lowercase for case-insensitive matching
-                return r.raceType?.toLowerCase() === typeRaceType;
-              });
+          if (typeRaceType) {
+            const filteredResults = divisionResults.filter((r: any) => {
+              // Compare raceType in lowercase for case-insensitive matching
+              return r.raceType?.toLowerCase() === typeRaceType;
+            });
               // Sort results based on race type
               const sortedResults = sortRaceResults(filteredResults, typeToUse);
               setDriverResults([...sortedResults]);
-            } else {
-              // If no race type match, try to match by exact raceName
-              const filteredResults = divisionResults.filter((r: any) => {
-                // Normalize raceName formats for comparison
-                let normalizedRaceName = r.raceName || '';
-                
-                // Convert old format to new format for comparison
-                const oldFormatMatch = normalizedRaceName.match(/^(.+)\s*\((\w+)\)$/);
-                if (oldFormatMatch) {
-                  const capitalizedRaceType = oldFormatMatch[2].charAt(0).toUpperCase() + oldFormatMatch[2].slice(1);
-                  normalizedRaceName = `${oldFormatMatch[1]} - ${capitalizedRaceType}`;
-                }
-                
-                return normalizedRaceName === typeToUse;
-              });
+          } else {
+            // If no race type match, try to match by exact raceName
+            const filteredResults = divisionResults.filter((r: any) => {
+              // Normalize raceName formats for comparison
+              let normalizedRaceName = r.raceName || '';
+              
+              // Convert old format to new format for comparison
+              const oldFormatMatch = normalizedRaceName.match(/^(.+)\s*\((\w+)\)$/);
+              if (oldFormatMatch) {
+                const capitalizedRaceType = oldFormatMatch[2].charAt(0).toUpperCase() + oldFormatMatch[2].slice(1);
+                normalizedRaceName = `${oldFormatMatch[1]} - ${capitalizedRaceType}`;
+              }
+              
+              return normalizedRaceName === typeToUse;
+            });
               // Sort results based on race type
               const sortedResults = sortRaceResults(filteredResults, typeToUse);
               setDriverResults([...sortedResults]);
-            }
-            shouldLoadResultsRef.current = false; // Don't auto-load again until type/division changes
+          }
+          shouldLoadResultsRef.current = false; // Don't auto-load again until type/division changes
           }
         } else if (shouldLoadResultsRef.current && !typeToUse) {
           // If no type selected, show empty
@@ -636,10 +637,45 @@ export default function RacesPage() {
     shouldLoadResultsRef.current = true;
   }, [selectedDivision, selectedType]);
 
+  // Handle focus after sorting by overallPosition
+  useEffect(() => {
+    if (focusAfterSortRef.current && driverResults.length > 0) {
+      const { rowIdentifier, field } = focusAfterSortRef.current;
+      
+      if (!rowIdentifier) {
+        focusAfterSortRef.current = null;
+        return;
+      }
+      
+      // Find the row that matches the driverId
+      const newIndex = driverResults.findIndex(r => r.driverId === rowIdentifier);
+      
+      if (newIndex !== -1) {
+        // Use requestAnimationFrame to ensure DOM has updated
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            const input = document.querySelector(
+              `input[data-row="${newIndex}"][data-field="${field}"]`
+            ) as HTMLInputElement;
+            if (input) {
+              input.focus();
+              input.select(); // Select the text so user can easily type a new value
+            }
+            // Clear the ref
+            focusAfterSortRef.current = null;
+          }, 10);
+        });
+      } else {
+        // Clear the ref if row not found
+        focusAfterSortRef.current = null;
+      }
+    }
+  }, [driverResults]);
+
   // Available divisions - combining Division 3, 4, and New into "Open" for race management
   const availableDivisions: (Division | 'Open')[] = ['Division 1', 'Division 2', 'Open'];
   const openDivisions: Division[] = ['Division 3', 'Division 4', 'New'];
-  
+
   // Helper to check if a division is an open division
   const isOpenDivision = (div: Division | null): boolean => {
     return div ? openDivisions.includes(div) : false;
@@ -873,6 +909,10 @@ export default function RacesPage() {
       
       // Update the specific field - preserve existing values for gridPosition and overallPosition
       const existingRow = updated[index];
+      // Store the row identifier before updating - use driverId as primary identifier
+      // Ensure rowIdentifier is always defined
+      const rowIdentifier = existingRow.driverId || `temp-${Date.now()}-${index}`;
+      
       updated[index] = { 
         ...existingRow, 
         [field]: value,
@@ -901,6 +941,28 @@ export default function RacesPage() {
         updated.push(newResult);
       }
       
+      // If overallPosition was updated and this is a heat or final race, re-sort by overallPosition
+      if (field === 'overallPosition' && selectedType && rowIdentifier) {
+        const { raceType } = parseRaceSelection(selectedType);
+        const normalizedRaceType = raceType?.toLowerCase();
+        
+        // Only re-sort for heat and final races, not qualification
+        if (normalizedRaceType === 'heat' || normalizedRaceType === 'final') {
+          // Sort by overallPosition, with null/undefined/0 values at the end
+          updated.sort((a, b) => {
+            const posA = parseInt(a.overallPosition?.toString() || '0') || Infinity;
+            const posB = parseInt(b.overallPosition?.toString() || '0') || Infinity;
+            return posA - posB;
+          });
+          
+          // Store the row identifier to focus after DOM updates
+          focusAfterSortRef.current = {
+            rowIdentifier: rowIdentifier,
+            field: 'overallPosition'
+          };
+        }
+      }
+      
       return updated;
     });
   };
@@ -911,12 +973,12 @@ export default function RacesPage() {
     
     const rowToDelete = driverResults[index];
     if (!rowToDelete) return;
-    
+      
     // Confirm deletion
     if (!confirm('Are you sure you want to delete this row?')) {
       return;
-    }
-    
+      }
+      
     // If this is a saved result (has a real driverId), delete from database
     if (rowToDelete.driverId && !rowToDelete.driverId.startsWith('temp-')) {
       try {
@@ -1605,32 +1667,32 @@ export default function RacesPage() {
                             <div className="my-2 border-t border-slate-300 dark:border-slate-600" />
                           )}
                           <div
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedType(type);
-                              // Reset the load flag so results will be loaded for the new type
-                              shouldLoadResultsRef.current = true;
-                            }}
-                            className={`group flex items-center justify-between p-2 rounded-lg transition-colors text-sm cursor-pointer ${
-                              selectedType === type
-                                ? 'bg-primary-500 text-white'
-                                : 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600'
-                            }`}
-                          >
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedType(type);
+                          // Reset the load flag so results will be loaded for the new type
+                          shouldLoadResultsRef.current = true;
+                        }}
+                        className={`group flex items-center justify-between p-2 rounded-lg transition-colors text-sm cursor-pointer ${
+                          selectedType === type
+                            ? 'bg-primary-500 text-white'
+                            : 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600'
+                        }`}
+                      >
                             <span className="flex-1 font-medium px-2 py-1">
-                              {type}
-                            </span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteType(type);
-                              }}
-                              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                              aria-label="Delete race name"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+                          {type}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteType(type);
+                          }}
+                          className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="Delete race name"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                         </div>
                       );
                     })
@@ -2204,7 +2266,7 @@ function SpreadsheetTable({
             <tr>
               <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800 w-12">
                 {/* Delete column */}
-              </th>
+                </th>
               <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase border border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
                 Driver Name
               </th>
@@ -2244,17 +2306,17 @@ function SpreadsheetTable({
                 className="hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
               >
                 <td className="px-2 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-center">
-                  {onDeleteRow && (
-                    <button
+                      {onDeleteRow && (
+                        <button
                       onClick={() => onDeleteRow(index)}
                       className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors"
                       aria-label="Delete row"
-                      title="Delete row"
-                    >
+                          title="Delete row"
+                        >
                       <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </td>
+                        </button>
+                      )}
+                  </td>
                 <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-visible">
                   <div className="relative">
                     <input
@@ -2472,9 +2534,9 @@ function SpreadsheetTable({
                 </td>
                 <td className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-visible">
                   <div className="relative">
-                    <input
-                      type="text"
-                      value={result.driverAlias || ''}
+                  <input
+                    type="text"
+                    value={result.driverAlias || ''}
                       onChange={(e) => handleDriverAliasChange(index, e.target.value)}
                       onPaste={(e) => {
                         focusedCellRef.current = { row: index, field: 'driverAlias' };
@@ -2512,18 +2574,18 @@ function SpreadsheetTable({
                           
                           if (!dropdown?.contains(activeElement)) {
                             setShowSuggestions(prev => ({ ...prev, [index]: false }));
-                          }
+                      }
                         }, 200);
                       }}
                       ref={(el) => {
                         aliasInputRef.current[index] = el;
-                      }}
-                      onKeyDown={(e) => {
+                    }}
+                    onKeyDown={(e) => {
                         const currentSuggestions = suggestions[index] || [];
                         const currentIndex = activeSuggestionIndex[index] ?? -1;
                         
                         if (e.key === 'Escape') {
-                          e.preventDefault();
+                        e.preventDefault();
                           setShowSuggestions(prev => ({ ...prev, [index]: false }));
                           setSuggestions(prev => ({ ...prev, [index]: [] }));
                         } else if (e.key === 'ArrowDown' && currentSuggestions.length > 0) {
@@ -2548,9 +2610,9 @@ function SpreadsheetTable({
                         } else if (e.key === 'Tab') {
                           e.preventDefault();
                           setShowSuggestions(prev => ({ ...prev, [index]: false }));
-                          const nextFieldIndex = fields.indexOf('driverAlias') + 1;
-                          if (nextFieldIndex < fields.length) {
-                            const nextField = fields[nextFieldIndex];
+                        const nextFieldIndex = fields.indexOf('driverAlias') + 1;
+                        if (nextFieldIndex < fields.length) {
+                          const nextField = fields[nextFieldIndex];
                             const nextInput = document.querySelector(
                               `input[data-row="${index}"][data-field="${nextField}"], select[data-row="${index}"][data-field="${nextField}"]`
                             ) as HTMLInputElement | HTMLSelectElement;
@@ -2581,14 +2643,14 @@ function SpreadsheetTable({
                                 newRowInput.focus();
                               }
                             }, 100);
-                          }
                         }
-                      }}
-                      data-row={index}
-                      data-field="driverAlias"
-                      className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:ring-1 focus:ring-blue-500"
-                      placeholder="Alias"
-                    />
+                      }
+                    }}
+                    data-row={index}
+                    data-field="driverAlias"
+                    className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:ring-1 focus:ring-blue-500"
+                    placeholder="Alias"
+                  />
                     {showSuggestions[index] && (suggestions[index] || []).length > 0 && dropdownPosition[index] && portalRef.current && createPortal(
                       <div 
                         data-dropdown-index={index}
@@ -2708,45 +2770,45 @@ function SpreadsheetTable({
                         onFocus={() => {
                           focusedCellRef.current = { row: index, field: 'division' };
                         }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Tab') {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const nextFieldIndex = fields.indexOf('division') + 1;
-                            if (nextFieldIndex < fields.length) {
-                              const nextField = fields[nextFieldIndex];
-                              const row = e.currentTarget.closest('tr');
-                              const nextInput = row?.querySelector(
-                                `input[data-field="${nextField}"], select[data-field="${nextField}"]`
-                              ) as HTMLInputElement | HTMLSelectElement;
-                              if (nextInput) {
-                                nextInput.focus();
-                              } else {
-                                const fallbackInput = document.querySelector(
-                                  `input[data-row="${index}"][data-field="${nextField}"], select[data-row="${index}"][data-field="${nextField}"]`
-                                ) as HTMLInputElement | HTMLSelectElement;
-                                fallbackInput?.focus();
-                              }
+                      onKeyDown={(e) => {
+                        if (e.key === 'Tab') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const nextFieldIndex = fields.indexOf('division') + 1;
+                          if (nextFieldIndex < fields.length) {
+                            const nextField = fields[nextFieldIndex];
+                            const row = e.currentTarget.closest('tr');
+                            const nextInput = row?.querySelector(
+                              `input[data-field="${nextField}"], select[data-field="${nextField}"]`
+                            ) as HTMLInputElement | HTMLSelectElement;
+                            if (nextInput) {
+                              nextInput.focus();
                             } else {
-                              const isLastRow = index >= rowsToDisplay.length - 1;
-                              if (!isLastRow) {
-                                const nextRowInput = document.querySelector(
+                              const fallbackInput = document.querySelector(
+                                `input[data-row="${index}"][data-field="${nextField}"], select[data-row="${index}"][data-field="${nextField}"]`
+                              ) as HTMLInputElement | HTMLSelectElement;
+                              fallbackInput?.focus();
+                            }
+                          } else {
+                            const isLastRow = index >= rowsToDisplay.length - 1;
+                            if (!isLastRow) {
+                              const nextRowInput = document.querySelector(
+                                `input[data-row="${index + 1}"][data-field="driverName"]`
+                              ) as HTMLInputElement;
+                              nextRowInput?.focus();
+                            } else {
+                              onUpdate(index, 'division', result.division || division, true);
+                              setTimeout(() => {
+                                const newRowInput = document.querySelector(
                                   `input[data-row="${index + 1}"][data-field="driverName"]`
                                 ) as HTMLInputElement;
-                                nextRowInput?.focus();
-                              } else {
-                                onUpdate(index, 'division', result.division || division, true);
-                                setTimeout(() => {
-                                  const newRowInput = document.querySelector(
-                                    `input[data-row="${index + 1}"][data-field="driverName"]`
-                                  ) as HTMLInputElement;
-                                  if (newRowInput) {
-                                    newRowInput.focus();
-                                  }
-                                }, 100);
-                              }
+                                if (newRowInput) {
+                                  newRowInput.focus();
+                                }
+                              }, 100);
                             }
-                          } else if (e.key === 'Enter') {
+                          }
+                        } else if (e.key === 'Enter') {
                             e.preventDefault();
                             e.stopPropagation();
                             const isLastRow = index >= rowsToDisplay.length - 1;
@@ -2807,42 +2869,42 @@ function SpreadsheetTable({
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Tab') {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const nextFieldIndex = fields.indexOf('division') + 1;
-                            if (nextFieldIndex < fields.length) {
-                              const nextField = fields[nextFieldIndex];
-                              const row = e.currentTarget.closest('tr');
-                              const nextInput = row?.querySelector(
-                                `input[data-field="${nextField}"], select[data-field="${nextField}"]`
-                              ) as HTMLInputElement | HTMLSelectElement;
-                              if (nextInput) {
-                                nextInput.focus();
-                              } else {
-                                const fallbackInput = document.querySelector(
-                                  `input[data-row="${index}"][data-field="${nextField}"], select[data-row="${index}"][data-field="${nextField}"]`
-                                ) as HTMLInputElement | HTMLSelectElement;
-                                fallbackInput?.focus();
-                              }
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const nextFieldIndex = fields.indexOf('division') + 1;
+                          if (nextFieldIndex < fields.length) {
+                            const nextField = fields[nextFieldIndex];
+                            const row = e.currentTarget.closest('tr');
+                            const nextInput = row?.querySelector(
+                              `input[data-field="${nextField}"], select[data-field="${nextField}"]`
+                            ) as HTMLInputElement | HTMLSelectElement;
+                            if (nextInput) {
+                              nextInput.focus();
                             } else {
-                              const isLastRow = index >= rowsToDisplay.length - 1;
-                              if (!isLastRow) {
-                                const nextRowInput = document.querySelector(
+                              const fallbackInput = document.querySelector(
+                                `input[data-row="${index}"][data-field="${nextField}"], select[data-row="${index}"][data-field="${nextField}"]`
+                              ) as HTMLInputElement | HTMLSelectElement;
+                              fallbackInput?.focus();
+                            }
+                          } else {
+                            const isLastRow = index >= rowsToDisplay.length - 1;
+                            if (!isLastRow) {
+                              const nextRowInput = document.querySelector(
+                                `input[data-row="${index + 1}"][data-field="driverName"]`
+                              ) as HTMLInputElement;
+                              nextRowInput?.focus();
+                            } else {
+                              onUpdate(index, 'division', result.division || division, true);
+                              setTimeout(() => {
+                                const newRowInput = document.querySelector(
                                   `input[data-row="${index + 1}"][data-field="driverName"]`
                                 ) as HTMLInputElement;
-                                nextRowInput?.focus();
-                              } else {
-                                onUpdate(index, 'division', result.division || division, true);
-                                setTimeout(() => {
-                                  const newRowInput = document.querySelector(
-                                    `input[data-row="${index + 1}"][data-field="driverName"]`
-                                  ) as HTMLInputElement;
-                                  if (newRowInput) {
-                                    newRowInput.focus();
-                                  }
-                                }, 100);
-                              }
+                                if (newRowInput) {
+                                  newRowInput.focus();
+                                }
+                              }, 100);
                             }
+                          }
                           } else if (e.key === 'Enter') {
                             e.preventDefault();
                             e.stopPropagation();
@@ -2864,10 +2926,10 @@ function SpreadsheetTable({
                                 }
                               }, 100);
                             }
-                          }
-                        }}
-                        data-row={index}
-                        data-field="division"
+                        }
+                      }}
+                      data-row={index}
+                      data-field="division"
                         className="w-full px-2 py-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:ring-1 focus:ring-blue-500"
                         placeholder="Division"
                         list={`division-list-${index}`}

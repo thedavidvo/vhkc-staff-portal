@@ -234,7 +234,7 @@ export async function addRound(round: Round, seasonId: string): Promise<void> {
       // Fallback to location column if location_id doesn't exist
       console.warn('location_id column not found, using location column as fallback');
       const locationName = round.location || '';
-      await sql`
+  await sql`
         INSERT INTO rounds (id, season_id, round_number, date, location, status)
         VALUES (${round.id}, ${seasonId}, ${round.roundNumber}, ${round.date || ''}, ${locationName}, ${round.status || 'upcoming'})
       `;
@@ -292,13 +292,13 @@ export async function updateRound(round: Round, seasonId: string): Promise<void>
       console.warn('location_id column not found, using location column as fallback');
       const locationName = round.location || '';
       result = await sql`
-        UPDATE rounds
+    UPDATE rounds
         SET round_number = ${round.roundNumber},
             date = ${round.date || ''},
             location = ${locationName},
-            status = ${round.status || 'upcoming'}
-        WHERE id = ${round.id} AND season_id = ${seasonId}
-      `;
+        status = ${round.status || 'upcoming'}
+    WHERE id = ${round.id} AND season_id = ${seasonId}
+  `;
     }
     
     console.log(`updateRound result for ${round.id}:`, result);
@@ -455,8 +455,8 @@ export async function getRaceResultsByRound(roundId: string, resultsSheetId?: st
     `;
   } else {
     query = sql`
-      SELECT * FROM race_results
-      WHERE round_id = ${roundId}
+    SELECT * FROM race_results
+    WHERE round_id = ${roundId}
       ORDER BY race_division, grid_position
     `;
   }

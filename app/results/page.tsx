@@ -573,52 +573,52 @@ export default function ResultsPage() {
                     resultsWithOverallPosition.map((result, index) => {
                       const driverDivision = getDriverDivisionAtRound(result.driverId, result.roundId, result.roundNumber);
                       return (
-                        <tr key={`${result.roundId}-${result.driverId}-${index}`} className="hover:bg-slate-50 dark:hover:bg-slate-800">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              {result.overallPosition === 1 && <Trophy className="w-4 h-4 text-amber-500" />}
-                              <span className="text-sm font-semibold text-slate-900 dark:text-white">
-                                {result.overallPosition}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                              {result.position}
+                      <tr key={`${result.roundId}-${result.driverId}-${index}`} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            {result.overallPosition === 1 && <Trophy className="w-4 h-4 text-amber-500" />}
+                            <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                              {result.overallPosition}
                             </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white">
-                            {result.driverName || 'Unknown Driver'}
-                          </td>
-                          <td className="px-4 py-3">
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                            {result.position}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white">
+                          {result.driverName || 'Unknown Driver'}
+                        </td>
+                        <td className="px-4 py-3">
                             {driverDivision ? (
                               <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(driverDivision)}`}>
                                 {driverDivision}
-                              </span>
+                          </span>
                             ) : (
                               <span className="text-sm text-slate-400 dark:text-slate-500">-</span>
                             )}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
-                            Round {result.roundNumber}: {result.roundName}
-                          </td>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                          Round {result.roundNumber}: {result.roundName}
+                        </td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(result.division)}`}>
                               {result.division}
                             </span>
                           </td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${result.finalType ? getFinalTypeColor(result.finalType) : 'bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200'}`}>
-                              {formatRaceType(result.raceType, result.finalType)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm font-mono text-slate-600 dark:text-slate-400">
-                            {result.fastestLap || '-'}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white">
-                            {result.points}
-                          </td>
-                        </tr>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${result.finalType ? getFinalTypeColor(result.finalType) : 'bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200'}`}>
+                            {formatRaceType(result.raceType, result.finalType)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm font-mono text-slate-600 dark:text-slate-400">
+                          {result.fastestLap || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white">
+                          {result.points}
+                        </td>
+                      </tr>
                       );
                     })
                   )}

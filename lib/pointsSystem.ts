@@ -62,12 +62,61 @@ export type PointsType = 'standard' | 'major' | 'minor';
  * @param hasHeatRace - Whether there is a heat race (if true and raceType is 'final', use major points)
  * @returns The points awarded for this position
  */
+// Find the last position that gets the minimum points for each type
+const getLastPositionWithMinPoints = () => {
+  let lastStandard = 0;
+  let lastMajor = 0;
+  let lastMinor = 0;
+  
+  // Find minimum points values
+  const minStandard = Math.min(...Object.values(POINTS_TABLE).map(p => p.standard));
+  const minMajor = Math.min(...Object.values(POINTS_TABLE).map(p => p.major));
+  const minMinor = Math.min(...Object.values(POINTS_TABLE).map(p => p.minor));
+  
+  // Find last position with minimum points
+  for (let pos = 50; pos >= 1; pos--) {
+    const entry = POINTS_TABLE[pos];
+    if (entry) {
+      if (!lastStandard && entry.standard === minStandard) lastStandard = pos;
+      if (!lastMajor && entry.major === minMajor) lastMajor = pos;
+      if (!lastMinor && entry.minor === minMinor) lastMinor = pos;
+    }
+  }
+  
+  return { lastStandard, lastMajor, lastMinor };
+};
+
+const LAST_POSITIONS = getLastPositionWithMinPoints();
+
 export function getPointsForPosition(
   position: number,
   raceType: 'qualification' | 'heat' | 'final' = 'qualification',
   hasHeatRace: boolean = false
 ): number {
-  if (position < 1 || position > 50) {
+  // Qualification races: no points awarded
+  if (raceType === 'qualification') {
+    return 0;
+  }
+
+  if (position < 1) {
+    return 0;
+  }
+
+  // Determine the last position that should get points based on race type
+  let lastPosition = 0;
+  if (raceType === 'final') {
+    lastPosition = hasHeatRace ? LAST_POSITIONS.lastMajor : LAST_POSITIONS.lastStandard;
+  } else if (raceType === 'heat') {
+    lastPosition = LAST_POSITIONS.lastMinor;
+  }
+
+  // If position is beyond the last position that gets points, return 0
+  if (lastPosition > 0 && position > lastPosition) {
+    return 0;
+  }
+
+  // Also check if position is beyond the table (safety check)
+  if (position > 50) {
     return 0;
   }
 
@@ -84,11 +133,6 @@ export function getPointsForPosition(
   // Heat races always use minor points
   if (raceType === 'heat') {
     return pointsEntry.minor;
-  }
-
-  // Qualification races: no points awarded
-  if (raceType === 'qualification') {
-    return 0;
   }
 
   // Default: no points

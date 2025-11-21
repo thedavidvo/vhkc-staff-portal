@@ -580,14 +580,14 @@ export default function DivisionsPage() {
               icon={Users}
               noPadding
             >
-              <div className="overflow-x-auto max-h-[calc(100vh-400px)]">
+              <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-400px)]">
                 <table className="w-full">
-                    <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-10">
+                    <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-30 shadow-sm">
                       <tr>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider sticky left-0 bg-slate-50 dark:bg-slate-800 z-20 min-w-[200px]">
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider sticky left-0 bg-slate-50 dark:bg-slate-800 z-50 min-w-[200px]">
                           Name
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider sticky left-[200px] bg-slate-50 dark:bg-slate-800 z-20 w-48">
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider sticky left-[200px] bg-slate-50 dark:bg-slate-800 z-50 w-48">
                           Current Division
                         </th>
                         <th className="px-6 py-4 text-center text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
@@ -620,21 +620,21 @@ export default function DivisionsPage() {
                           return (
                             <tr
                               key={driver.id}
-                              className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${
+                              className={`group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${
                                 pendingChange ? 'bg-amber-50 dark:bg-amber-900/10' : ''
                               }`}
                             >
-                              <td className={`px-6 py-4 text-sm font-medium text-slate-900 dark:text-white sticky left-0 z-10 ${
+                              <td className={`px-6 py-4 text-sm font-medium text-slate-900 dark:text-white sticky left-0 z-20 ${
                                 pendingChange 
-                                  ? 'bg-amber-50 dark:bg-amber-900/10 border-l-4 border-l-amber-400' 
-                                  : 'bg-white dark:bg-slate-800'
+                                  ? 'bg-amber-50 dark:bg-amber-900/10 border-l-4 border-l-amber-400 group-hover:bg-amber-50 dark:group-hover:bg-amber-900/10' 
+                                  : 'bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-800'
                               }`}>
                                 {driver.name}
                               </td>
-                              <td className={`px-6 py-4 text-sm sticky left-[200px] z-10 w-48 ${
+                              <td className={`px-6 py-4 text-sm sticky left-[200px] z-20 w-48 ${
                                 pendingChange 
-                                  ? 'bg-amber-50 dark:bg-amber-900/10' 
-                                  : 'bg-white dark:bg-slate-800'
+                                  ? 'bg-amber-50 dark:bg-amber-900/10 group-hover:bg-amber-50 dark:group-hover:bg-amber-900/10' 
+                                  : 'bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-800'
                               }`}>
                                 <div className="relative inline-block">
                                   <select
@@ -694,23 +694,6 @@ export default function DivisionsPage() {
                                 <div className="flex flex-col items-center gap-2">
                                 {lastChange ? (
                                   <div className="flex flex-col items-center gap-1" title={`Last change at ${getRoundDisplayName(lastChange.roundId, rounds)}`}>
-                                    <div className="flex items-center gap-1">
-                                      {lastChange.changeType === 'division_start' || lastChange.changeType === 'mid_season_join' ? (
-                                        <span className={`px-2 py-0.5 text-xs font-semibold rounded ${getDivisionColor(lastChange.divisionStart || lastChange.fromDivision)}`}>
-                                          Started: {lastChange.divisionStart || lastChange.fromDivision}
-                                        </span>
-                                      ) : (
-                                        <>
-                                          <span className={`px-2 py-0.5 text-xs font-semibold rounded ${getDivisionColor(lastChange.fromDivision)}`}>
-                                            {lastChange.fromDivision}
-                                          </span>
-                                          <span className="text-slate-400 text-xs">→</span>
-                                          <span className={`px-2 py-0.5 text-xs font-semibold rounded ${getDivisionColor(lastChange.toDivision)}`}>
-                                            {lastChange.toDivision}
-                                          </span>
-                                        </>
-                                      )}
-                                    </div>
                                     <span className="text-xs text-slate-500 dark:text-slate-400">
                                       {getRoundDisplayName(lastChange.roundId, rounds)}
                                     </span>
@@ -1766,14 +1749,6 @@ function DivisionHistoryModal({
                 
                 const roundDisplayName = getRoundDisplayName(change.roundId, rounds);
                 const isPreSeason = change.roundId.startsWith('pre-season-');
-                const isDivisionStart = change.changeType === 'division_start';
-                const isMidSeasonJoin = change.changeType === 'mid_season_join';
-                const isRegularChange = change.changeType === 'promotion' || change.changeType === 'demotion';
-                
-                // Determine display division
-                const displayDivision = isDivisionStart || isMidSeasonJoin 
-                  ? change.divisionStart 
-                  : (change.toDivision || change.fromDivision);
                 
                 return (
                   <div
@@ -1807,23 +1782,6 @@ function DivisionHistoryModal({
                              change.changeType === 'division_start' ? 'Division Start' :
                              'Mid-Season Join'}
                           </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {isDivisionStart || isMidSeasonJoin ? (
-                            <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getDivisionColor(displayDivision as Division)}`}>
-                              Started: {displayDivision}
-                            </span>
-                          ) : change.fromDivision && change.toDivision ? (
-                            <>
-                              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getDivisionColor(change.fromDivision)}`}>
-                                {change.fromDivision}
-                              </span>
-                              <span className="text-slate-400 text-sm">→</span>
-                              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getDivisionColor(change.toDivision)}`}>
-                                {change.toDivision}
-                              </span>
-                            </>
-                          ) : null}
                         </div>
                         {change.createdAt && (
                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
