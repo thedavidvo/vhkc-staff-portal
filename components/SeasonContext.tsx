@@ -70,16 +70,20 @@ export function SeasonProvider({ children }: { children: ReactNode }) {
 
   const updateSeason = async (season: Season) => {
     try {
+      console.log('SeasonContext updateSeason called for season:', season.id);
       const response = await fetch('/api/seasons', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(season),
       });
+      
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('Failed to update season:', response.status, errorData);
-        throw new Error('Failed to update season');
+        const errorMessage = errorData.error || 'Failed to update season';
+        throw new Error(errorMessage);
       }
+      
       // Refresh seasons to get updated data from database
       // refreshSeasons will automatically update selectedSeason if it matches
       await refreshSeasons();

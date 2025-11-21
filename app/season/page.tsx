@@ -107,10 +107,10 @@ export default function SeasonPage() {
     setSelectedRound(round);
     setIsRoundDetailsOpen(true);
     
-    // Fetch address from locations table if location is set
-    if (round.location) {
+    // Fetch address from locations table if locationId is set
+    if (round.locationId) {
       try {
-        const location = locations.find(loc => loc.name === round.location);
+        const location = locations.find(loc => loc.id === round.locationId);
         if (location && location.address) {
           setRoundDetailsAddress(location.address);
         } else {
@@ -118,18 +118,18 @@ export default function SeasonPage() {
           const response = await fetch('/api/locations');
           if (response.ok) {
             const locationsData = await response.json();
-            const foundLocation = locationsData.find((loc: Location) => loc.name === round.location);
-            setRoundDetailsAddress(foundLocation?.address || round.address || 'N/A');
+            const foundLocation = locationsData.find((loc: Location) => loc.id === round.locationId);
+            setRoundDetailsAddress(foundLocation?.address || 'N/A');
           } else {
-            setRoundDetailsAddress(round.address || 'N/A');
+            setRoundDetailsAddress('N/A');
           }
         }
       } catch (error) {
         console.error('Failed to fetch location address:', error);
-        setRoundDetailsAddress(round.address || 'N/A');
+        setRoundDetailsAddress('N/A');
       }
     } else {
-      setRoundDetailsAddress(round.address || 'N/A');
+      setRoundDetailsAddress('N/A');
     }
   };
 
@@ -165,10 +165,20 @@ export default function SeasonPage() {
       const updatedRounds = [...selectedSeason.rounds];
       const existingIndex = updatedRounds.findIndex((r) => r.id === round.id);
       
+      // Ensure we have all required fields from the round, preserving locationId
+      const roundToSave: Round = {
+        id: round.id,
+        roundNumber: round.roundNumber,
+        name: '', // name column removed
+        date: round.date || '',
+        locationId: round.locationId, // Explicitly preserve locationId
+        status: round.status || 'upcoming',
+      };
+      
       if (existingIndex >= 0) {
-        updatedRounds[existingIndex] = round;
+        updatedRounds[existingIndex] = roundToSave;
       } else {
-        updatedRounds.push(round);
+        updatedRounds.push(roundToSave);
       }
 
       // Sort rounds by roundNumber
@@ -325,7 +335,9 @@ export default function SeasonPage() {
                           </div>
                           <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">
                             {(() => {
-                              const displayName = (round.location && round.location.trim()) || 'TBD';
+                              const displayName = round.location && round.location.trim() 
+                                ? round.location.trim() 
+                                : 'TBD';
                               // Remove "Season - " prefix if present
                               const cleanName = displayName.replace(/^Season\s*-\s*/i, '');
                               return cleanName || 'No details';
@@ -441,7 +453,7 @@ export default function SeasonPage() {
         }}
         season={editingSeason}
         onUpdate={handleUpdateSeason}
-        locations={locations.map(l => l.name)}
+        locations={locations}
         initialRoundToEdit={roundToEdit}
         onLocationAdded={async (locationName: string, address: string) => {
           try {
@@ -586,8 +598,7 @@ export default function SeasonPage() {
           }}
           round={roundToEdit}
           seasonId={selectedSeason.id}
-          locations={locations.map(l => l.name)}
-          locationsWithAddress={locations}
+          locations={locations}
           onSave={handleSaveRound}
           onLocationAdded={async (locationName: string, address: string) => {
             try {

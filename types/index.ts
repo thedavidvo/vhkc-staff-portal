@@ -11,6 +11,7 @@ export interface Driver {
   homeTrack?: string;
   division: Division;
   email: string;
+  mobileNumber?: string;
   teamName?: string;
   status: DriverStatus;
   lastUpdated: string;
@@ -89,8 +90,9 @@ export interface Round {
   roundNumber: number;
   name: string;
   date: string;
-  location: string;
-  address: string;
+  locationId?: string;
+  location?: string; // For backward compatibility and display - populated from locations table
+  address?: string; // For backward compatibility and display - populated from locations table
   status: 'upcoming' | 'completed' | 'cancelled';
 }
 

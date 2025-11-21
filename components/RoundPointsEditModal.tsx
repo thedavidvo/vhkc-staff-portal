@@ -330,7 +330,7 @@ export default function RoundPointsEditModal({
                       .sort((a, b) => (a.roundNumber || 0) - (b.roundNumber || 0))
                       .map((round) => (
                         <option key={round.id} value={round.id}>
-                          Round {round.roundNumber}: {round.location || round.name || 'TBD'} {round.status === 'completed' ? '(Completed)' : ''}
+                          Round {round.roundNumber}: {round.location || 'TBD'} {round.status === 'completed' ? '(Completed)' : ''}
                         </option>
                       ))}
                   </select>

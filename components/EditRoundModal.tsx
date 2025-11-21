@@ -5,7 +5,8 @@ import { Round } from '@/types';
 import Modal from '@/components/Modal';
 import { Calendar, Save } from 'lucide-react';
 
-interface LocationWithAddress {
+interface Location {
+  id: string;
   name: string;
   address: string;
 }
@@ -15,8 +16,8 @@ interface EditRoundModalProps {
   onClose: () => void;
   round: Round | null;
   seasonId: string;
-  locations: string[];
-  locationsWithAddress?: LocationWithAddress[];
+  locations: Location[];
+  locationsWithAddress?: Location[];
   onSave: (round: Round) => Promise<void>;
   onLocationAdded?: (locationName: string, address: string) => Promise<void>;
 }
@@ -40,18 +41,43 @@ export default function EditRoundModal({
     if (round) {
       setFormData({ ...round });
     }
-  }, [round]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [round?.id]);
 
   if (!isOpen || !round || !formData) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!formData || !formData.id) {
+      alert('Round ID is missing. Please try again.');
+      return;
+    }
+    
+    if (!formData.roundNumber || formData.roundNumber < 1) {
+      alert('Round number is required and must be at least 1.');
+      return;
+    }
+    
     try {
-      await onSave(formData);
+      // Ensure we pass a clean round object with all required fields, preserving locationId
+      const roundToSave: Round = {
+        id: formData.id,
+        roundNumber: formData.roundNumber,
+        name: '', // name column removed
+        date: formData.date || '',
+        locationId: formData.locationId, // Explicitly preserve locationId
+        status: formData.status || 'upcoming',
+      };
+      
+      console.log('EditRoundModal submitting round:', roundToSave);
+      await onSave(roundToSave);
       onClose();
     } catch (error) {
       console.error('Failed to save round:', error);
-      alert('Failed to save round. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to save round: ${errorMessage}`);
     }
   };
 
@@ -117,36 +143,20 @@ export default function EditRoundModal({
           {!showManualLocation ? (
             <div className="space-y-2">
               <select
-                value={formData.location || ''}
-                onChange={async (e) => {
+                value={formData.locationId || ''}
+                onChange={(e) => {
                   if (e.target.value === '__manual__') {
                     setShowManualLocation(true);
                   } else {
-                    // When selecting a location, fetch its address from the database
-                    let address = '';
-                    if (e.target.value) {
-                      try {
-                        const locationsResponse = await fetch('/api/locations');
-                        if (locationsResponse.ok) {
-                          const locationsData = await locationsResponse.json();
-                          const selectedLocation = locationsData.find((loc: any) => loc.name === e.target.value);
-                          if (selectedLocation && selectedLocation.address) {
-                            address = selectedLocation.address;
-                          }
-                        }
-                      } catch (error) {
-                        console.error('Failed to fetch location address:', error);
-                      }
-                    }
-                    setFormData({ ...formData, location: e.target.value, address });
+                    setFormData({ ...formData, locationId: e.target.value || undefined });
                   }
                 }}
                 className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
               >
                 <option value="">Select a location (optional)</option>
                 {locations.length > 0 && locations.map((loc) => (
-                  <option key={loc} value={loc}>
-                    {loc}
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}
                   </option>
                 ))}
                 <option value="__manual__">+ Add New Location</option>
@@ -181,10 +191,21 @@ export default function EditRoundModal({
                 <button
                   type="button"
                   onClick={async () => {
+                    let newLocationId: string | undefined;
+                    
                     // If location is provided, add it to the locations list
                     if (manualLocation.trim() && onLocationAdded) {
                       try {
                         await onLocationAdded(manualLocation.trim(), manualAddress.trim());
+                        // Fetch the newly added location to get its ID
+                        const response = await fetch('/api/locations');
+                        if (response.ok) {
+                          const locationsData = await response.json();
+                          const newLocation = locationsData.find((l: Location) => l.name === manualLocation.trim());
+                          if (newLocation) {
+                            newLocationId = newLocation.id;
+                          }
+                        }
                       } catch (error) {
                         console.error('Failed to add location:', error);
                         alert('Failed to add location. Please try again.');
@@ -192,11 +213,10 @@ export default function EditRoundModal({
                       }
                     }
                     
-                    // Update form data with location (can be empty)
+                    // Update form data with locationId
                     setFormData({ 
                       ...formData, 
-                      location: manualLocation.trim() || '', 
-                      address: manualAddress.trim() || formData.address 
+                      locationId: newLocationId || undefined
                     });
                     setShowManualLocation(false);
                     setManualLocation('');

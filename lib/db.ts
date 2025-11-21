@@ -40,11 +40,10 @@ export async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS rounds (
         id TEXT PRIMARY KEY,
         season_id TEXT NOT NULL,
-        name TEXT NOT NULL,
         round_number INTEGER,
         date TEXT,
+        location_id TEXT,
         location TEXT,
-        address TEXT,
         status TEXT DEFAULT 'upcoming',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -58,6 +57,7 @@ export async function initializeDatabase() {
         season_id TEXT NOT NULL,
         name TEXT NOT NULL,
         email TEXT,
+        mobile_number TEXT,
         division TEXT,
         team_name TEXT,
         status TEXT DEFAULT 'active',

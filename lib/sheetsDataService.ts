@@ -156,7 +156,7 @@ async function getRounds(): Promise<RoundWithSeasonId[]> {
       id: round.id || '',
       seasonId: round.seasonId || '',
       roundNumber: parseInt(round.roundNumber?.toString() || '0'),
-      name: round.name || '',
+      name: '', // name column removed from database
       date: round.date || '',
       location: round.location || '',
       address: round.address || '',
@@ -181,7 +181,7 @@ async function addRound(round: Round, seasonId: string): Promise<void> {
     round.id,
     seasonId,
     round.roundNumber.toString(),
-    round.name,
+    '', // name column removed
     round.date || '',
     round.location || '',
     round.address || '',
@@ -206,7 +206,7 @@ async function updateRound(round: Round, seasonId: string): Promise<void> {
   if (idIndex >= 0) roundRow[idIndex] = round.id;
   if (seasonIdIndex >= 0) roundRow[seasonIdIndex] = seasonId;
   if (roundNumberIndex >= 0) roundRow[roundNumberIndex] = round.roundNumber.toString();
-  if (nameIndex >= 0) roundRow[nameIndex] = round.name;
+  if (nameIndex >= 0) roundRow[nameIndex] = ''; // name column removed from database
   if (dateIndex >= 0) roundRow[dateIndex] = round.date || '';
   if (locationIndex >= 0) roundRow[locationIndex] = round.location || '';
   if (addressIndex >= 0) roundRow[addressIndex] = round.address || '';

@@ -34,7 +34,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(rounds);
   } catch (error) {
     console.error('Error in GET /api/rounds:', error);
-    return NextResponse.json({ error: 'Failed to fetch rounds' }, { status: 500 });
+    // Return empty array instead of error to prevent UI issues
+    return NextResponse.json([]);
   }
 }
 

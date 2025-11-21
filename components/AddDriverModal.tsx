@@ -14,6 +14,7 @@ interface AddDriverModalProps {
     name: string;
     aliases?: string[];
     email: string;
+    mobileNumber?: string;
     division: Division;
     dateOfBirth?: string;
     homeTrack?: string;
@@ -63,6 +64,7 @@ export default function AddDriverModal({
     lastName: '',
     aliases: [''], // Support multiple aliases
     email: '',
+    mobileNumber: '',
     division: 'Division 4' as Division,
     dateOfBirth: { day: 0, month: 0, year: 0 },
     homeTrack: '',
@@ -92,6 +94,7 @@ export default function AddDriverModal({
       name: driverName,
       aliases: validAliases.length > 0 ? validAliases : undefined,
       email: formData.email,
+      mobileNumber: formData.mobileNumber || undefined,
       division: formData.division,
       dateOfBirth: dateString || undefined,
       homeTrack: formData.homeTrack || undefined,
@@ -104,6 +107,7 @@ export default function AddDriverModal({
       lastName: '',
       aliases: [''],
       email: '',
+      mobileNumber: '',
       division: 'Division 4',
       dateOfBirth: { day: 0, month: 0, year: 0 },
       homeTrack: '',
@@ -215,18 +219,32 @@ export default function AddDriverModal({
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Email
-            </label>
-            <input
-              type="email"
-              required
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-              placeholder="driver@example.com"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                required
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                placeholder="driver@example.com"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Mobile Number <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">(optional)</span>
+              </label>
+              <input
+                type="tel"
+                value={formData.mobileNumber}
+                onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })}
+                className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                placeholder="+1234567890"
+              />
+            </div>
           </div>
 
           <div>

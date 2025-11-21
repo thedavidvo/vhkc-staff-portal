@@ -62,7 +62,7 @@ export default function DivisionChangesModal({
   // Get round name helper
   const getRoundName = (roundId: string) => {
     const round = rounds.find((r: any) => r.id === roundId);
-    return round ? `Round ${round.roundNumber} - ${round.location || round.name}` : 'Unknown Round';
+    return round ? `Round ${round.roundNumber} - ${round.location || 'TBD'}` : 'Unknown Round';
   };
 
   const isPromotions = type === 'promotions';
@@ -115,7 +115,7 @@ export default function DivisionChangesModal({
                 const count = changes.filter(c => c.roundId === round.id).length;
                 return (
                   <option key={round.id} value={round.id}>
-                    Round {round.roundNumber} - {round.location || round.name} ({count})
+                    Round {round.roundNumber} - {round.location || 'TBD'} ({count})
                   </option>
                 );
               })}

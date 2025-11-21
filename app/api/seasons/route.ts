@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const season = await request.json();
+    console.log('PUT /api/seasons - updating season:', season.id, 'with rounds:', season.rounds?.length);
     await updateSeason(season);
     
     // Invalidate cache
@@ -106,7 +107,8 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in PUT /api/seasons:', error);
-    return NextResponse.json({ error: 'Failed to update season' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update season';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 

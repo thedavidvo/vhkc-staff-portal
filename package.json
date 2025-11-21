@@ -11,7 +11,10 @@
     "init-db": "tsx scripts/init-db.ts",
     "migrate": "tsx scripts/migrate-sheets-to-neon.ts",
     "migrate-remove-fields": "tsx scripts/migrate-remove-unused-fields.ts",
-    "migrate-add-points": "tsx scripts/migrate-add-points-table.ts"
+    "migrate-add-points": "tsx scripts/migrate-add-points-table.ts",
+    "migrate-add-mobile": "tsx scripts/migrate-add-mobile-number.ts",
+    "migrate-rounds-location-id": "tsx scripts/migrate-rounds-location-id.ts",
+    "migrate-remove-rounds-name": "tsx scripts/migrate-remove-rounds-name.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

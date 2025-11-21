@@ -84,16 +84,28 @@ export async function updateSeason(season: Season): Promise<void> {
     if (season.rounds && season.rounds.length > 0) {
       for (const round of season.rounds) {
         try {
+          console.log(`Processing round ${round.id}:`, {
+            id: round.id,
+            roundNumber: round.roundNumber,
+            date: round.date,
+            locationId: round.locationId,
+            status: round.status,
+            seasonId: season.id
+          });
+          
           if (existingRoundIds.has(round.id)) {
             // Update existing round
+            console.log(`Updating existing round ${round.id}`);
             await updateRound(round, season.id);
           } else {
             // Add new round
+            console.log(`Adding new round ${round.id}`);
             await addRound(round, season.id);
           }
         } catch (roundError) {
           console.error(`Error saving round ${round.id}:`, roundError);
-          // Continue with other rounds even if one fails
+          const errorMessage = roundError instanceof Error ? roundError.message : String(roundError);
+          throw new Error(`Failed to save round ${round.id}: ${errorMessage}`);
         }
       }
     }
@@ -112,28 +124,47 @@ export async function deleteSeason(seasonId: string): Promise<void> {
 // ============================================================================
 
 export async function getRounds(): Promise<(Round & { seasonId: string })[]> {
-  const rounds = await sql`SELECT * FROM rounds ORDER BY date DESC`;
+  const rounds = await sql`
+    SELECT 
+      r.*,
+      l.name as location_name,
+      l.address as location_address
+    FROM rounds r
+    LEFT JOIN locations l ON r.location_id = l.id
+    ORDER BY r.date DESC
+  `;
   return (rounds as any[]).map((r: any) => ({
     id: r.id,
     seasonId: r.season_id,
     roundNumber: r.round_number || 0,
-    name: r.name,
+    name: '', // name column removed
     date: r.date || '',
-    location: r.location || '',
-    address: r.address || '',
+    locationId: r.location_id || undefined,
+    location: r.location_name || r.location || '',
+    address: r.location_address || '',
     status: r.status as 'upcoming' | 'completed' | 'cancelled',
   }));
 }
 
 export async function getRoundsBySeasonId(seasonId: string): Promise<Round[]> {
-  const rounds = await sql`SELECT * FROM rounds WHERE season_id = ${seasonId} ORDER BY round_number`;
+  const rounds = await sql`
+    SELECT 
+      r.*,
+      l.name as location_name,
+      l.address as location_address
+    FROM rounds r
+    LEFT JOIN locations l ON r.location_id = l.id
+    WHERE r.season_id = ${seasonId}
+    ORDER BY r.round_number
+  `;
   return (rounds as any[]).map((r: any) => ({
     id: r.id,
     roundNumber: r.round_number || 0,
-    name: r.name,
+    name: '', // name column removed
     date: r.date || '',
-    location: r.location || '',
-    address: r.address || '',
+    locationId: r.location_id || undefined,
+    location: r.location_name || r.location || '',
+    address: r.location_address || '',
     status: r.status as 'upcoming' | 'completed' | 'cancelled',
   }));
 }
@@ -142,39 +173,136 @@ export async function getRoundsBySeasonId(seasonId: string): Promise<Round[]> {
 export const getRoundsBySeason = getRoundsBySeasonId;
 
 export async function getRoundById(roundId: string): Promise<Round | null> {
-  const rounds = await sql`SELECT * FROM rounds WHERE id = ${roundId}` as any[];
+  const rounds = await sql`
+    SELECT 
+      r.*,
+      l.name as location_name,
+      l.address as location_address
+    FROM rounds r
+    LEFT JOIN locations l ON r.location_id = l.id
+    WHERE r.id = ${roundId}
+  ` as any[];
   if (rounds.length === 0) return null;
   
   const r = rounds[0];
   return {
     id: r.id,
     roundNumber: r.round_number || 0,
-    name: r.name,
+    name: '', // name column removed
     date: r.date || '',
-    location: r.location || '',
-    address: r.address || '',
+    locationId: r.location_id || undefined,
+    location: r.location_name || r.location || '',
+    address: r.location_address || '',
     status: r.status as 'upcoming' | 'completed' | 'cancelled',
   };
 }
 
 export async function addRound(round: Round, seasonId: string): Promise<void> {
-  await sql`
-    INSERT INTO rounds (id, season_id, name, round_number, date, location, address, status)
-    VALUES (${round.id}, ${seasonId}, ${round.name}, ${round.roundNumber}, ${round.date}, ${round.location}, ${round.address}, ${round.status || 'upcoming'})
-  `;
+  const locationIdValue = (round.locationId && round.locationId.trim() !== '') 
+    ? round.locationId 
+    : null;
+  
+  console.log(`addRound called:`, {
+    roundId: round.id,
+    seasonId,
+    roundNumber: round.roundNumber,
+    date: round.date,
+    locationId: round.locationId,
+    locationIdValue,
+    status: round.status
+  });
+  
+  try {
+    // Check if location_id column exists
+    const columnCheck = await sql`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'rounds' AND column_name = 'location_id'
+    ` as any[];
+    
+    const hasLocationIdColumn = columnCheck.length > 0;
+    
+    if (hasLocationIdColumn) {
+      // Use location_id column
+      await sql`
+        INSERT INTO rounds (id, season_id, round_number, date, location_id, status)
+        VALUES (${round.id}, ${seasonId}, ${round.roundNumber}, ${round.date || ''}, ${locationIdValue}, ${round.status || 'upcoming'})
+      `;
+    } else {
+      // Fallback to location column if location_id doesn't exist
+      console.warn('location_id column not found, using location column as fallback');
+      const locationName = round.location || '';
+      await sql`
+        INSERT INTO rounds (id, season_id, round_number, date, location, status)
+        VALUES (${round.id}, ${seasonId}, ${round.roundNumber}, ${round.date || ''}, ${locationName}, ${round.status || 'upcoming'})
+      `;
+    }
+    
+    console.log(`Successfully added round ${round.id}`);
+  } catch (error) {
+    console.error(`Error adding round ${round.id}:`, error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to add round ${round.id}: ${errorMessage}`);
+  }
 }
 
 export async function updateRound(round: Round, seasonId: string): Promise<void> {
-  await sql`
-    UPDATE rounds
-    SET name = ${round.name},
-        round_number = ${round.roundNumber},
-        date = ${round.date},
-        location = ${round.location},
-        address = ${round.address},
-        status = ${round.status || 'upcoming'}
-    WHERE id = ${round.id} AND season_id = ${seasonId}
-  `;
+  // Handle empty strings and undefined as null for location_id
+  const locationIdValue = (round.locationId && round.locationId.trim() !== '') 
+    ? round.locationId 
+    : null;
+  
+  console.log(`updateRound called:`, {
+    roundId: round.id,
+    seasonId,
+    roundNumber: round.roundNumber,
+    date: round.date,
+    locationId: round.locationId,
+    locationIdValue,
+    status: round.status
+  });
+  
+  try {
+    // Check if location_id column exists, if not use location column as fallback
+    const columnCheck = await sql`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'rounds' AND column_name = 'location_id'
+    ` as any[];
+    
+    const hasLocationIdColumn = columnCheck.length > 0;
+    
+    let result;
+    if (hasLocationIdColumn) {
+      // Use location_id column
+      result = await sql`
+        UPDATE rounds
+        SET round_number = ${round.roundNumber},
+            date = ${round.date || ''},
+            location_id = ${locationIdValue},
+            status = ${round.status || 'upcoming'}
+        WHERE id = ${round.id} AND season_id = ${seasonId}
+      `;
+    } else {
+      // Fallback to location column if location_id doesn't exist
+      console.warn('location_id column not found, using location column as fallback');
+      const locationName = round.location || '';
+      result = await sql`
+        UPDATE rounds
+        SET round_number = ${round.roundNumber},
+            date = ${round.date || ''},
+            location = ${locationName},
+            status = ${round.status || 'upcoming'}
+        WHERE id = ${round.id} AND season_id = ${seasonId}
+      `;
+    }
+    
+    console.log(`updateRound result for ${round.id}:`, result);
+  } catch (error) {
+    console.error(`Error updating round ${round.id}:`, error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to update round ${round.id}: ${errorMessage}`);
+  }
 }
 
 export async function deleteRound(roundId: string): Promise<void> {
@@ -194,6 +322,7 @@ export async function getDrivers(seasonId?: string): Promise<Driver[]> {
     id: d.id,
     name: d.name,
     email: d.email || '',
+    mobileNumber: d.mobile_number || '',
     division: d.division as Division,
     teamName: d.team_name || '',
     status: d.status || 'ACTIVE',
@@ -218,6 +347,7 @@ export async function getDriverById(driverId: string): Promise<Driver | null> {
     id: d.id,
     name: d.name,
     email: d.email || '',
+    mobileNumber: d.mobile_number || '',
     division: d.division as Division,
     teamName: d.team_name || '',
     status: d.status || 'ACTIVE',
@@ -235,10 +365,10 @@ export async function addDriver(driver: Driver, seasonId: string): Promise<void>
   
   await sql`
     INSERT INTO drivers (
-      id, season_id, name, email, division, team_name, status,
+      id, season_id, name, email, mobile_number, division, team_name, status,
       last_updated, first_name, last_name, date_of_birth, home_track, aliases
     ) VALUES (
-      ${driver.id}, ${seasonId}, ${driver.name}, ${driver.email || ''},
+      ${driver.id}, ${seasonId}, ${driver.name}, ${driver.email || ''}, ${driver.mobileNumber || ''},
       ${driver.division}, ${driver.teamName || ''}, ${driver.status || 'ACTIVE'},
       ${driver.lastUpdated || ''}, ${driver.firstName || ''}, ${driver.lastName || ''},
       ${driver.dateOfBirth || ''}, ${driver.homeTrack || ''}, ${aliases}
@@ -253,6 +383,7 @@ export async function updateDriver(driver: Driver, seasonId?: string): Promise<v
     UPDATE drivers
     SET name = ${driver.name},
         email = ${driver.email || ''},
+        mobile_number = ${driver.mobileNumber || ''},
         division = ${driver.division},
         team_name = ${driver.teamName || ''},
         status = ${driver.status || 'ACTIVE'},

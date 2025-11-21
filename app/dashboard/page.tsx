@@ -81,12 +81,15 @@ export default function Dashboard() {
 
         if (roundsResponse.ok) {
           const roundsData = await roundsResponse.json();
-          const sortedRounds = (roundsData || []).sort((a: any, b: any) => {
+          const sortedRounds = (Array.isArray(roundsData) ? roundsData : []).sort((a: any, b: any) => {
             const roundA = a.roundNumber || 0;
             const roundB = b.roundNumber || 0;
             return roundA - roundB;
           });
           setRounds(sortedRounds);
+        } else {
+          console.error('Failed to fetch rounds:', roundsResponse.status, roundsResponse.statusText);
+          setRounds([]);
         }
 
         if (pointsResponse.ok) {
@@ -95,6 +98,9 @@ export default function Dashboard() {
         }
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
+        setRounds([]);
+        setDrivers([]);
+        setPoints([]);
       } finally {
         setLoading(false);
       }
@@ -193,10 +199,16 @@ export default function Dashboard() {
     today.setHours(0, 0, 0, 0);
     
     const upcomingRounds = rounds
-      .filter((round) => round && round.status === 'upcoming' && round.date)
+      .filter((round) => {
+        // Filter for upcoming rounds with a valid date
+        if (!round || round.status !== 'upcoming') return false;
+        if (!round.date || round.date.trim() === '') return false;
+        return true;
+      })
       .map((round) => {
         try {
           const raceDate = new Date(round.date);
+          if (isNaN(raceDate.getTime())) return null;
           raceDate.setHours(0, 0, 0, 0);
           return {
             ...round,

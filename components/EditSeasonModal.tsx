@@ -5,12 +5,18 @@ import { useState, useEffect } from 'react';
 import { Season, Round } from '@/types';
 import Modal from '@/components/Modal';
 
+interface Location {
+  id: string;
+  name: string;
+  address: string;
+}
+
 interface EditSeasonModalProps {
   isOpen: boolean;
   onClose: () => void;
   season: Season | null;
   onUpdate: (season: Season) => void;
-  locations: string[];
+  locations: Location[];
   onLocationAdded?: (locationName: string, address: string) => void;
   initialRoundToEdit?: Round | null;
 }
@@ -28,10 +34,18 @@ export default function EditSeasonModal({
   const [editingRound, setEditingRound] = useState<Round | null>(null);
   const [showRoundForm, setShowRoundForm] = useState(false);
 
-  // Initialize form data when season changes or modal opens
+  // Initialize form data when modal opens or season ID changes
   useEffect(() => {
     if (season && isOpen) {
-      setFormData({ ...season });
+      // Only reset formData if season ID changed or modal just opened
+      setFormData((prev) => {
+        // If no previous data or season ID changed, reset
+        if (!prev || prev.id !== season.id) {
+          return { ...season };
+        }
+        // Otherwise keep existing formData to preserve unsaved changes
+        return prev;
+      });
       // If initialRoundToEdit is provided, open the round form for that round
       if (initialRoundToEdit) {
         setEditingRound(initialRoundToEdit);
@@ -41,7 +55,7 @@ export default function EditSeasonModal({
         setShowRoundForm(false);
       }
     }
-  }, [season, isOpen, initialRoundToEdit]);
+  }, [season?.id, isOpen, initialRoundToEdit]);
 
   if (!isOpen || !season) return null;
 
@@ -92,38 +106,81 @@ export default function EditSeasonModal({
     const newRound: Round = {
       id: `round-${Date.now()}`,
       roundNumber: maxRoundNumber + 1,
-      name: '',
+      name: '', // name column removed
       date: '',
-      location: '',
-      address: '',
+      locationId: undefined,
       status: 'upcoming',
     };
     setEditingRound(newRound);
     setShowRoundForm(true);
   };
 
-  const handleSaveRound = (round: Round) => {
+  const handleSaveRound = async (round: Round) => {
+    console.log('handleSaveRound called with round:', round);
+    
+    // Validate round has required fields
+    if (!round || !round.id) {
+      alert('Round ID is missing. Cannot save round.');
+      return;
+    }
+    
+    if (!round.roundNumber || round.roundNumber < 1) {
+      alert('Round number is required and must be at least 1.');
+      return;
+    }
+    
     if (!formData) {
       setFormData({ ...season });
     }
-    const updatedRounds = [...(formData || season).rounds];
+    const currentData = formData || season;
+    const updatedRounds = [...currentData.rounds];
     const existingIndex = updatedRounds.findIndex((r) => r.id === round.id);
     
+    // Ensure we have all required fields from the round, preserving locationId
+    const roundToSave: Round = {
+      id: round.id,
+      roundNumber: round.roundNumber,
+      name: '', // name column removed
+      date: round.date || '',
+      locationId: round.locationId, // Preserve locationId explicitly
+      status: round.status || 'upcoming',
+    };
+    
+    console.log('Saving roundToSave:', roundToSave);
+    
     if (existingIndex >= 0) {
-      updatedRounds[existingIndex] = round;
+      updatedRounds[existingIndex] = roundToSave;
     } else {
-      updatedRounds.push(round);
+      updatedRounds.push(roundToSave);
     }
 
     // Sort rounds by roundNumber
     updatedRounds.sort((a, b) => a.roundNumber - b.roundNumber);
 
-    setFormData((prev) => {
-      if (!prev) return { ...season };
-      return { ...prev, rounds: updatedRounds };
-    });
-    setEditingRound(null);
-    setShowRoundForm(false);
+    const updatedSeason = {
+      ...currentData,
+      rounds: updatedRounds,
+      numberOfRounds: updatedRounds.length,
+    };
+    
+    console.log('Calling onUpdate with updatedSeason (seasonId:', updatedSeason.id, ', rounds:', updatedRounds.length, ')');
+    
+    // Update local state immediately
+    setFormData(updatedSeason);
+    
+    // Save immediately to database
+    try {
+      await onUpdate(updatedSeason);
+      console.log('Successfully saved round');
+      setEditingRound(null);
+      setShowRoundForm(false);
+    } catch (error) {
+      console.error('Failed to save round:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to save round: ${errorMessage}`);
+      // Revert to previous state on error
+      setFormData({ ...season });
+    }
   };
 
   const handleDeleteRound = async (roundId: string) => {
@@ -269,13 +326,19 @@ export default function EditSeasonModal({
                       </div>
                       <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                         {(() => {
-                          const displayName = (round.name && round.name.trim()) || (round.location && round.location.trim()) || '';
-                          // Remove "Season - " prefix if present
-                          const cleanName = displayName.replace(/^Season\s*-\s*/i, '');
                           const parts = [];
-                          if (cleanName) parts.push(cleanName);
-                          if (round.date) parts.push(new Date(round.date).toLocaleDateString());
-                          if (round.location) parts.push(round.location);
+                          // Location
+                          const locationName = round.location && round.location.trim() 
+                            ? round.location.trim() 
+                            : 'No Location';
+                          parts.push(locationName);
+                          // Date
+                          if (round.date) {
+                            parts.push(new Date(round.date).toLocaleDateString());
+                          } else {
+                            parts.push('No Date');
+                          }
+                          // Status
                           parts.push(round.status.charAt(0).toUpperCase() + round.status.slice(1).toLowerCase());
                           return parts.join(' • ');
                         })()}
@@ -324,7 +387,7 @@ export default function EditSeasonModal({
 
 interface RoundFormProps {
   round: Round;
-  locations: string[];
+  locations: Location[];
   onSave: (round: Round) => void;
   onCancel: () => void;
   onLocationAdded?: (locationName: string, address: string) => void;
@@ -337,9 +400,40 @@ function RoundForm({ round, locations, onSave, onCancel, onLocationAdded, isEdit
   const [manualLocation, setManualLocation] = useState('');
   const [manualAddress, setManualAddress] = useState('');
 
+  // Update formData when round ID changes (when editing a different round)
+  useEffect(() => {
+    if (round) {
+      setFormData({ ...round });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [round.id]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    
+    // Validate required fields
+    if (!formData.id) {
+      alert('Round ID is missing. Please try again.');
+      return;
+    }
+    
+    if (!formData.roundNumber || formData.roundNumber < 1) {
+      alert('Round number is required and must be at least 1.');
+      return;
+    }
+    
+    // Ensure we pass a clean round object with all required fields
+    const roundToSave: Round = {
+      id: formData.id,
+      roundNumber: formData.roundNumber,
+      name: '', // name column removed
+      date: formData.date || '',
+      locationId: formData.locationId, // Explicitly preserve locationId
+      status: formData.status || 'upcoming',
+    };
+    
+    console.log('RoundForm submitting round:', roundToSave);
+    onSave(roundToSave);
   };
 
   return (
@@ -387,19 +481,6 @@ function RoundForm({ round, locations, onSave, onCancel, onLocationAdded, isEdit
 
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Round Name <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={formData.name || ''}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Leave blank to use location"
-              className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               Date <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">(optional)</span>
             </label>
             <input
@@ -417,20 +498,20 @@ function RoundForm({ round, locations, onSave, onCancel, onLocationAdded, isEdit
             {!showManualLocation ? (
               <div className="space-y-2">
                 <select
-                  value={formData.location || ''}
+                  value={formData.locationId || ''}
                   onChange={(e) => {
                     if (e.target.value === '__manual__') {
                       setShowManualLocation(true);
                     } else {
-                      setFormData({ ...formData, location: e.target.value });
+                      setFormData({ ...formData, locationId: e.target.value || undefined });
                     }
                   }}
                   className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
                 >
                   <option value="">Select a location (optional)</option>
                   {locations.length > 0 && locations.map((loc) => (
-                    <option key={loc} value={loc}>
-                      {loc}
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name}
                     </option>
                   ))}
                   <option value="__manual__">+ Add New Location</option>
@@ -465,10 +546,21 @@ function RoundForm({ round, locations, onSave, onCancel, onLocationAdded, isEdit
                   <button
                     type="button"
                     onClick={async () => {
+                      let newLocationId: string | undefined;
+                      
                       // If location is provided, add it to the locations list
                       if (manualLocation.trim() && onLocationAdded) {
                         try {
                           await onLocationAdded(manualLocation.trim(), manualAddress.trim());
+                          // Fetch the newly added location to get its ID
+                          const response = await fetch('/api/locations');
+                          if (response.ok) {
+                            const locationsData = await response.json();
+                            const newLocation = locationsData.find((l: Location) => l.name === manualLocation.trim());
+                            if (newLocation) {
+                              newLocationId = newLocation.id;
+                            }
+                          }
                         } catch (error) {
                           console.error('Failed to add location:', error);
                           alert('Failed to add location. Please try again.');
@@ -476,11 +568,10 @@ function RoundForm({ round, locations, onSave, onCancel, onLocationAdded, isEdit
                         }
                       }
                       
-                      // Update form data with location (can be empty)
+                      // Update form data with locationId
                       setFormData({ 
                         ...formData, 
-                        location: manualLocation.trim() || '', 
-                        address: manualAddress.trim() || formData.address 
+                        locationId: newLocationId || undefined
                       });
                       setShowManualLocation(false);
                       setManualLocation('');

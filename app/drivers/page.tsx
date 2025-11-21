@@ -150,9 +150,11 @@ export default function DriversPage() {
 
   const filteredDrivers = useMemo(() => {
     return drivers.filter((driver) => {
+      const searchLower = searchQuery.toLowerCase();
       const matchesSearch =
-        driver.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        driver.email.toLowerCase().includes(searchQuery.toLowerCase());
+        driver.name.toLowerCase().includes(searchLower) ||
+        driver.email.toLowerCase().includes(searchLower) ||
+        (driver.mobileNumber && driver.mobileNumber.toLowerCase().includes(searchLower));
       const matchesDivision = divisionFilter === 'all' || driver.division === divisionFilter;
       const matchesTeam = teamFilter === 'all' || driver.teamName === teamFilter;
       const matchesStatus = statusFilter === 'all' || driver.status === statusFilter;
@@ -246,6 +248,7 @@ export default function DriversPage() {
     name: string;
     aliases?: string[];
     email: string;
+    mobileNumber?: string;
     division: Division;
     dateOfBirth?: string;
     homeTrack?: string;
@@ -264,6 +267,7 @@ export default function DriversPage() {
         firstName: driverData.firstName,
         lastName: driverData.lastName,
         email: driverData.email,
+        mobileNumber: driverData.mobileNumber,
         division: driverData.division,
         dateOfBirth: driverData.dateOfBirth,
         homeTrack: driverData.homeTrack,
@@ -345,7 +349,7 @@ export default function DriversPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
               type="text"
-              placeholder="Search drivers by name or email..."
+              placeholder="Search drivers by name, email, or mobile..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
@@ -407,10 +411,13 @@ export default function DriversPage() {
                           Name
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                          Division
+                          Alias
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                          Team
+                          Mobile Number
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                          Division
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                           Status
@@ -435,13 +442,18 @@ export default function DriversPage() {
                           <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white">
                             {driver.name}
                           </td>
+                          <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                            {driver.aliases && driver.aliases.length > 0 
+                              ? driver.aliases.join(', ') 
+                              : 'N/A'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                            {driver.mobileNumber || 'N/A'}
+                          </td>
                           <td className="px-4 py-3 text-sm">
                             <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(driver.division)}`}>
                               {driver.division}
                             </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
-                            {driver.teamName || 'No Team'}
                           </td>
                           <td className="px-4 py-3 text-sm">
                             <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getStatusColor(driver.status)}`}>
@@ -536,17 +548,31 @@ export default function DriversPage() {
                           />
                         </div>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                          Email
-                        </label>
-                        <input
-                          type="email"
-                          value={editForm.email || ''}
-                          onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                          placeholder={selectedDriver.email}
-                        />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                            Email
+                          </label>
+                          <input
+                            type="email"
+                            value={editForm.email || ''}
+                            onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                            placeholder={selectedDriver.email}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                            Mobile Number
+                          </label>
+                          <input
+                            type="tel"
+                            value={editForm.mobileNumber || selectedDriver.mobileNumber || ''}
+                            onChange={(e) => setEditForm({ ...editForm, mobileNumber: e.target.value })}
+                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                            placeholder={selectedDriver.mobileNumber || 'Mobile Number'}
+                          />
+                        </div>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -775,11 +801,19 @@ export default function DriversPage() {
                           </p>
                         </div>
                       </div>
-                      <div>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">Email</p>
-                        <p className="text-base font-medium text-slate-900 dark:text-white">
-                          {selectedDriver.email}
-                        </p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-slate-600 dark:text-slate-400">Email</p>
+                          <p className="text-base font-medium text-slate-900 dark:text-white">
+                            {selectedDriver.email}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-slate-600 dark:text-slate-400">Mobile Number</p>
+                          <p className="text-base font-medium text-slate-900 dark:text-white">
+                            {selectedDriver.mobileNumber || 'N/A'}
+                          </p>
+                        </div>
                       </div>
                       <div>
                         <p className="text-sm text-slate-600 dark:text-slate-400">Date of Birth</p>
