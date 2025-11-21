@@ -14,7 +14,8 @@
     "migrate-add-points": "tsx scripts/migrate-add-points-table.ts",
     "migrate-add-mobile": "tsx scripts/migrate-add-mobile-number.ts",
     "migrate-rounds-location-id": "tsx scripts/migrate-rounds-location-id.ts",
-    "migrate-remove-rounds-name": "tsx scripts/migrate-remove-rounds-name.ts"
+    "migrate-remove-rounds-name": "tsx scripts/migrate-remove-rounds-name.ts",
+    "import-drivers-csv": "tsx scripts/import-drivers-csv.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

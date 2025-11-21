@@ -5,9 +5,10 @@ import Header from '@/components/Header';
 import PageLayout from '@/components/PageLayout';
 import SectionCard from '@/components/SectionCard';
 import AddDriverModal from '@/components/AddDriverModal';
+import EditDriverModal from '@/components/EditDriverModal';
 import { useSeason } from '@/components/SeasonContext';
 import { Driver, Division, DriverStatus } from '@/types';
-import { Edit, Trash2, X, Save, User, Plus, Loader2, Users, Search, Filter } from 'lucide-react';
+import { Edit, Trash2, Plus, Loader2, Users, Search, Filter, ChevronUp, ChevronDown } from 'lucide-react';
 
 // Helper function to get division color
 const getDivisionColor = (division: Division) => {
@@ -78,23 +79,29 @@ const combineDate = (day: number, month: number, year: number): string => {
   return `${yearStr}-${monthStr}-${dayStr}`;
 };
 
-// Helper function to calculate age from date of birth
-const calculateAge = (dateOfBirth: string | undefined): number | null => {
-  if (!dateOfBirth) return null;
-  const birthDate = new Date(dateOfBirth);
-  if (isNaN(birthDate.getTime())) return null;
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age;
-};
 
 // Helper function to format status with normal casing
 const formatStatus = (status: string): string => {
   return status.charAt(0) + status.slice(1).toLowerCase();
+};
+
+// Helper function to format mobile number as "XXXX XXX XXX"
+const formatMobileNumber = (mobileNumber: string | undefined): string => {
+  if (!mobileNumber) return 'N/A';
+  
+  // Remove all non-digit characters
+  const digitsOnly = mobileNumber.replace(/\D/g, '');
+  
+  if (digitsOnly.length === 0) return 'N/A';
+  
+  // Format as "XXXX XXX XXX" (first 4, then 3, then 3)
+  if (digitsOnly.length <= 4) {
+    return digitsOnly;
+  } else if (digitsOnly.length <= 7) {
+    return `${digitsOnly.slice(0, 4)} ${digitsOnly.slice(4)}`;
+  } else {
+    return `${digitsOnly.slice(0, 4)} ${digitsOnly.slice(4, 7)} ${digitsOnly.slice(7, 10)}`;
+  }
 };
 
 
@@ -106,11 +113,11 @@ export default function DriversPage() {
   const [divisionFilter, setDivisionFilter] = useState<Division | 'all'>('all');
   const [teamFilter, setTeamFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<DriverStatus | 'all'>('all');
-  const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState<Partial<Driver>>({});
-  const [dateOfBirth, setDateOfBirth] = useState<{ day: number; month: number; year: number }>({ day: 0, month: 0, year: 0 });
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [driverToEdit, setDriverToEdit] = useState<Driver | null>(null);
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const notifyDriversUpdated = () => {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('vhkc:drivers-updated'));
@@ -148,8 +155,8 @@ export default function DriversPage() {
     return Array.from(teamSet);
   }, [drivers]);
 
-  const filteredDrivers = useMemo(() => {
-    return drivers.filter((driver) => {
+  const filteredAndSortedDrivers = useMemo(() => {
+    let filtered = drivers.filter((driver) => {
       const searchLower = searchQuery.toLowerCase();
       const matchesSearch =
         driver.name.toLowerCase().includes(searchLower) ||
@@ -160,33 +167,99 @@ export default function DriversPage() {
       const matchesStatus = statusFilter === 'all' || driver.status === statusFilter;
       return matchesSearch && matchesDivision && matchesTeam && matchesStatus;
     });
-  }, [drivers, searchQuery, divisionFilter, teamFilter, statusFilter]);
+
+    // Apply sorting
+    if (sortField) {
+      filtered.sort((a, b) => {
+        let aValue: string | number | undefined;
+        let bValue: string | number | undefined;
+
+        switch (sortField) {
+          case 'name':
+            aValue = a.name?.toLowerCase() || '';
+            bValue = b.name?.toLowerCase() || '';
+            break;
+          case 'firstName':
+            aValue = a.firstName?.toLowerCase() || '';
+            bValue = b.firstName?.toLowerCase() || '';
+            break;
+          case 'lastName':
+            aValue = a.lastName?.toLowerCase() || '';
+            bValue = b.lastName?.toLowerCase() || '';
+            break;
+          case 'email':
+            aValue = a.email?.toLowerCase() || '';
+            bValue = b.email?.toLowerCase() || '';
+            break;
+          case 'aliases':
+            aValue = a.aliases?.join(', ').toLowerCase() || '';
+            bValue = b.aliases?.join(', ').toLowerCase() || '';
+            break;
+          case 'mobileNumber':
+            aValue = a.mobileNumber?.toLowerCase() || '';
+            bValue = b.mobileNumber?.toLowerCase() || '';
+            break;
+          case 'division':
+            aValue = a.division?.toLowerCase() || '';
+            bValue = b.division?.toLowerCase() || '';
+            break;
+          case 'teamName':
+            aValue = a.teamName?.toLowerCase() || '';
+            bValue = b.teamName?.toLowerCase() || '';
+            break;
+          case 'dateOfBirth':
+            aValue = a.dateOfBirth ? new Date(a.dateOfBirth).getTime() : 0;
+            bValue = b.dateOfBirth ? new Date(b.dateOfBirth).getTime() : 0;
+            break;
+          case 'homeTrack':
+            aValue = a.homeTrack?.toLowerCase() || '';
+            bValue = b.homeTrack?.toLowerCase() || '';
+            break;
+          case 'status':
+            aValue = a.status?.toLowerCase() || '';
+            bValue = b.status?.toLowerCase() || '';
+            break;
+          case 'lastUpdated':
+            aValue = a.lastUpdated ? new Date(a.lastUpdated).getTime() : 0;
+            bValue = b.lastUpdated ? new Date(b.lastUpdated).getTime() : 0;
+            break;
+          default:
+            return 0;
+        }
+
+        // Handle undefined values
+        if (aValue === undefined && bValue === undefined) return 0;
+        if (aValue === undefined) return sortDirection === 'asc' ? 1 : -1;
+        if (bValue === undefined) return sortDirection === 'asc' ? -1 : 1;
+        
+        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [drivers, searchQuery, divisionFilter, teamFilter, statusFilter, sortField, sortDirection]);
 
 
   const handleEdit = (driver: Driver) => {
-    setSelectedDriver(driver);
-    // Ensure aliases array always has at least one empty field for editing
-    const aliasesArray = driver.aliases && driver.aliases.length > 0 ? driver.aliases : [];
-    setEditForm({ ...driver, aliases: aliasesArray.length > 0 ? [...aliasesArray, ''] : [''] });
-    const parsedDate = parseDate(driver.dateOfBirth);
-    setDateOfBirth(parsedDate);
-    setIsEditing(true);
+    setDriverToEdit(driver);
+    setIsEditModalOpen(true);
   };
 
-  const handleSave = async () => {
-    if (!selectedDriver || !selectedSeason) return;
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const handleSaveEdit = async (updatedDriver: Driver) => {
+    if (!selectedSeason) return;
 
     try {
-      const dateString = combineDate(dateOfBirth.day, dateOfBirth.month, dateOfBirth.year);
-      // Filter out empty aliases
-      const validAliases = (editForm.aliases || []).filter(a => a.trim() !== '');
-      const finalForm = { 
-        ...editForm, 
-        dateOfBirth: dateString || editForm.dateOfBirth,
-        aliases: validAliases.length > 0 ? validAliases : undefined
-      };
-      const updatedDriver = { ...selectedDriver, ...finalForm } as Driver;
-      
       // Update via API
       const response = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`, {
         method: 'PUT',
@@ -197,20 +270,20 @@ export default function DriversPage() {
       if (response.ok) {
         // Update local state
         setDrivers(
-          drivers.map((d) => (d.id === selectedDriver.id ? updatedDriver : d))
+          drivers.map((d) => (d.id === updatedDriver.id ? updatedDriver : d))
         );
-        setSelectedDriver(updatedDriver);
-        setIsEditing(false);
-        setDateOfBirth({ day: 0, month: 0, year: 0 });
+        
+        
         notifyDriversUpdated();
       } else {
-        alert('Failed to update driver. Please try again.');
+        throw new Error('Failed to update driver');
       }
     } catch (error) {
-      console.error('Failed to update driver:', error);
-      alert('Failed to update driver. Please try again.');
+      console.error('Failed to save driver:', error);
+      throw error;
     }
   };
+
 
   const handleDelete = async (driverId: string) => {
     if (!selectedSeason) return;
@@ -226,10 +299,6 @@ export default function DriversPage() {
       if (response.ok) {
         // Update local state
         setDrivers(drivers.filter((d) => d.id !== driverId));
-        if (selectedDriver?.id === driverId) {
-          setSelectedDriver(null);
-          setIsEditing(false);
-        }
         // Notify other components
         notifyDriversUpdated();
       } else {
@@ -394,491 +463,251 @@ export default function DriversPage() {
         </div>
       </SectionCard>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Drivers List */}
-        <SectionCard
-          title={`All Drivers (${filteredDrivers.length})`}
-          icon={Users}
-          noPadding
-          className="lg:col-span-1"
-        >
-          <div className="overflow-x-auto max-h-[calc(100vh-400px)]">
-                  <table className="w-full">
-                    <thead className="bg-slate-50 dark:bg-slate-800">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                          Name
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                          Alias
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                          Mobile Number
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                          Division
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                          Status
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                      {filteredDrivers.map((driver) => (
-                        <tr
-                          key={driver.id}
-                          className={`hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer ${
-                            selectedDriver?.id === driver.id ? 'bg-primary-50 dark:bg-primary-900/20' : ''
-                          }`}
-                          onClick={() => {
-                            setSelectedDriver(driver);
-                            setIsEditing(false);
-                          }}
-                        >
-                          <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white">
-                            {driver.name}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
-                            {driver.aliases && driver.aliases.length > 0 
-                              ? driver.aliases.join(', ') 
-                              : 'N/A'}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
-                            {driver.mobileNumber || 'N/A'}
-                          </td>
-                          <td className="px-4 py-3 text-sm">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(driver.division)}`}>
-                              {driver.division}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getStatusColor(driver.status)}`}>
-                              {driver.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEdit(driver);
-                                }}
-                                className="p-1 text-primary hover:bg-primary-100 dark:hover:bg-primary-900 rounded"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDelete(driver.id);
-                                }}
-                                className="p-1 text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-          </SectionCard>
-
-          {/* Driver Details Panel */}
-          <div className="lg:col-span-1">
-            {selectedDriver ? (
-              <SectionCard
-                title="Driver Details"
-                icon={User}
-                actions={
-                  !isEditing && (
-                    <button
-                      onClick={() => handleEdit(selectedDriver)}
-                      className="p-2 text-primary hover:bg-primary-100 dark:hover:bg-primary-900/30 rounded-xl transition-colors"
-                    >
-                      <Edit className="w-5 h-5" />
-                    </button>
-                  )
-                }
-              >
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                      Driver Details
-                    </h2>
-                    {!isEditing && (
-                      <button
-                        onClick={() => handleEdit(selectedDriver)}
-                        className="p-2 text-primary hover:bg-primary-100 dark:hover:bg-primary-900 rounded"
-                      >
-                        <Edit className="w-5 h-5" />
-                      </button>
+      {/* Main Content */}
+      <SectionCard
+        title={`All Drivers (${filteredAndSortedDrivers.length})`}
+        icon={Users}
+        noPadding
+        className="lg:col-span-2"
+      >
+        <div className="overflow-x-auto max-h-[calc(100vh-400px)]">
+          <table className="w-full">
+            <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-30 shadow-sm">
+              <tr>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase sticky left-0 bg-slate-50 dark:bg-slate-800 z-50 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border-r border-slate-200 dark:border-slate-700"
+                  onClick={() => handleSort('name')}
+                >
+                  <div className="flex items-center gap-1">
+                    Name
+                    {sortField === 'name' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
                     )}
                   </div>
-
-                  {isEditing ? (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                            First Name
-                          </label>
-                          <input
-                            type="text"
-                            value={editForm.firstName || selectedDriver.firstName || ''}
-                            onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
-                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                            placeholder={selectedDriver.firstName || 'First Name'}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                            Last Name
-                          </label>
-                          <input
-                            type="text"
-                            value={editForm.lastName || selectedDriver.lastName || ''}
-                            onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
-                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                            placeholder={selectedDriver.lastName || 'Last Name'}
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                            Email
-                          </label>
-                          <input
-                            type="email"
-                            value={editForm.email || ''}
-                            onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                            placeholder={selectedDriver.email}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                            Mobile Number
-                          </label>
-                          <input
-                            type="tel"
-                            value={editForm.mobileNumber || selectedDriver.mobileNumber || ''}
-                            onChange={(e) => setEditForm({ ...editForm, mobileNumber: e.target.value })}
-                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                            placeholder={selectedDriver.mobileNumber || 'Mobile Number'}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                          Date of Birth
-                        </label>
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <input
-                              type="number"
-                              min="1"
-                              max="31"
-                              value={dateOfBirth.day || ''}
-                              onChange={(e) => {
-                                const day = parseInt(e.target.value) || 0;
-                                setDateOfBirth({ ...dateOfBirth, day });
-                                const dateString = combineDate(day, dateOfBirth.month, dateOfBirth.year);
-                                if (dateString) {
-                                  setEditForm({ ...editForm, dateOfBirth: dateString });
-                                }
-                              }}
-                              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                              placeholder="DD"
-                            />
-                          </div>
-                          <div>
-                            <input
-                              type="number"
-                              min="1"
-                              max="12"
-                              value={dateOfBirth.month || ''}
-                              onChange={(e) => {
-                                const month = parseInt(e.target.value) || 0;
-                                setDateOfBirth({ ...dateOfBirth, month });
-                                const dateString = combineDate(dateOfBirth.day, month, dateOfBirth.year);
-                                if (dateString) {
-                                  setEditForm({ ...editForm, dateOfBirth: dateString });
-                                }
-                              }}
-                              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                              placeholder="MM"
-                            />
-                          </div>
-                          <div>
-                            <input
-                              type="number"
-                              min="1900"
-                              max={new Date().getFullYear()}
-                              value={dateOfBirth.year || ''}
-                              onChange={(e) => {
-                                const year = parseInt(e.target.value) || 0;
-                                setDateOfBirth({ ...dateOfBirth, year });
-                                const dateString = combineDate(dateOfBirth.day, dateOfBirth.month, year);
-                                if (dateString) {
-                                  setEditForm({ ...editForm, dateOfBirth: dateString });
-                                }
-                              }}
-                              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                              placeholder="YYYY"
-                            />
-                          </div>
-                        </div>
-                        {(dateOfBirth.day && dateOfBirth.month && dateOfBirth.year) || selectedDriver.dateOfBirth ? (
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                            Age: {calculateAge(combineDate(dateOfBirth.day, dateOfBirth.month, dateOfBirth.year) || selectedDriver.dateOfBirth) ?? 'N/A'} years old
-                          </p>
-                        ) : null}
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                          Division
-                        </label>
-                        <div className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800">
-                          <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(selectedDriver.division)}`}>
-                            {selectedDriver.division}
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                          Aliases
-                        </label>
-                        <div className="space-y-2">
-                          {(editForm.aliases || ['']).map((alias, index) => (
-                            <div key={index} className="flex gap-2">
-                              <input
-                                type="text"
-                                value={alias}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    const currentAliases = editForm.aliases || [''];
-                                    const trimmedValue = e.currentTarget.value.trim();
-                                    
-                                    // Always add new alias if current one has content and it's the last field
-                                    if (trimmedValue && index === currentAliases.length - 1) {
-                                      // Update the current alias value and add a new empty one
-                                      const newAliases = [...currentAliases];
-                                      newAliases[index] = trimmedValue;
-                                      newAliases.push('');
-                                      setEditForm({ ...editForm, aliases: newAliases });
-                                    } else if (trimmedValue && index < currentAliases.length - 1) {
-                                      // If it's not the last field, just update the current value
-                                      const newAliases = [...currentAliases];
-                                      newAliases[index] = trimmedValue;
-                                      setEditForm({ ...editForm, aliases: newAliases });
-                                    }
-                                  }
-                                }}
-                                onChange={(e) => {
-                                  const currentAliases = editForm.aliases || [''];
-                                  const newAliases = [...currentAliases];
-                                  newAliases[index] = e.target.value;
-                                  setEditForm({ ...editForm, aliases: newAliases });
-                                }}
-                                className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                                placeholder={`Alias ${index + 1}`}
-                              />
-                              {index < (editForm.aliases || ['']).length - 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const currentAliases = editForm.aliases || [''];
-                                    const newAliases = currentAliases.filter((_, i) => i !== index);
-                                    // Ensure at least one empty field remains
-                                    if (newAliases.length === 0) {
-                                      newAliases.push('');
-                                    }
-                                    setEditForm({ ...editForm, aliases: newAliases });
-                                  }}
-                                  className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                                >
-                                  Remove
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const currentAliases = editForm.aliases || [''];
-                              setEditForm({ ...editForm, aliases: [...currentAliases, ''] });
-                            }}
-                            className="px-3 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-800 transition-colors text-sm"
-                          >
-                            + Add Alias
-                          </button>
-                        </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                          Press Enter on the last alias field to add another
-                        </p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                          Home Track
-                        </label>
-                        <input
-                          type="text"
-                          value={editForm.homeTrack || selectedDriver.homeTrack || ''}
-                          onChange={(e) => setEditForm({ ...editForm, homeTrack: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                          placeholder={selectedDriver.homeTrack || 'Home Track'}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                          Team Name
-                        </label>
-                        <div className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                          {selectedDriver.teamName || 'No Team'}
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                          Status
-                        </label>
-                        <div className="flex gap-2">
-                          {(['ACTIVE', 'INACTIVE', 'BANNED'] as DriverStatus[]).map((status) => (
-                            <button
-                              key={status}
-                              type="button"
-                              onClick={() => setEditForm({ ...editForm, status })}
-                              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
-                                (editForm.status || selectedDriver.status) === status
-                                  ? getStatusColor(status) + ' ring-2 ring-offset-2 ring-slate-400'
-                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
-                              }`}
-                            >
-                              {formatStatus(status)}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="flex gap-2 pt-4">
-                        <button
-                          onClick={handleSave}
-                          className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-600 transition-colors font-medium"
-                        >
-                          <Save className="w-4 h-4 inline mr-2" />
-                          Save
-                        </button>
-                        <button
-                          onClick={() => {
-                            setIsEditing(false);
-                            setEditForm({});
-                            setDateOfBirth({ day: 0, month: 0, year: 0 });
-                          }}
-                          className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  onClick={() => handleSort('firstName')}
+                >
+                  <div className="flex items-center gap-1">
+                    First Name
+                    {sortField === 'firstName' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  onClick={() => handleSort('lastName')}
+                >
+                  <div className="flex items-center gap-1">
+                    Last Name
+                    {sortField === 'lastName' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  onClick={() => handleSort('email')}
+                >
+                  <div className="flex items-center gap-1">
+                    Email
+                    {sortField === 'email' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  onClick={() => handleSort('aliases')}
+                >
+                  <div className="flex items-center gap-1">
+                    Alias
+                    {sortField === 'aliases' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  onClick={() => handleSort('mobileNumber')}
+                >
+                  <div className="flex items-center gap-1">
+                    Mobile Number
+                    {sortField === 'mobileNumber' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  onClick={() => handleSort('division')}
+                >
+                  <div className="flex items-center gap-1">
+                    Division
+                    {sortField === 'division' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  onClick={() => handleSort('teamName')}
+                >
+                  <div className="flex items-center gap-1">
+                    Team Name
+                    {sortField === 'teamName' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  onClick={() => handleSort('dateOfBirth')}
+                >
+                  <div className="flex items-center gap-1">
+                    Date of Birth
+                    {sortField === 'dateOfBirth' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  onClick={() => handleSort('homeTrack')}
+                >
+                  <div className="flex items-center gap-1">
+                    Home Track
+                    {sortField === 'homeTrack' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  onClick={() => handleSort('status')}
+                >
+                  <div className="flex items-center gap-1">
+                    Status
+                    {sortField === 'status' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  onClick={() => handleSort('lastUpdated')}
+                >
+                  <div className="flex items-center gap-1">
+                    Last Updated
+                    {sortField === 'lastUpdated' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase sticky right-0 bg-slate-50 dark:bg-slate-800 z-50 border-l border-slate-200 dark:border-slate-700">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+              {filteredAndSortedDrivers.map((driver) => (
+                <tr
+                  key={driver.id}
+                  className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white sticky left-0 bg-white dark:bg-slate-800 z-0 border-r border-slate-200 dark:border-slate-700">
+                    {driver.name}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                    {driver.firstName || 'N/A'}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                    {driver.lastName || 'N/A'}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                    {driver.email || 'N/A'}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                    {driver.aliases && driver.aliases.length > 0 
+                      ? driver.aliases.join(', ') 
+                      : 'N/A'}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                    {formatMobileNumber(driver.mobileNumber)}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(driver.division)}`}>
+                      {driver.division}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                    {driver.teamName || 'N/A'}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                    {driver.dateOfBirth 
+                      ? new Date(driver.dateOfBirth).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                      : 'N/A'}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                    {driver.homeTrack || 'N/A'}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getStatusColor(driver.status)}`}>
+                      {driver.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                    {driver.lastUpdated 
+                      ? new Date(driver.lastUpdated).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                      : 'N/A'}
+                  </td>
+                  <td className="px-4 py-3 text-sm sticky right-0 bg-white dark:bg-slate-800 z-0 border-l border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(driver);
+                        }}
+                        className="p-1 text-primary hover:bg-primary-100 dark:hover:bg-primary-900 rounded"
+                        title="Edit driver"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(driver.id);
+                        }}
+                        className="p-1 text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded"
+                        title="Delete driver"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-slate-600 dark:text-slate-400">First Name</p>
-                          <p className="text-base font-medium text-slate-900 dark:text-white">
-                            {selectedDriver.firstName || selectedDriver.name.split(' ')[0] || 'N/A'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-slate-600 dark:text-slate-400">Last Name</p>
-                          <p className="text-base font-medium text-slate-900 dark:text-white">
-                            {selectedDriver.lastName || selectedDriver.name.split(' ').slice(1).join(' ') || 'N/A'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-slate-600 dark:text-slate-400">Email</p>
-                          <p className="text-base font-medium text-slate-900 dark:text-white">
-                            {selectedDriver.email}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-slate-600 dark:text-slate-400">Mobile Number</p>
-                          <p className="text-base font-medium text-slate-900 dark:text-white">
-                            {selectedDriver.mobileNumber || 'N/A'}
-                          </p>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">Date of Birth</p>
-                        <p className="text-base font-medium text-slate-900 dark:text-white">
-                          {selectedDriver.dateOfBirth 
-                            ? `${new Date(selectedDriver.dateOfBirth).toLocaleDateString()} (${calculateAge(selectedDriver.dateOfBirth) ?? 'N/A'} years old)`
-                            : 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Division</p>
-                        <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(selectedDriver.division)}`}>
-                          {selectedDriver.division}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">Aliases</p>
-                        <p className="text-base font-medium text-slate-900 dark:text-white">
-                          {selectedDriver.aliases && selectedDriver.aliases.length > 0
-                            ? selectedDriver.aliases.join(', ')
-                            : 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">Team</p>
-                        <p className="text-base font-medium text-slate-900 dark:text-white">
-                          {selectedDriver.teamName || 'No Team'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">Home Track</p>
-                        <p className="text-base font-medium text-slate-900 dark:text-white">
-                          {selectedDriver.homeTrack || 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">Status</p>
-                        <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getStatusColor(selectedDriver.status)}`}>
-                          {selectedDriver.status}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-              </SectionCard>
-            ) : (
-              <SectionCard
-                title="Driver Details"
-                icon={User}
-              >
-                <div className="text-center py-12">
-                  <User className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-                  <p className="text-slate-500 dark:text-slate-400 text-lg">
-                    Select a driver to view details
-                  </p>
-                </div>
-              </SectionCard>
-            )}
-          </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
+      </SectionCard>
       </PageLayout>
 
       <AddDriverModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAdd={handleAddDriver}
+      />
+      <EditDriverModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setDriverToEdit(null);
+        }}
+        driver={driverToEdit}
+        onSave={handleSaveEdit}
       />
     </>
   );
