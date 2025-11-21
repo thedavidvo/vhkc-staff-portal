@@ -142,11 +142,11 @@ export default function EditSeasonModal({
       roundNumber: round.roundNumber,
       name: '', // name column removed
       date: round.date || '',
-      locationId: round.locationId, // Preserve locationId explicitly
+      locationId: round.locationId, // Preserve locationId explicitly - can be undefined
       status: round.status || 'upcoming',
     };
     
-    console.log('Saving roundToSave:', roundToSave);
+    console.log('handleSaveRound: Saving roundToSave:', roundToSave, 'original round.locationId:', round.locationId);
     
     if (existingIndex >= 0) {
       updatedRounds[existingIndex] = roundToSave;
@@ -401,9 +401,25 @@ function RoundForm({ round, locations, onSave, onCancel, onLocationAdded, isEdit
   const [manualAddress, setManualAddress] = useState('');
 
   // Update formData when round ID changes (when editing a different round)
+  // Only reset when the round ID changes, not when other properties change
   useEffect(() => {
     if (round) {
-      setFormData({ ...round });
+      console.log('RoundForm: round prop changed, updating formData:', { 
+        id: round.id, 
+        locationId: round.locationId,
+        roundNumber: round.roundNumber,
+        date: round.date,
+        status: round.status
+      });
+      // Create a fresh copy of the round to ensure all fields are properly set
+      setFormData({ 
+        id: round.id,
+        roundNumber: round.roundNumber,
+        name: round.name || '',
+        date: round.date || '',
+        locationId: round.locationId, // Preserve locationId explicitly
+        status: round.status || 'upcoming'
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round.id]);
@@ -428,11 +444,11 @@ function RoundForm({ round, locations, onSave, onCancel, onLocationAdded, isEdit
       roundNumber: formData.roundNumber,
       name: '', // name column removed
       date: formData.date || '',
-      locationId: formData.locationId, // Explicitly preserve locationId
+      locationId: formData.locationId, // Explicitly preserve locationId - can be undefined
       status: formData.status || 'upcoming',
     };
     
-    console.log('RoundForm submitting round:', roundToSave);
+    console.log('RoundForm submitting round:', roundToSave, 'formData.locationId:', formData.locationId);
     onSave(roundToSave);
   };
 
@@ -503,7 +519,11 @@ function RoundForm({ round, locations, onSave, onCancel, onLocationAdded, isEdit
                     if (e.target.value === '__manual__') {
                       setShowManualLocation(true);
                     } else {
-                      setFormData({ ...formData, locationId: e.target.value || undefined });
+                      // Preserve locationId - use empty string as undefined, or the selected value
+                      const value = e.target.value;
+                      const newLocationId = value && value.trim() !== '' ? value : undefined;
+                      console.log('Location dropdown changed:', { value, newLocationId, currentFormData: formData.locationId });
+                      setFormData({ ...formData, locationId: newLocationId });
                     }
                   }}
                   className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"

@@ -1286,9 +1286,12 @@ Thank you once again for your involvement with VHKC. We look forward to continui
             const changes = await changesResponse.json();
             
             // Filter by selected division - only show drivers that were initially in the selected division
-            let filteredChanges = changes;
+            // Only show promotions and demotions in reports, not division_start or mid_season_join
+            let filteredChanges = changes.filter((c: any) => 
+              c.changeType === 'promotion' || c.changeType === 'demotion'
+            );
             if (selectedDivision !== 'All') {
-              filteredChanges = changes.filter((c: any) => c.fromDivision === selectedDivision);
+              filteredChanges = filteredChanges.filter((c: any) => c.fromDivision === selectedDivision);
             }
             
             const promotions = filteredChanges.filter((c: any) => c.changeType === 'promotion');

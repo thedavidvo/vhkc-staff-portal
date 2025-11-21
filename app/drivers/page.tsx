@@ -470,7 +470,7 @@ export default function DriversPage() {
         noPadding
         className="lg:col-span-2"
       >
-        <div className="overflow-x-auto max-h-[calc(100vh-400px)]">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-400px)]">
           <table className="w-full">
             <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-30 shadow-sm">
               <tr>
@@ -541,7 +541,7 @@ export default function DriversPage() {
                   </div>
                 </th>
                 <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase sticky left-[200px] bg-slate-50 dark:bg-slate-800 z-50 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border-r border-slate-200 dark:border-slate-700"
                   onClick={() => handleSort('division')}
                 >
                   <div className="flex items-center gap-1">
@@ -615,9 +615,9 @@ export default function DriversPage() {
               {filteredAndSortedDrivers.map((driver) => (
                 <tr
                   key={driver.id}
-                  className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  className="group hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
-                  <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white sticky left-0 bg-white dark:bg-slate-800 z-0 border-r border-slate-200 dark:border-slate-700">
+                  <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white sticky left-0 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 z-20 border-r border-slate-200 dark:border-slate-700">
                     {driver.name}
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
@@ -637,7 +637,7 @@ export default function DriversPage() {
                   <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
                     {formatMobileNumber(driver.mobileNumber)}
                   </td>
-                  <td className="px-4 py-3 text-sm">
+                  <td className="px-4 py-3 text-sm sticky left-[200px] bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 z-20 border-r border-slate-200 dark:border-slate-700">
                     <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(driver.division)}`}>
                       {driver.division}
                     </span>
@@ -663,7 +663,7 @@ export default function DriversPage() {
                       ? new Date(driver.lastUpdated).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
                       : 'N/A'}
                   </td>
-                  <td className="px-4 py-3 text-sm sticky right-0 bg-white dark:bg-slate-800 z-0 border-l border-slate-200 dark:border-slate-700">
+                  <td className="px-4 py-3 text-sm sticky right-0 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 z-20 border-l border-slate-200 dark:border-slate-700">
                     <div className="flex items-center gap-2">
                       <button
                         onClick={(e) => {

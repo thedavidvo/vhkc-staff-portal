@@ -46,7 +46,7 @@ export interface Race {
 }
 
 export interface RaceDivisionResult {
-  division: Division;
+  division: Division | 'Open'; // division is now race_division, which can be "Open"
   results: DriverRaceResult[];
 }
 
@@ -61,6 +61,8 @@ export interface DriverRaceResult {
   overallPosition?: number;
   fastestLap: string;
   points: number;
+  resultsSheetId?: string; // Unique identifier for the results sheet
+  raceDivision?: Division | 'Open'; // UI division clicked (Open/Division 1/Division 2)
 }
 
 export interface Team {

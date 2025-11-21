@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Header from '@/components/Header';
 import PageLayout from '@/components/PageLayout';
 import SectionCard from '@/components/SectionCard';
@@ -75,12 +75,13 @@ interface RaceResult {
   date: string;
   driverId: string;
   driverName: string;
-  division: Division;
+  division: Division; // Race division
   position: number;
   fastestLap: string;
   points: number;
   raceType?: string;
   finalType?: string;
+  overallPosition?: number;
 }
 
 export default function ResultsPage() {
@@ -94,6 +95,7 @@ export default function ResultsPage() {
   const [sortBy, setSortBy] = useState<'position' | 'time' | 'points'>('position');
   const [drivers, setDrivers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [divisionChanges, setDivisionChanges] = useState<any[]>([]);
   
   // Helper function to parse time - time is in decimal format (e.g., 60.131)
   const parseTime = (timeStr: string): number => {
@@ -102,6 +104,95 @@ export default function ResultsPage() {
     const time = parseFloat(timeStr);
     return isNaN(time) ? Infinity : time;
   };
+
+  // Helper function to get driver's division at a specific point in time based on round
+  const getDriverDivisionAtRound = useCallback((driverId: string, roundId: string, roundNumber: number): Division | undefined => {
+      if (!driverId) {
+        return undefined;
+      }
+
+      // Fallback to current division
+      const driver = drivers.find(d => d.id === driverId);
+      const currentDivision = driver?.division;
+
+      if (!roundId || divisionChanges.length === 0) {
+        return currentDivision;
+      }
+
+      // Get all division changes for this driver
+      const driverChanges = divisionChanges.filter(c => c.driverId === driverId);
+      if (driverChanges.length === 0) {
+        return currentDivision;
+      }
+
+      // Get the target round for comparison
+      const targetRound = rounds.find(r => r.id === roundId);
+      const targetRoundNumber = targetRound?.roundNumber || roundNumber;
+      const isTargetPreSeason = roundId.startsWith('pre-season-');
+
+      // Sort changes by round number, with pre-season first (round 0)
+      const sortedChanges = [...driverChanges].sort((a, b) => {
+        const aIsPreSeason = a.roundId.startsWith('pre-season-');
+        const bIsPreSeason = b.roundId.startsWith('pre-season-');
+        
+        // Pre-season always comes first
+        if (aIsPreSeason && !bIsPreSeason) return -1;
+        if (!aIsPreSeason && bIsPreSeason) return 1;
+        if (aIsPreSeason && bIsPreSeason) return 0; // Both pre-season, order doesn't matter
+        
+        // Get round numbers for comparison
+        const aRound = rounds.find(r => r.id === a.roundId);
+        const bRound = rounds.find(r => r.id === b.roundId);
+        const aRoundNumber = aRound?.roundNumber || 0;
+        const bRoundNumber = bRound?.roundNumber || 0;
+        
+        return aRoundNumber - bRoundNumber;
+      });
+
+      // Find the most recent change that occurred at or before the target round
+      let mostRecentChange = null;
+      
+      for (const change of sortedChanges) {
+        const changeIsPreSeason = change.roundId.startsWith('pre-season-');
+        
+        // If target is pre-season, only consider pre-season changes
+        if (isTargetPreSeason) {
+          if (changeIsPreSeason) {
+            mostRecentChange = change;
+          }
+          continue;
+        }
+        
+        // If change is pre-season and target is not, this change applies to all rounds
+        if (changeIsPreSeason) {
+          mostRecentChange = change;
+          continue;
+        }
+        
+        // Compare round numbers for regular rounds
+        const changeRound = rounds.find(r => r.id === change.roundId);
+        const changeRoundNumber = changeRound?.roundNumber || 0;
+        
+        if (changeRoundNumber <= targetRoundNumber) {
+          mostRecentChange = change;
+        } else {
+          // Changes are sorted, so we can break once we exceed target
+          break;
+        }
+      }
+
+      // If we found a change, return the appropriate division
+      if (mostRecentChange) {
+        if (mostRecentChange.changeType === 'promotion' || mostRecentChange.changeType === 'demotion') {
+          return mostRecentChange.toDivision || currentDivision;
+        } else if (mostRecentChange.changeType === 'division_start' || mostRecentChange.changeType === 'mid_season_join') {
+          return mostRecentChange.divisionStart || currentDivision;
+        }
+      }
+
+      // Fallback to current division
+      return currentDivision;
+  }, [drivers, divisionChanges, rounds]);
 
   // Fetch rounds and race results
   useEffect(() => {
@@ -122,6 +213,13 @@ export default function ResultsPage() {
         if (driversResponse.ok) {
           const driversData = await driversResponse.json();
           setDrivers(driversData);
+        }
+        
+        // Fetch division changes
+        const divisionChangesResponse = await fetch(`/api/division-changes?seasonId=${selectedSeason.id}`);
+        if (divisionChangesResponse.ok) {
+          const divisionChangesData = await divisionChangesResponse.json();
+          setDivisionChanges(Array.isArray(divisionChangesData) ? divisionChangesData : []);
         }
         
         const roundsResponse = await fetch(`/api/rounds?seasonId=${selectedSeason.id}`);
@@ -445,10 +543,13 @@ export default function ResultsPage() {
                       Driver
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                      Division
+                      Driver Division
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                       Round
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                      Race Division
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                       Race Type
@@ -464,50 +565,62 @@ export default function ResultsPage() {
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                   {resultsWithOverallPosition.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+                      <td colSpan={9} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
                         No results found. Adjust your filters or add race results.
                       </td>
                     </tr>
                   ) : (
-                    resultsWithOverallPosition.map((result, index) => (
-                      <tr key={`${result.roundId}-${result.driverId}-${index}`} className="hover:bg-slate-50 dark:hover:bg-slate-800">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            {result.overallPosition === 1 && <Trophy className="w-4 h-4 text-amber-500" />}
-                            <span className="text-sm font-semibold text-slate-900 dark:text-white">
-                              {result.overallPosition}
+                    resultsWithOverallPosition.map((result, index) => {
+                      const driverDivision = getDriverDivisionAtRound(result.driverId, result.roundId, result.roundNumber);
+                      return (
+                        <tr key={`${result.roundId}-${result.driverId}-${index}`} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              {result.overallPosition === 1 && <Trophy className="w-4 h-4 text-amber-500" />}
+                              <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                                {result.overallPosition}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                              {result.position}
                             </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                            {result.position}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white">
-                          {result.driverName || 'Unknown Driver'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(result.division)}`}>
-                            {result.division}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
-                          Round {result.roundNumber}: {result.roundName}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${result.finalType ? getFinalTypeColor(result.finalType) : 'bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200'}`}>
-                            {formatRaceType(result.raceType, result.finalType)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm font-mono text-slate-600 dark:text-slate-400">
-                          {result.fastestLap || '-'}
-                        </td>
-                        <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white">
-                          {result.points}
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                          <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white">
+                            {result.driverName || 'Unknown Driver'}
+                          </td>
+                          <td className="px-4 py-3">
+                            {driverDivision ? (
+                              <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(driverDivision)}`}>
+                                {driverDivision}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-slate-400 dark:text-slate-500">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                            Round {result.roundNumber}: {result.roundName}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(result.division)}`}>
+                              {result.division}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${result.finalType ? getFinalTypeColor(result.finalType) : 'bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200'}`}>
+                              {formatRaceType(result.raceType, result.finalType)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm font-mono text-slate-600 dark:text-slate-400">
+                            {result.fastestLap || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white">
+                            {result.points}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

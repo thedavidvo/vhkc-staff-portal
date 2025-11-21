@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRaceResultsByRound, addRaceResult, updateRaceResult, deleteRaceResultsByRaceType, deleteRaceResult, deletePointsByRaceResult } from '@/lib/dbService';
+import { getRaceResultsByRound, addRaceResult, updateRaceResult, deleteRaceResultsByRaceType } from '@/lib/dbService';
 import { cache } from '@/lib/cache';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const roundId = searchParams.get('roundId');
+    const resultsSheetId = searchParams.get('resultsSheetId');
     
+    // Require roundId
     if (!roundId) {
       return NextResponse.json({ error: 'roundId required' }, { status: 400 });
     }
     
-    const cacheKey = `race-results:${roundId}`;
+    
+    const cacheKey = resultsSheetId 
+      ? `race-results:${roundId}:${resultsSheetId}` 
+      : `race-results:${roundId}`;
     
     // Try to get from cache first
     const cached = cache.get(cacheKey);
@@ -19,12 +24,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(cached);
     }
     
-    const results = await getRaceResultsByRound(roundId);
+    // Pass resultsSheetId to getRaceResultsByRound for efficient filtering at database level
+    const results = await getRaceResultsByRound(roundId, resultsSheetId ?? undefined);
+    
+    // Results are already filtered by resultsSheetId if provided
+    const filteredResults = results;
     
     // Cache results for 1 minute (race results change frequently)
-    cache.set(cacheKey, results, 1 * 60 * 1000);
+    cache.set(cacheKey, filteredResults, 1 * 60 * 1000);
     
-    return NextResponse.json(results);
+    return NextResponse.json(filteredResults);
   } catch (error) {
     console.error('Error in GET /api/race-results:', error);
     return NextResponse.json({ error: 'Failed to fetch race results' }, { status: 500 });
@@ -75,6 +84,10 @@ export async function PATCH(request: NextRequest) {
     // Invalidate cache for this round and related caches
     cache.invalidate(`race-results:${roundId}`);
     cache.invalidate(`round-results:${roundId}`);
+    // Also invalidate cache for specific resultsSheetId if available in existing result
+    if (existingResult?.resultsSheetId) {
+      cache.invalidate(`race-results:${roundId}:${existingResult.resultsSheetId}`);
+    }
     cache.invalidatePattern('drivers:');
     
     return NextResponse.json({ success: true });
@@ -93,6 +106,10 @@ export async function POST(request: NextRequest) {
     if (result.roundId) {
       cache.invalidate(`race-results:${result.roundId}`);
       cache.invalidate(`round-results:${result.roundId}`);
+      // Also invalidate cache for specific resultsSheetId if provided
+      if ((result as any).resultsSheetId) {
+        cache.invalidate(`race-results:${result.roundId}:${(result as any).resultsSheetId}`);
+      }
       // Invalidate drivers cache if we have the season
       cache.invalidatePattern('drivers:');
     }
@@ -130,6 +147,10 @@ export async function PUT(request: NextRequest) {
     // Invalidate cache for this round and related caches
     cache.invalidate(`race-results:${roundId}`);
     cache.invalidate(`round-results:${roundId}`);
+    // Also invalidate cache for specific resultsSheetId if provided in the result
+    if (result.resultsSheetId) {
+      cache.invalidate(`race-results:${roundId}:${result.resultsSheetId}`);
+    }
     cache.invalidatePattern('drivers:');
     
     return NextResponse.json({ success: true });
@@ -143,30 +164,30 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const roundId = searchParams.get('roundId');
-    const raceType = searchParams.get('raceType');
     const driverId = searchParams.get('driverId');
+    const raceType = searchParams.get('raceType');
     const finalType = searchParams.get('finalType');
     
-    if (!roundId) {
-      return NextResponse.json({ error: 'roundId required' }, { status: 400 });
-    }
-    
-    if (driverId) {
-      await deleteRaceResult(roundId, driverId, raceType ?? undefined, finalType ?? undefined);
+    // If driverId is provided, delete specific race result
+    if (roundId && driverId) {
+      const { deleteRaceResult, deletePointsByRaceResult } = await import('@/lib/dbService');
+      await deleteRaceResult(roundId, driverId, raceType || undefined, finalType || undefined);
+      
       // Also delete associated points
-      await deletePointsByRaceResult(roundId, driverId, raceType ?? undefined, finalType ?? undefined);
-    } else {
-      if (!raceType) {
-        return NextResponse.json({ error: 'raceType required when driverId is not provided' }, { status: 400 });
+      if (raceType) {
+        await deletePointsByRaceResult(roundId, driverId, raceType, finalType || undefined);
       }
+    } else if (roundId && raceType) {
+      // Delete all race results of a specific type
       await deleteRaceResultsByRaceType(roundId, raceType);
+    } else {
+      return NextResponse.json({ error: 'roundId and either driverId or raceType required' }, { status: 400 });
     }
     
     // Invalidate cache for this round and related caches
     cache.invalidate(`race-results:${roundId}`);
     cache.invalidate(`round-results:${roundId}`);
     cache.invalidatePattern('drivers:');
-    cache.invalidatePattern('points:');
     
     return NextResponse.json({ success: true });
   } catch (error) {

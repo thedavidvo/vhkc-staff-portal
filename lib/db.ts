@@ -88,14 +88,29 @@ export async function initializeDatabase() {
         race_type TEXT DEFAULT 'qualification',
         race_name TEXT,
         final_type TEXT,
+        race_division TEXT,
+        results_sheet_id TEXT,
         confirmed BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(round_id, driver_id, race_type, final_type)
       )
     `;
 
+    // Add race_division and results_sheet_id columns if they don't exist (for existing databases)
+    // This must happen BEFORE creating indexes on these columns
+    await sql`
+      ALTER TABLE race_results 
+      ADD COLUMN IF NOT EXISTS race_division TEXT
+    `;
+    await sql`
+      ALTER TABLE race_results 
+      ADD COLUMN IF NOT EXISTS results_sheet_id TEXT
+    `;
+
     await sql`CREATE INDEX IF NOT EXISTS idx_race_results_round_id ON race_results(round_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_race_results_driver_id ON race_results(driver_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_race_results_race_division ON race_results(race_division)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_race_results_results_sheet_id ON race_results(results_sheet_id)`;
 
     await sql`
       CREATE TABLE IF NOT EXISTS locations (
@@ -162,12 +177,81 @@ export async function initializeDatabase() {
         round_id TEXT NOT NULL,
         driver_id TEXT NOT NULL,
         driver_name TEXT NOT NULL,
-        from_division TEXT NOT NULL,
-        to_division TEXT NOT NULL,
-        change_type TEXT NOT NULL CHECK (change_type IN ('promotion', 'demotion')),
+        from_division TEXT,
+        to_division TEXT,
+        division_start TEXT,
+        change_type TEXT NOT NULL CHECK (change_type IN ('promotion', 'demotion', 'division_start', 'mid_season_join')),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `;
+
+    // Add division_start column if it doesn't exist
+    try {
+      await sql`
+        ALTER TABLE division_changes 
+        ADD COLUMN IF NOT EXISTS division_start TEXT
+      `;
+      console.log('✓ Added division_start column to division_changes');
+    } catch (error: any) {
+      console.warn('Could not add division_start column:', error.message);
+    }
+
+    // Make from_division and to_division nullable if they're not already
+    try {
+      // Check if column exists and is NOT NULL, then make it nullable
+      const fromDivisionCheck = await sql`
+        SELECT is_nullable 
+        FROM information_schema.columns 
+        WHERE table_name = 'division_changes' 
+        AND column_name = 'from_division'
+      ` as any[];
+      
+      if (fromDivisionCheck.length > 0 && fromDivisionCheck[0].is_nullable === 'NO') {
+        await sql`ALTER TABLE division_changes ALTER COLUMN from_division DROP NOT NULL`;
+        console.log('✓ Made from_division nullable in division_changes');
+      }
+    } catch (error: any) {
+      if (!error.message?.includes('does not exist')) {
+        console.warn('Could not alter from_division column:', error.message);
+      }
+    }
+    
+    try {
+      const toDivisionCheck = await sql`
+        SELECT is_nullable 
+        FROM information_schema.columns 
+        WHERE table_name = 'division_changes' 
+        AND column_name = 'to_division'
+      ` as any[];
+      
+      if (toDivisionCheck.length > 0 && toDivisionCheck[0].is_nullable === 'NO') {
+        await sql`ALTER TABLE division_changes ALTER COLUMN to_division DROP NOT NULL`;
+        console.log('✓ Made to_division nullable in division_changes');
+      }
+    } catch (error: any) {
+      if (!error.message?.includes('does not exist')) {
+        console.warn('Could not alter to_division column:', error.message);
+      }
+    }
+
+    // Update the check constraint to include new change types
+    try {
+      // Drop existing constraint if it exists
+      await sql`ALTER TABLE division_changes DROP CONSTRAINT IF EXISTS division_changes_change_type_check`;
+      
+      // Add new constraint with all change types
+      await sql`
+        ALTER TABLE division_changes 
+        ADD CONSTRAINT division_changes_change_type_check 
+        CHECK (change_type IN ('promotion', 'demotion', 'division_start', 'mid_season_join'))
+      `;
+      console.log('✓ Updated change_type constraint in division_changes');
+    } catch (error: any) {
+      // Constraint might already exist or table might not exist yet
+      if (!error.message?.includes('already exists') && !error.message?.includes('does not exist')) {
+        console.warn('Could not update constraint:', error.message);
+      }
+    }
 
     await sql`CREATE INDEX IF NOT EXISTS idx_division_changes_round_id ON division_changes(round_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_division_changes_driver_id ON division_changes(driver_id)`;

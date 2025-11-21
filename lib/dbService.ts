@@ -198,8 +198,9 @@ export async function getRoundById(roundId: string): Promise<Round | null> {
 }
 
 export async function addRound(round: Round, seasonId: string): Promise<void> {
-  const locationIdValue = (round.locationId && round.locationId.trim() !== '') 
-    ? round.locationId 
+  // Handle empty strings, undefined, and null as null for location_id
+  const locationIdValue = (round.locationId && typeof round.locationId === 'string' && round.locationId.trim() !== '') 
+    ? round.locationId.trim() 
     : null;
   
   console.log(`addRound called:`, {
@@ -208,6 +209,7 @@ export async function addRound(round: Round, seasonId: string): Promise<void> {
     roundNumber: round.roundNumber,
     date: round.date,
     locationId: round.locationId,
+    locationIdType: typeof round.locationId,
     locationIdValue,
     status: round.status
   });
@@ -247,9 +249,9 @@ export async function addRound(round: Round, seasonId: string): Promise<void> {
 }
 
 export async function updateRound(round: Round, seasonId: string): Promise<void> {
-  // Handle empty strings and undefined as null for location_id
-  const locationIdValue = (round.locationId && round.locationId.trim() !== '') 
-    ? round.locationId 
+  // Handle empty strings, undefined, and null as null for location_id
+  const locationIdValue = (round.locationId && typeof round.locationId === 'string' && round.locationId.trim() !== '') 
+    ? round.locationId.trim() 
     : null;
   
   console.log(`updateRound called:`, {
@@ -258,6 +260,7 @@ export async function updateRound(round: Round, seasonId: string): Promise<void>
     roundNumber: round.roundNumber,
     date: round.date,
     locationId: round.locationId,
+    locationIdType: typeof round.locationId,
     locationIdValue,
     status: round.status
   });
@@ -274,7 +277,7 @@ export async function updateRound(round: Round, seasonId: string): Promise<void>
     
     let result;
     if (hasLocationIdColumn) {
-      // Use location_id column
+      // Use location_id column - explicitly set to null if no locationId
       result = await sql`
         UPDATE rounds
         SET round_number = ${round.roundNumber},
@@ -283,6 +286,7 @@ export async function updateRound(round: Round, seasonId: string): Promise<void>
             status = ${round.status || 'upcoming'}
         WHERE id = ${round.id} AND season_id = ${seasonId}
       `;
+      console.log(`updateRound: Updated round ${round.id} with location_id = ${locationIdValue}`);
     } else {
       // Fallback to location column if location_id doesn't exist
       console.warn('location_id column not found, using location column as fallback');
@@ -436,38 +440,52 @@ export interface DriverRaceResult {
 }
 
 export interface RaceDivisionResult {
-  division: Division;
+  division: Division | 'Open'; // division is now race_division, which can be "Open"
   results: (DriverRaceResult & { raceType?: string; raceName?: string; finalType?: string; confirmed?: boolean })[];
 }
 
-export async function getRaceResultsByRound(roundId: string): Promise<RaceDivisionResult[]> {
-  const results = await sql`
-    SELECT * FROM race_results
-    WHERE round_id = ${roundId}
-    ORDER BY division, grid_position
-  ` as any[];
+export async function getRaceResultsByRound(roundId: string, resultsSheetId?: string): Promise<RaceDivisionResult[]> {
+  // Build query with optional resultsSheetId filter
+  let query;
+  if (resultsSheetId) {
+    query = sql`
+      SELECT * FROM race_results
+      WHERE round_id = ${roundId} AND results_sheet_id = ${resultsSheetId}
+      ORDER BY race_division, grid_position
+    `;
+  } else {
+    query = sql`
+      SELECT * FROM race_results
+      WHERE round_id = ${roundId}
+      ORDER BY race_division, grid_position
+    `;
+  }
+  
+  const results = await query as any[];
   
   // Get driver names
   const drivers = await getDrivers();
   const driverMap = new Map(drivers.map(d => [d.id, d]));
   
-  // Group by division
+  // Group by race_division (the division the race was run in, not the driver's current division)
   const divisionMap = new Map<string, any[]>();
   
   for (const result of results) {
-    const division = result.division as Division;
-    if (!divisionMap.has(division)) {
-      divisionMap.set(division, []);
+    // Use race_division for grouping, fallback to division if race_division is null
+    // race_division can be "Open" which is not a valid Division type
+    const raceDivision = (result.race_division || result.division) as Division | 'Open';
+    if (!divisionMap.has(raceDivision)) {
+      divisionMap.set(raceDivision, []);
     }
     
     const driver = driverMap.get(result.driver_id);
     
-    divisionMap.get(division)!.push({
+    divisionMap.get(raceDivision)!.push({
       driverId: result.driver_id,
       driverName: driver?.name || 'Unknown Driver',
       driverAlias: result.driver_alias || '',
       kartNumber: result.kart_number || '',
-      division: result.division,
+      division: result.division, // Driver's actual division
       position: result.grid_position || 0,
       gridPosition: result.grid_position || 0,
       overallPosition: result.overall_position || 0,
@@ -476,11 +494,13 @@ export async function getRaceResultsByRound(roundId: string): Promise<RaceDivisi
       raceName: result.race_name || '',
       finalType: result.final_type || '',
       confirmed: result.confirmed || false,
+      resultsSheetId: result.results_sheet_id || undefined,
+      raceDivision: result.race_division || result.division,
     });
   }
   
   return Array.from(divisionMap.entries()).map(([division, results]) => ({
-    division: division as Division,
+    division: division as Division | 'Open',
     results,
   }));
 }
@@ -491,11 +511,25 @@ export async function addRaceResult(
   // Ensure kartNumber is explicitly set (handle null/undefined)
   const kartNumber = result.kartNumber != null ? String(result.kartNumber) : '';
   
+  // Use provided resultsSheetId and raceDivision
+  // resultsSheetId should be provided from frontend with format: seasonId-roundId-raceDivision-raceType-finalType
+  const resultsSheetId = (result as any).resultsSheetId;
+  const raceDivision = (result as any).raceDivision || result.division;
+  
+  // Fallback: generate resultsSheetId if not provided (should not happen in normal flow)
+  // Remove all spaces to make it one continuous string
+  const cleanRoundId = (result.roundId || '').replace(/\s+/g, '');
+  const cleanRaceDivision = (raceDivision || result.division || '').replace(/\s+/g, '');
+  const cleanRaceType = (result.raceType || 'qualification').replace(/\s+/g, '');
+  const cleanFinalType = (result.finalType || '').replace(/\s+/g, '');
+  const finalResultsSheetId = resultsSheetId || 
+    `${cleanRoundId}${cleanRaceDivision}${cleanRaceType}${cleanFinalType}`;
+  
   await sql`
     INSERT INTO race_results (
       round_id, driver_id, driver_alias, division, kart_number,
       grid_position, overall_position, fastest_lap,
-      race_type, race_name, final_type, confirmed
+      race_type, race_name, final_type, race_division, results_sheet_id, confirmed
     ) VALUES (
       ${result.roundId}, ${result.driverId}, ${result.driverAlias || ''},
       ${result.division}, ${kartNumber},
@@ -503,7 +537,7 @@ export async function addRaceResult(
       ${result.overallPosition || result.gridPosition || result.position || 0},
       ${result.fastestLap || ''},
       ${result.raceType || 'qualification'}, ${result.raceName || ''},
-      ${result.finalType || ''}, ${result.confirmed || false}
+      ${result.finalType || ''}, ${raceDivision}, ${finalResultsSheetId}, ${result.confirmed || false}
     )
     ON CONFLICT (round_id, driver_id, race_type, final_type)
     DO UPDATE SET
@@ -514,6 +548,8 @@ export async function addRaceResult(
       overall_position = EXCLUDED.overall_position,
       fastest_lap = EXCLUDED.fastest_lap,
       race_name = EXCLUDED.race_name,
+      race_division = EXCLUDED.race_division,
+      results_sheet_id = EXCLUDED.results_sheet_id,
       confirmed = EXCLUDED.confirmed
   `;
 }
@@ -529,6 +565,18 @@ export async function updateRaceResult(
   // Ensure kartNumber is explicitly set (handle null/undefined)
   const kartNumber = result.kartNumber != null ? String(result.kartNumber) : '';
   
+  const resultsSheetId = (result as any).resultsSheetId;
+  const raceDivision = (result as any).raceDivision || result.division;
+  
+  // Fallback: generate resultsSheetId if not provided
+  // Remove all spaces to make it one continuous string
+  const cleanRoundId = (roundId || '').replace(/\s+/g, '');
+  const cleanRaceDivision = (raceDivision || result.division || '').replace(/\s+/g, '');
+  const cleanRaceType = (raceType || 'qualification').replace(/\s+/g, '');
+  const cleanFinalType = (finalType || '').replace(/\s+/g, '');
+  const finalResultsSheetId = resultsSheetId || 
+    `${cleanRoundId}${cleanRaceDivision}${cleanRaceType}${cleanFinalType}`;
+  
   await sql`
     UPDATE race_results
     SET driver_alias = ${result.driverAlias || ''},
@@ -540,6 +588,8 @@ export async function updateRaceResult(
         race_type = ${raceType},
         race_name = ${result.raceName || ''},
         final_type = ${finalType},
+        race_division = ${raceDivision},
+        results_sheet_id = ${finalResultsSheetId || null},
         confirmed = ${result.confirmed || false}
     WHERE round_id = ${roundId}
       AND driver_id = ${driverId}
@@ -849,23 +899,29 @@ export interface DivisionChange {
   roundId: string;
   driverId: string;
   driverName: string;
-  fromDivision: Division;
-  toDivision: Division;
-  changeType: 'promotion' | 'demotion';
+  fromDivision?: Division;
+  toDivision?: Division;
+  divisionStart?: Division; // For division_start and mid_season_join
+  changeType: 'promotion' | 'demotion' | 'division_start' | 'mid_season_join';
   createdAt: string;
+  pointsAdjustments?: Record<string, number>; // roundId -> points adjustment
 }
 
 export async function addDivisionChange(change: DivisionChange): Promise<void> {
   await sql`
     INSERT INTO division_changes (
       id, season_id, round_id, driver_id, driver_name,
-      from_division, to_division, change_type, created_at
+      from_division, to_division, division_start, change_type, created_at
     ) VALUES (
       ${change.id}, ${change.seasonId}, ${change.roundId}, ${change.driverId},
-      ${change.driverName}, ${change.fromDivision}, ${change.toDivision},
-      ${change.changeType}, ${change.createdAt || new Date().toISOString()}
+      ${change.driverName}, ${change.fromDivision || null}, ${change.toDivision || null}, 
+      ${change.divisionStart || null}, ${change.changeType}, ${change.createdAt || new Date().toISOString()}
     )
   `;
+  
+  // Note: Points adjustments are handled separately by the API
+  // The pointsAdjustments field is stored but not processed here
+  // to avoid circular dependencies and keep the API layer responsible
 }
 
 export async function getDivisionChangesByRound(roundId: string): Promise<DivisionChange[]> {
@@ -881,9 +937,10 @@ export async function getDivisionChangesByRound(roundId: string): Promise<Divisi
     roundId: c.round_id,
     driverId: c.driver_id,
     driverName: c.driver_name,
-    fromDivision: c.from_division as Division,
-    toDivision: c.to_division as Division,
-    changeType: c.change_type as 'promotion' | 'demotion',
+    fromDivision: c.from_division as Division | undefined,
+    toDivision: c.to_division as Division | undefined,
+    divisionStart: c.division_start as Division | undefined,
+    changeType: c.change_type as 'promotion' | 'demotion' | 'division_start' | 'mid_season_join',
     createdAt: c.created_at || '',
   }));
 }
@@ -901,9 +958,10 @@ export async function getDivisionChangesBySeason(seasonId: string): Promise<Divi
     roundId: c.round_id,
     driverId: c.driver_id,
     driverName: c.driver_name,
-    fromDivision: c.from_division as Division,
-    toDivision: c.to_division as Division,
-    changeType: c.change_type as 'promotion' | 'demotion',
+    fromDivision: c.from_division as Division | undefined,
+    toDivision: c.to_division as Division | undefined,
+    divisionStart: c.division_start as Division | undefined,
+    changeType: c.change_type as 'promotion' | 'demotion' | 'division_start' | 'mid_season_join',
     createdAt: c.created_at || '',
   }));
 }
