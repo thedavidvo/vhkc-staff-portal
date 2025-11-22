@@ -132,69 +132,43 @@ const filterDivisionResultsBySelection = (
   if (!selection) return divisionResults;
   
   const { raceType, finalType } = parseRaceSelection(selection);
+  let filtered = divisionResults.filter(
+    (r: any) => (r.raceType || 'qualification').toLowerCase() === raceType.toLowerCase()
+  );
   
-  // ALWAYS filter by raceName to prevent cross-contamination between different races
-  // that share the same raceType and finalType
-  const filtered = divisionResults.filter((r: any) => {
-    const resultRaceType = (r.raceType || 'qualification').toLowerCase();
-    const resultFinalType = r.finalType || '';
-    
-    // First check: raceType MUST match
-    if (resultRaceType !== raceType.toLowerCase()) {
-      return false;
-    }
-    
-    // Second check: finalType must match if specified
     if (raceType === 'qualification' && finalType) {
-      if (resultFinalType !== finalType) {
-        return false;
-      }
+    filtered = filtered.filter((r: any) => (r.finalType || '') === finalType);
     } else if ((raceType === 'heat' || raceType === 'final') && finalType) {
-      if (resultFinalType.toUpperCase() !== finalType.toUpperCase()) {
+    filtered = filtered.filter(
+      (r: any) => (r.finalType || '').toUpperCase() === finalType.toUpperCase()
+    );
+  }
+  
+  if (filtered.length === 0) {
+    // Fallback: filter by raceName if the above filters didn't match
+    const fallbackTypeToUse = selection;
+    const { raceType: parsedRaceType, finalType: parsedFinalType } = parseRaceSelection(fallbackTypeToUse);
+    const typeRaceType = parsedRaceType.toLowerCase();
+    
+    filtered = divisionResults.filter((r: any) => {
+      // Check raceType matches
+      if (r.raceType?.toLowerCase() !== typeRaceType) {
         return false;
       }
-    }
-    
-    // Third check: raceName must match (CRITICAL to prevent loading different races)
-    // Database stores plain names like "Final B", "Heat A"
-    // selection might be "Final B - Final", "Heat A - Heat", or just "Final B", "Heat A"
-    
-    // Try exact match first
-    if (r.raceName === selection) {
-      return true;
-    }
-    
-    // Try matching if selection has "- Type" suffix but database raceName doesn't
-    const selectionMatch = selection.match(/^(.+)\s*-\s*(\w+)$/);
-    if (selectionMatch) {
-      const baseName = selectionMatch[1].trim();
-      if (baseName === r.raceName) {
-        return true;
+      
+      // CRITICAL: Also filter by finalType
+      if (parsedFinalType) {
+        const resultFinalType = r.finalType || '';
+        if (parsedRaceType === 'qualification') {
+          return resultFinalType === parsedFinalType; // "1", "2", "3" must match exactly
+        } else if (parsedRaceType === 'heat' || parsedRaceType === 'final') {
+          return resultFinalType.toUpperCase() === parsedFinalType.toUpperCase(); // "A", "B" case-insensitive
+        }
       }
-    }
-    
-    // Try matching if database raceName has "- Type" suffix but selection doesn't
-    const raceNameMatch = (r.raceName || '').match(/^(.+)\s*-\s*(\w+)$/);
-    if (raceNameMatch) {
-      const baseName = raceNameMatch[1].trim();
-      if (baseName === selection) {
+      
         return true;
-      }
-    }
-    
-    // Try normalized legacy format "Race (type)" -> "Race - Type"
-    const oldFormatMatch = (r.raceName || '').match(/^(.+)\s*\((\w+)\)$/);
-    if (oldFormatMatch) {
-      const capitalizedRaceType =
-        oldFormatMatch[2].charAt(0).toUpperCase() + oldFormatMatch[2].slice(1);
-      const normalizedName = `${oldFormatMatch[1]} - ${capitalizedRaceType}`;
-      if (normalizedName === selection || oldFormatMatch[1].trim() === selection) {
-        return true;
-      }
-    }
-    
-    return false;
-  });
+    });
+  }
   
   return filtered;
 };
@@ -309,18 +283,14 @@ export default function RacesPage() {
   const [selectedFinalType, setSelectedFinalType] = useState<string>('A');
   const [selectedGroup, setSelectedGroup] = useState<string>('1');
   const shouldLoadResultsRef = useRef(true); // Track if we should load results from saved data
-  const focusAfterSortRef = useRef<{ rowIdentifier: string; field: keyof DriverRaceResult } | null>(null); // Track row to focus after sorting
 
   // Fetch race results for a specific round
-  const fetchRaceResults = async (roundId: string, resultsSheetId?: string, raceName?: string) => {
+  const fetchRaceResults = async (roundId: string, resultsSheetId?: string) => {
     try {
-      // Always include roundId, and optionally include resultsSheetId and raceName for specific sheet filtering
+      // Always include roundId, and optionally include resultsSheetId for specific sheet filtering
       let url = `/api/race-results?roundId=${roundId}`;
       if (resultsSheetId) {
         url += `&resultsSheetId=${resultsSheetId}`;
-      }
-      if (raceName) {
-        url += `&raceName=${encodeURIComponent(raceName)}`;
       }
       const response = await fetch(url);
       if (response.ok) {
@@ -372,12 +342,94 @@ export default function RacesPage() {
       let divisionResults: any[] = [];
       let resultsSheetId: string | null = null;
       
+      if (selectedType && shouldLoadResultsRef.current) {
+        // Look for results with the same raceType/finalType ONLY in the selected division
+        // to find the resultsSheetId
         // Handle "Open" division - if selectedDivision is one of openDivisions, also check for "Open" race_division
         let divisionResult = selectedEvent.results.find((r: any) => r.division === selectedDivision);
         if (!divisionResult && isOpenDivision(selectedDivision)) {
           divisionResult = selectedEvent.results.find((r: any) => r.division === 'Open');
         }
+      if (divisionResult && divisionResult.results) {
+          const { raceType, finalType } = parseRaceSelection(selectedType);
+          const matchingResult = divisionResult.results.find((r: any) => 
+            (r.raceType || 'qualification').toLowerCase() === raceType.toLowerCase() &&
+            (r.finalType || '') === (finalType || '')
+          );
+          
+          if (matchingResult && matchingResult.resultsSheetId) {
+            resultsSheetId = matchingResult.resultsSheetId;
+          }
+        }
+        
+        // If we found a resultsSheetId, fetch all results for that sheet
+        if (resultsSheetId) {
+          console.log('Loading results by resultsSheetId:', resultsSheetId);
+          const loadSheetResults = async () => {
+            const sheetResults = await fetchRaceResults(selectedEvent.id, resultsSheetId!);
+            
+            // Flatten results from the selected division only
+            // Handle "Open" division - if selectedDivision is one of openDivisions, also check for "Open" race_division
+            const allSheetResults: any[] = [];
+            sheetResults.forEach((divisionResult: any) => {
+              // Check if this division result matches the selected division
+              const matchesDivision = divisionResult.division === selectedDivision;
+              // Also check if selectedDivision is an open division and race_division is "Open"
+              const matchesOpen = isOpenDivision(selectedDivision) && divisionResult.division === 'Open';
+              
+              if (divisionResult.results && (matchesDivision || matchesOpen)) {
+                allSheetResults.push(...divisionResult.results);
+              }
+            });
+            
+            // Extract unique race types from sheet results in the selected division
+            const uniqueRaceTypes = new Set<string>();
+            types.forEach(type => uniqueRaceTypes.add(type));
+            allSheetResults.forEach((result: any) => {
+              if (result.raceName && result.raceName.trim() !== '') {
+                let raceName = result.raceName;
+                const invalidPattern = /^(\w+)\s*\((\1)\)$/i;
+                if (invalidPattern.test(raceName)) {
+                  return;
+                }
+                const oldFormatMatch = raceName.match(/^(.+)\s*\((\w+)\)$/);
+                if (oldFormatMatch) {
+                  const capitalizedRaceType = oldFormatMatch[2].charAt(0).toUpperCase() + oldFormatMatch[2].slice(1);
+                  raceName = `${oldFormatMatch[1]} - ${capitalizedRaceType}`;
+                } else {
+                  const newFormatMatch = raceName.match(/^(.+)\s*-\s*(\w+)$/);
+                  if (newFormatMatch) {
+                    const capitalizedRaceType = newFormatMatch[2].charAt(0).toUpperCase() + newFormatMatch[2].slice(1);
+                    raceName = `${oldFormatMatch[1]} - ${capitalizedRaceType}`;
+                  }
+                }
+                uniqueRaceTypes.add(raceName);
+              }
+            });
+            
+            const existingTypes = Array.from(uniqueRaceTypes);
+            setTypes(existingTypes);
+            
+            // Filter by selectedType (results are already filtered by selectedDivision)
+            const filteredResults = filterDivisionResultsBySelection(allSheetResults, selectedType);
+            // Sort results based on race type
+            const sortedResults = sortRaceResults(filteredResults, selectedType);
+            setDriverResults(sortedResults.length > 0 ? [...sortedResults] : []);
+            shouldLoadResultsRef.current = false;
+          };
+          
+          loadSheetResults();
+          return; // Exit early, we're fetching by sheet ID
+        }
+      }
       
+      // Fallback: use division-based filtering if no resultsSheetId found
+      // Handle "Open" division - if selectedDivision is one of openDivisions, also check for "Open" race_division
+      let divisionResult = selectedEvent.results.find((r: any) => r.division === selectedDivision);
+      if (!divisionResult && isOpenDivision(selectedDivision)) {
+        // Also check for "Open" race_division
+        divisionResult = selectedEvent.results.find((r: any) => r.division === 'Open');
+      }
       if (divisionResult && divisionResult.results) {
         divisionResults = divisionResult.results || [];
         
@@ -467,324 +519,40 @@ export default function RacesPage() {
         const existingTypes = Array.from(uniqueRaceTypesForSelection);
         
         // Auto-select the first type if none is selected
-        const newSelectedType = existingTypes[existingTypes.length - 1] || existingTypes[0] || null;
         if (!selectedType || !existingTypes.includes(selectedType)) {
           // If we have manually added types, prefer keeping the last selected one
           // Otherwise select the first one
-          if (newSelectedType) {
-            setSelectedType(newSelectedType);
-          }
+          setSelectedType(existingTypes[existingTypes.length - 1] || existingTypes[0] || null);
         }
         
-        // Use the computed type directly to avoid race conditions with setState
-        const typeToUse = selectedType && existingTypes.includes(selectedType) ? selectedType : newSelectedType;
-        
-        // Now try to find resultsSheetId using the type we'll actually use
-        if (typeToUse && shouldLoadResultsRef.current && divisionResult && divisionResult.results) {
-          const { raceType, finalType } = parseRaceSelection(typeToUse);
-          console.log('Looking for resultsSheetId. typeToUse:', typeToUse, 'raceType:', raceType, 'finalType:', finalType);
-          console.log('Available results:', divisionResult.results.map((r: any) => ({ raceName: r.raceName, raceType: r.raceType, finalType: r.finalType })));
-          
-          // CRITICAL: Also match by raceName to prevent loading the wrong race's sheet
-          const matchingResult = divisionResult.results.find((r: any) => {
-            // Must match raceType
-            if ((r.raceType || 'qualification').toLowerCase() !== raceType.toLowerCase()) {
-              return false;
-            }
-            
-            // Must match finalType
-            if ((r.finalType || '') !== (finalType || '')) {
-              return false;
-            }
-            
-            // Must match raceName (exact or normalized)
-            const resultRaceName = (r as any).raceName;
-            
-            // Try exact match first
-            if (resultRaceName === typeToUse) {
-              console.log('✓ Exact match found:', resultRaceName);
-              return true;
-            }
-            
-            // Try matching if typeToUse has "- Type" suffix but database raceName doesn't
-            // e.g., typeToUse = "Final B - Final", raceName = "Final B"
-            const typeToUseMatch = typeToUse.match(/^(.+)\s*-\s*(\w+)$/);
-            if (typeToUseMatch) {
-              const baseName = typeToUseMatch[1].trim();
-              if (baseName === resultRaceName) {
-                console.log('✓ Base name match found:', resultRaceName, '(typeToUse had suffix:', typeToUse, ')');
-                return true;
-              }
-            }
-            
-            // Try matching if database raceName has "- Type" suffix but typeToUse doesn't
-            const raceNameMatch = (resultRaceName || '').match(/^(.+)\s*-\s*(\w+)$/);
-            if (raceNameMatch) {
-              const baseName = raceNameMatch[1].trim();
-              if (baseName === typeToUse) {
-                console.log('✓ Base name match found:', resultRaceName, '(raceName had suffix)');
-                return true;
-              }
-            }
-            
-            // Try normalized legacy format "Race (type)" -> "Race - Type"
-            const oldFormatMatch = (resultRaceName || '').match(/^(.+)\s*\((\w+)\)$/);
-            if (oldFormatMatch) {
-              const capitalizedRaceType = oldFormatMatch[2].charAt(0).toUpperCase() + oldFormatMatch[2].slice(1);
-              const normalizedName = `${oldFormatMatch[1]} - ${capitalizedRaceType}`;
-              if (normalizedName === typeToUse || oldFormatMatch[1].trim() === typeToUse) {
-                console.log('✓ Normalized legacy match found:', resultRaceName, '→', normalizedName);
-                return true;
-              }
-            }
-            
-            return false;
-          });
-          
-          if (matchingResult && (matchingResult as any).resultsSheetId) {
-            console.log('✓ Found resultsSheetId:', (matchingResult as any).resultsSheetId, 'for race:', (matchingResult as any).raceName);
-            resultsSheetId = (matchingResult as any).resultsSheetId;
-          } else {
-            console.log('✗ No matching result found for typeToUse:', typeToUse);
-          }
-        }
-        
-        // If we found a resultsSheetId, fetch all results for that sheet
-        if (resultsSheetId && typeToUse) {
-          console.log('Loading results by resultsSheetId:', resultsSheetId, 'raceName:', typeToUse);
-          const loadSheetResults = async () => {
-            // CRITICAL: Pass raceName to filter at database level and prevent cross-contamination
-            const sheetResults = await fetchRaceResults(selectedEvent.id, resultsSheetId!, typeToUse);
-            
-            // Parse the selected race type to filter by
-            const { raceType: selectedRaceType, finalType: selectedFinalType } = parseRaceSelection(typeToUse);
-            
-            // Flatten results from the selected division only, and filter by race type
-            // Handle "Open" division - if selectedDivision is one of openDivisions, also check for "Open" race_division
-            const allSheetResults: any[] = [];
-            sheetResults.forEach((divisionResult: any) => {
-              // Check if this division result matches the selected division
-              // Use race_division (raceDivision) for matching, not the driver's division
-              const raceDivision = divisionResult.division; // This is the race_division from the API
-              
-              // For non-open divisions, ONLY process divisionResults where raceDivision exactly matches selectedDivision
-              // For open divisions, also check for 'Open' race_division
-              const matchesDivision = !isOpenDivision(selectedDivision) && raceDivision === selectedDivision;
-              const matchesOpen = isOpenDivision(selectedDivision) && raceDivision === 'Open';
-              
-              // Only process division results that match the selected division
-              if (!matchesDivision && !matchesOpen) {
-                return; // Skip this divisionResult - it doesn't match
-              }
-              
-              if (divisionResult.results) {
-                // Filter results by race type and final type FIRST to prevent cross-contamination
-                const filteredByRaceType = divisionResult.results.filter((result: any) => {
-                  const resultRaceType = (result.raceType || 'qualification').toLowerCase();
-                  const resultFinalType = result.finalType || '';
-                  
-                  // Must match the selected race type - this is CRITICAL for preventing cross-contamination
-                  if (resultRaceType !== selectedRaceType.toLowerCase()) {
-                    return false;
-                  }
-                  
-                  // For qualification with group, must match finalType
-                  if (selectedRaceType === 'qualification' && selectedFinalType) {
-                    return resultFinalType === selectedFinalType;
-                  }
-                  
-                  // For heat and final, must match finalType if specified
-                  if ((selectedRaceType === 'heat' || selectedRaceType === 'final') && selectedFinalType) {
-                    return resultFinalType.toUpperCase() === selectedFinalType.toUpperCase();
-                  }
-                  
-                  // If no finalType specified, include all results of that race type
-                  return true;
-                });
-                
-                // For open divisions, include filtered results from the 'Open' divisionResult
-                // For non-open divisions (like Division 2), also verify each result's raceDivision matches
-                if (isOpenDivision(selectedDivision) && raceDivision === 'Open') {
-                  // When selectedDivision is an open division and we're looking at 'Open' race_division results,
-                  // include filtered results from this divisionResult
-                  allSheetResults.push(...filteredByRaceType);
-                } else {
-                  // For exact division matches (like Division 2), filter by result's raceDivision AND race type
-                  // IMPORTANT: Only use raceDivision, NOT result.division (driver's division), to prevent cross-contamination
-                  const filteredResults = filteredByRaceType.filter((result: any) => {
-                    // For non-open divisions, ONLY use raceDivision (never fall back to division)
-                    // This ensures we're filtering by the division the race was run in, not the driver's current division
-                    const resultRaceDivision = result.raceDivision;
-                    if (!resultRaceDivision) {
-                      // If raceDivision is missing, skip this result to prevent cross-contamination
-                      return false;
-                    }
-                    // Ensure result's raceDivision exactly matches selectedDivision for non-open divisions
-                    return resultRaceDivision === selectedDivision;
-                  });
-                  allSheetResults.push(...filteredResults);
-                }
-              }
-            });
-            
-            // Extract unique race types from sheet results in the selected division
-            const uniqueRaceTypes = new Set<string>();
-            types.forEach(type => uniqueRaceTypes.add(type));
-            allSheetResults.forEach((result: any) => {
-              if (result.raceName && result.raceName.trim() !== '') {
-                let raceName = result.raceName;
-                const invalidPattern = /^(\w+)\s*\((\1)\)$/i;
-                if (invalidPattern.test(raceName)) {
-                  return;
-                }
-                const oldFormatMatch = raceName.match(/^(.+)\s*\((\w+)\)$/);
-                if (oldFormatMatch) {
-                  const capitalizedRaceType = oldFormatMatch[2].charAt(0).toUpperCase() + oldFormatMatch[2].slice(1);
-                  raceName = `${oldFormatMatch[1]} - ${capitalizedRaceType}`;
-                } else {
-                  const newFormatMatch = raceName.match(/^(.+)\s*-\s*(\w+)$/);
-                  if (newFormatMatch) {
-                    const capitalizedRaceType = newFormatMatch[2].charAt(0).toUpperCase() + newFormatMatch[2].slice(1);
-                    raceName = `${oldFormatMatch[1]} - ${capitalizedRaceType}`;
-                  }
-                }
-                uniqueRaceTypes.add(raceName);
-              }
-            });
-            
-            const existingTypes = Array.from(uniqueRaceTypes);
-            setTypes(existingTypes);
-            
-            // Deduplicate results FIRST by driverId to prevent doubling up
-            // Since we're loading by resultsSheetId (which is specific to a race type), we only need to deduplicate by driverId
-            // This should happen before filtering to catch any duplicates that might have been added to allSheetResults
-            const seenDrivers = new Map<string, any>();
-            const deduplicatedSheetResults = allSheetResults.filter((result: any) => {
-              // Use driverId as the key since resultsSheetId already ensures we're looking at the same race type
-              const key = result.driverId;
-              if (!key) return false; // Skip results without driverId
-              if (seenDrivers.has(key)) {
-                // Skip duplicate - keep the first occurrence
-                return false;
-              }
-              seenDrivers.set(key, result);
-              return true;
-            });
-            
-            // Filter by typeToUse (results are already filtered by selectedDivision)
-            const filteredResults = filterDivisionResultsBySelection(deduplicatedSheetResults, typeToUse);
-            
-            // Sort results based on race type
-            const sortedResults = sortRaceResults(filteredResults, typeToUse);
-            setDriverResults(sortedResults.length > 0 ? [...sortedResults] : []);
-            shouldLoadResultsRef.current = false;
-          };
-          
-          loadSheetResults();
-          return; // Exit early, we're fetching by sheet ID
-        }
-      }
-      
-      // Fallback: use division-based filtering if no resultsSheetId found
-      // Note: divisionResult and divisionResults should already be computed above
-      // Re-compute existingTypes and typeToUse for fallback path
-      if (divisionResult && divisionResult.results && !resultsSheetId) {
-        // Re-compute existingTypes for fallback
-        const uniqueRaceTypesForSelection = new Set<string>();
-        types.forEach(type => uniqueRaceTypesForSelection.add(type));
-        divisionResults.forEach((result: any) => {
-          if (result.raceName && result.raceName.trim() !== '') {
-            let raceName = result.raceName;
-            const invalidPattern = /^(\w+)\s*\((\1)\)$/i;
-            if (invalidPattern.test(raceName)) {
-              return;
-            }
-            if (!uniqueRaceTypesForSelection.has(raceName)) {
-              uniqueRaceTypesForSelection.add(raceName);
-            }
-          }
-        });
-        const fallbackExistingTypes = Array.from(uniqueRaceTypesForSelection);
-        
-        // Auto-select the first type if none is selected
-        const fallbackNewSelectedType = fallbackExistingTypes[fallbackExistingTypes.length - 1] || fallbackExistingTypes[0] || null;
-        if (!selectedType || !fallbackExistingTypes.includes(selectedType)) {
-          if (fallbackNewSelectedType) {
-            setSelectedType(fallbackNewSelectedType);
-          }
-        }
-        
-        // Use the computed type directly to avoid race conditions with setState
-        const fallbackTypeToUse = (selectedType && fallbackExistingTypes.includes(selectedType)) ? selectedType : fallbackNewSelectedType;
-        
-        if (shouldLoadResultsRef.current && fallbackTypeToUse) {
+        // Only update driver results if we should load them (not when user is typing)
+        // Use the first type if selectedType is null (it will be set above)
+        const typeToUse = selectedType || existingTypes[0];
+        if (shouldLoadResultsRef.current && typeToUse) {
           // Extract race type from selectedType
           // Handle new format: "Race Name - Qualification" -> "qualification"
           // Handle old format: "Race Name (qualification)" -> "qualification"
           let typeRaceType: string | null = null;
           
           // Try new format first (e.g., "Name - Type")
-          const newFormatMatch = fallbackTypeToUse.match(/-\s*(\w+)$/);
+          const newFormatMatch = typeToUse.match(/-\s*(\w+)$/);
           if (newFormatMatch) {
             typeRaceType = newFormatMatch[1].toLowerCase();
           } else {
             // Try old format (e.g., "Name (type)")
-            const oldFormatMatch = fallbackTypeToUse.match(/\((\w+)\)$/);
+            const oldFormatMatch = typeToUse.match(/\((\w+)\)$/);
             if (oldFormatMatch) {
               typeRaceType = oldFormatMatch[1].toLowerCase();
             }
           }
           
           // Try to find resultsSheetId from the first matching result in the selected division
-          // CRITICAL: Match by raceType, finalType, AND raceName to prevent loading wrong race's sheet
           let sheetId: string | null = null;
-          const { raceType: fallbackRaceType, finalType: fallbackFinalType } = parseRaceSelection(fallbackTypeToUse);
           const matchingResult = divisionResults.find((r: any) => {
-            // Must match raceType
-            if ((r.raceType || 'qualification').toLowerCase() !== fallbackRaceType.toLowerCase()) {
-              return false;
+            if (typeRaceType) {
+              return r.raceType?.toLowerCase() === typeRaceType;
             }
-            
-            // Must match finalType if specified
-            if (fallbackFinalType && (r.finalType || '') !== fallbackFinalType) {
-              return false;
-            }
-            
-            // Must match raceName (exact or normalized)
-            // Try exact match first
-            if (r.raceName === fallbackTypeToUse) {
-              return true;
-            }
-            
-            // Try matching if fallbackTypeToUse has "- Type" suffix but database raceName doesn't
-            const typeToUseMatch = fallbackTypeToUse.match(/^(.+)\s*-\s*(\w+)$/);
-            if (typeToUseMatch) {
-              const baseName = typeToUseMatch[1].trim();
-              if (baseName === r.raceName) {
-                return true;
-              }
-            }
-            
-            // Try matching if database raceName has "- Type" suffix but fallbackTypeToUse doesn't
-            const raceNameMatch = (r.raceName || '').match(/^(.+)\s*-\s*(\w+)$/);
-            if (raceNameMatch) {
-              const baseName = raceNameMatch[1].trim();
-              if (baseName === fallbackTypeToUse) {
-                return true;
-              }
-            }
-            
-            // Try normalized legacy format "Race (type)" -> "Race - Type"
-            const oldFormatMatch = (r.raceName || '').match(/^(.+)\s*\((\w+)\)$/);
-            if (oldFormatMatch) {
-              const capitalizedRaceType = oldFormatMatch[2].charAt(0).toUpperCase() + oldFormatMatch[2].slice(1);
-              const normalizedName = `${oldFormatMatch[1]} - ${capitalizedRaceType}`;
-              if (normalizedName === fallbackTypeToUse || oldFormatMatch[1].trim() === fallbackTypeToUse) {
-                return true;
-              }
-            }
-            
-            return false;
+            return r.raceName === typeToUse;
           });
           
           if (matchingResult && matchingResult.resultsSheetId) {
@@ -793,103 +561,28 @@ export default function RacesPage() {
           
           // If we have a resultsSheetId, fetch all results for that sheet but filter by selectedDivision
           if (sheetId) {
-            console.log('Loading results by resultsSheetId:', sheetId, 'raceName:', fallbackTypeToUse);
+            console.log('Loading results by resultsSheetId:', sheetId);
             const loadSheetResults = async () => {
-              // CRITICAL: Pass raceName to filter at database level and prevent cross-contamination
-              const sheetResults = await fetchRaceResults(selectedEvent.id, sheetId!, fallbackTypeToUse);
+              const sheetResults = await fetchRaceResults(selectedEvent.id, sheetId!);
               
-              // Parse the selected race type to filter by
-              const { raceType: selectedRaceType, finalType: selectedFinalType } = parseRaceSelection(fallbackTypeToUse);
-              
-              // Flatten results from the selected division only, and filter by race type
+              // Flatten results from the selected division only
               // Handle "Open" division - if selectedDivision is one of openDivisions, also check for "Open" race_division
               const allSheetResults: any[] = [];
               sheetResults.forEach((divisionResult: any) => {
                 // Check if this division result matches the selected division
-                // Use race_division (raceDivision) for matching, not the driver's division
-                const raceDivision = divisionResult.division; // This is the race_division from the API
+                const matchesDivision = divisionResult.division === selectedDivision;
+                // Also check if selectedDivision is an open division and race_division is "Open"
+                const matchesOpen = isOpenDivision(selectedDivision) && divisionResult.division === 'Open';
                 
-                // For non-open divisions, ONLY process divisionResults where raceDivision exactly matches selectedDivision
-                // For open divisions, also check for 'Open' race_division
-                const matchesDivision = !isOpenDivision(selectedDivision) && raceDivision === selectedDivision;
-                const matchesOpen = isOpenDivision(selectedDivision) && raceDivision === 'Open';
-                
-                // Only process division results that match the selected division
-                if (!matchesDivision && !matchesOpen) {
-                  return; // Skip this divisionResult - it doesn't match
-                }
-                
-                if (divisionResult.results) {
-                  // Filter results by race type and final type FIRST to prevent cross-contamination
-                  const filteredByRaceType = divisionResult.results.filter((result: any) => {
-                    const resultRaceType = (result.raceType || 'qualification').toLowerCase();
-                    const resultFinalType = result.finalType || '';
-                    
-                    // Must match the selected race type - this is CRITICAL for preventing cross-contamination
-                    if (resultRaceType !== selectedRaceType.toLowerCase()) {
-                      return false;
-                    }
-                    
-                    // For qualification with group, must match finalType
-                    if (selectedRaceType === 'qualification' && selectedFinalType) {
-                      return resultFinalType === selectedFinalType;
-                    }
-                    
-                    // For heat and final, must match finalType if specified
-                    if ((selectedRaceType === 'heat' || selectedRaceType === 'final') && selectedFinalType) {
-                      return resultFinalType.toUpperCase() === selectedFinalType.toUpperCase();
-                    }
-                    
-                    // If no finalType specified, include all results of that race type
-                    return true;
-                  });
-                  
-                  // For open divisions, include filtered results from the 'Open' divisionResult
-                  // For non-open divisions (like Division 2), also verify each result's raceDivision matches
-                  if (isOpenDivision(selectedDivision) && raceDivision === 'Open') {
-                    // When selectedDivision is an open division and we're looking at 'Open' race_division results,
-                    // include filtered results from this divisionResult
-                    allSheetResults.push(...filteredByRaceType);
-                  } else {
-                    // For exact division matches (like Division 2), filter by result's raceDivision AND race type
-                    // IMPORTANT: Only use raceDivision, NOT result.division (driver's division), to prevent cross-contamination
-                    const filteredResults = filteredByRaceType.filter((result: any) => {
-                      // For non-open divisions, ONLY use raceDivision (never fall back to division)
-                      // This ensures we're filtering by the division the race was run in, not the driver's current division
-                      const resultRaceDivision = result.raceDivision;
-                      if (!resultRaceDivision) {
-                        // If raceDivision is missing, skip this result to prevent cross-contamination
-                        return false;
-                      }
-                      // Ensure result's raceDivision exactly matches selectedDivision for non-open divisions
-                      return resultRaceDivision === selectedDivision;
-                    });
-                    allSheetResults.push(...filteredResults);
-                  }
+                if (divisionResult.results && (matchesDivision || matchesOpen)) {
+                  allSheetResults.push(...divisionResult.results);
                 }
               });
               
-              // Deduplicate results FIRST by driverId to prevent doubling up
-              // Since we're loading by resultsSheetId (which is specific to a race type), we only need to deduplicate by driverId
-              // This should happen before filtering to catch any duplicates that might have been added to allSheetResults
-              const seenDrivers = new Map<string, any>();
-              const deduplicatedSheetResults = allSheetResults.filter((result: any) => {
-                // Use driverId as the key since resultsSheetId already ensures we're looking at the same race type
-                const key = result.driverId;
-                if (!key) return false; // Skip results without driverId
-                if (seenDrivers.has(key)) {
-                  // Skip duplicate - keep the first occurrence
-                  return false;
-                }
-                seenDrivers.set(key, result);
-                return true;
-              });
-              
-              // Filter by fallbackTypeToUse (results are already filtered by selectedDivision)
-              const filteredResults = filterDivisionResultsBySelection(deduplicatedSheetResults, fallbackTypeToUse);
-              
+              // Filter by selectedType (results are already filtered by selectedDivision)
+              const filteredResults = filterDivisionResultsBySelection(allSheetResults, typeToUse);
               // Sort results based on race type
-              const sortedResults = sortRaceResults(filteredResults, fallbackTypeToUse);
+              const sortedResults = sortRaceResults(filteredResults, typeToUse);
               setDriverResults(sortedResults.length > 0 ? [...sortedResults] : []);
               shouldLoadResultsRef.current = false;
             };
@@ -903,21 +596,11 @@ export default function RacesPage() {
               return r.raceType?.toLowerCase() === typeRaceType;
             });
               // Sort results based on race type
-              const sortedResults = sortRaceResults(filteredResults, fallbackTypeToUse);
+              const sortedResults = sortRaceResults(filteredResults, typeToUse);
               setDriverResults([...sortedResults]);
           } else {
             // If no race type match, try to match by exact raceName
-            // But ALWAYS verify raceType matches to prevent cross-contamination
-            const { raceType: fallbackRaceType, finalType: fallbackFinalType } = parseRaceSelection(fallbackTypeToUse);
             const filteredResults = divisionResults.filter((r: any) => {
-              const resultRaceType = (r.raceType || 'qualification').toLowerCase();
-              const resultFinalType = r.finalType || '';
-              
-              // First check: raceType MUST match
-              if (resultRaceType !== fallbackRaceType.toLowerCase()) {
-                return false;
-              }
-              
               // Normalize raceName formats for comparison
               let normalizedRaceName = r.raceName || '';
               
@@ -928,26 +611,15 @@ export default function RacesPage() {
                 normalizedRaceName = `${oldFormatMatch[1]} - ${capitalizedRaceType}`;
               }
               
-              // Match by raceName
-              if (normalizedRaceName === fallbackTypeToUse) {
-                // Also verify finalType matches if specified
-                if (fallbackRaceType === 'qualification' && fallbackFinalType) {
-                  return resultFinalType === fallbackFinalType;
-                } else if ((fallbackRaceType === 'heat' || fallbackRaceType === 'final') && fallbackFinalType) {
-                  return resultFinalType.toUpperCase() === fallbackFinalType.toUpperCase();
-                }
-                return true; // No finalType specified, so match is valid
-              }
-              
-              return false;
+              return normalizedRaceName === typeToUse;
             });
               // Sort results based on race type
-              const sortedResults = sortRaceResults(filteredResults, fallbackTypeToUse);
+              const sortedResults = sortRaceResults(filteredResults, typeToUse);
               setDriverResults([...sortedResults]);
           }
           shouldLoadResultsRef.current = false; // Don't auto-load again until type/division changes
           }
-        } else if (shouldLoadResultsRef.current && !fallbackTypeToUse) {
+        } else if (shouldLoadResultsRef.current && !typeToUse) {
           // If no type selected, show empty
           setDriverResults([]);
           shouldLoadResultsRef.current = false;
@@ -968,49 +640,10 @@ export default function RacesPage() {
     }
   }, [selectedEvent, selectedDivision, selectedType]);
   
-  // Reset the load flag and clear results when division or type changes
+  // Reset the load flag when division or type changes
   useEffect(() => {
     shouldLoadResultsRef.current = true;
-    // Clear results immediately when type changes to prevent showing stale data
-    if (selectedType) {
-      setDriverResults([]);
-    }
   }, [selectedDivision, selectedType]);
-
-  // Handle focus after sorting by overallPosition
-  useEffect(() => {
-    if (focusAfterSortRef.current && driverResults.length > 0) {
-      const { rowIdentifier, field } = focusAfterSortRef.current;
-      
-      if (!rowIdentifier) {
-        focusAfterSortRef.current = null;
-        return;
-      }
-      
-      // Find the row that matches the driverId
-      const newIndex = driverResults.findIndex(r => r.driverId === rowIdentifier);
-      
-      if (newIndex !== -1) {
-        // Use requestAnimationFrame to ensure DOM has updated
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            const input = document.querySelector(
-              `input[data-row="${newIndex}"][data-field="${field}"]`
-            ) as HTMLInputElement;
-            if (input) {
-              input.focus();
-              input.select(); // Select the text so user can easily type a new value
-            }
-            // Clear the ref
-            focusAfterSortRef.current = null;
-          }, 10);
-        });
-      } else {
-        // Clear the ref if row not found
-        focusAfterSortRef.current = null;
-      }
-    }
-  }, [driverResults]);
 
   // Available divisions - combining Division 3, 4, and New into "Open" for race management
   const availableDivisions: (Division | 'Open')[] = ['Division 1', 'Division 2', 'Open'];
@@ -1022,7 +655,7 @@ export default function RacesPage() {
   };
   
   // Get unique driver counts per division for selected event
-  const divisionDriverCounts = useMemo<Partial<Record<Division, number>>>(() => {
+  const divisionDriverCounts = useMemo<Record<Division, number>>(() => {
     if (!selectedEvent) return {
       'Division 1': 0,
       'Division 2': 0,
@@ -1030,7 +663,7 @@ export default function RacesPage() {
       'Division 4': 0,
       'New': 0,
     };
-    const uniqueDrivers: Partial<Record<Division, Set<string>>> = {
+    const uniqueDrivers: Record<Division, Set<string>> = {
       'Division 1': new Set(),
       'Division 2': new Set(),
       'Division 3': new Set(),
@@ -1038,71 +671,27 @@ export default function RacesPage() {
       'New': new Set(),
     };
     
-    // Also track unique drivers from 'Open' race_division results
-    // These are drivers who raced in Open division races
-    const openRaceDivisionDrivers = new Set<string>();
-    
     // Count unique drivers per division
     selectedEvent.results?.forEach((divisionResult) => {
       const division = divisionResult.division;
-      
-      // Handle 'Open' race_division - these are drivers who raced in Open division races
-      if (division === 'Open' && divisionResult.results) {
+      if (division in uniqueDrivers && divisionResult.results) {
         divisionResult.results.forEach((result: any) => {
           // Only count valid driver IDs (not temporary ones)
           if (result.driverId && !result.driverId.startsWith('temp-')) {
-            openRaceDivisionDrivers.add(result.driverId);
-            
-            // Also add to the specific open divisions (Division 3, 4, New) based on the result's division
-            // Use raceDivision first, then fall back to division
-            const resultDivision = result.raceDivision || result.division;
-            if (resultDivision && resultDivision in uniqueDrivers) {
-              const divSet = uniqueDrivers[resultDivision as Division];
-              if (divSet) {
-                divSet.add(result.driverId);
-              }
-            }
-          }
-        });
-      } else if (division in uniqueDrivers && divisionResult.results) {
-        // Handle regular divisions (Division 1, 2, 3, 4, New)
-        divisionResult.results.forEach((result: any) => {
-          // Only count valid driver IDs (not temporary ones)
-          if (result.driverId && !result.driverId.startsWith('temp-')) {
-            const divSet = uniqueDrivers[division as Division];
-            if (divSet) {
-              divSet.add(result.driverId);
-            }
+            uniqueDrivers[division as Division].add(result.driverId);
           }
         });
       }
     });
     
     // Convert sets to counts
-    // For open divisions (Division 3, 4, New), we need to count:
-    // 1. Drivers who have results specifically in that division
-    // 2. Drivers from 'Open' race_division who don't have a specific division assigned
-    // The Open division display should show the total unique drivers across all open divisions
-    const counts: Partial<Record<Division, number>> = {
-      'Division 1': uniqueDrivers['Division 1']?.size || 0,
-      'Division 2': uniqueDrivers['Division 2']?.size || 0,
-      'Division 3': uniqueDrivers['Division 3']?.size || 0,
-      'Division 4': uniqueDrivers['Division 4']?.size || 0,
-      'New': uniqueDrivers['New']?.size || 0,
+    const counts: Record<Division, number> = {
+      'Division 1': uniqueDrivers['Division 1'].size,
+      'Division 2': uniqueDrivers['Division 2'].size,
+      'Division 3': uniqueDrivers['Division 3'].size,
+      'Division 4': uniqueDrivers['Division 4'].size,
+      'New': uniqueDrivers['New'].size,
     };
-    
-    // For the Open division display, we need to count unique drivers across all open divisions
-    // This includes drivers from Division 3, 4, New, and Open race_division
-    const openDivisionsList: Division[] = ['Division 3', 'Division 4', 'New'];
-    const allOpenDrivers = new Set<string>();
-    openDivisionsList.forEach(div => {
-      uniqueDrivers[div]?.forEach(driverId => allOpenDrivers.add(driverId));
-    });
-    openRaceDivisionDrivers.forEach(driverId => allOpenDrivers.add(driverId));
-    
-    // Store the total open drivers count for use in the UI
-    // We'll use this when calculating the Open division count
-    (counts as any).__openTotal = allOpenDrivers.size;
     
     return counts;
   }, [selectedEvent]);
@@ -1196,37 +785,19 @@ export default function RacesPage() {
       }
     }
     
-    if (raceType && selectedEvent && selectedDivision) {
+    if (raceType && selectedEvent) {
       try {
-        // Parse finalType from typeName to ensure we only delete the specific race group
-        const { finalType } = parseRaceSelection(typeName);
-        
-        // Determine raceDivision based on selected division
-        // For open divisions (Division 3, 4, New), use 'Open' as race_division
-        const uiDivision = selectedUIDivision || selectedDivision || 'Division 1';
-        const raceDivision = isOpenDivision(selectedDivision) ? 'Open' : uiDivision;
-        
-        // Build delete URL with raceDivision and finalType to ensure we only delete results from the selected division
-        const deleteUrl = new URL(`/api/race-results`, window.location.origin);
-        deleteUrl.searchParams.set('roundId', selectedEvent.id);
-        deleteUrl.searchParams.set('raceType', raceType);
-        if (raceDivision) {
-          deleteUrl.searchParams.set('raceDivision', raceDivision);
-        }
-        if (finalType) {
-          deleteUrl.searchParams.set('finalType', finalType);
-        }
-        
-        const response = await fetch(deleteUrl.toString(), {
+        // Delete race results from Google Sheets
+        const response = await fetch(`/api/race-results?roundId=${selectedEvent.id}&raceType=${raceType}`, {
           method: 'DELETE',
         });
         
         if (!response.ok) {
-          throw new Error('Failed to delete race results');
+          throw new Error('Failed to delete race results from Google Sheets');
         }
       } catch (error) {
         console.error('Error deleting race results:', error);
-        alert('Failed to delete race results. Please try again.');
+        alert('Failed to delete race results from Google Sheets. Please try again.');
         return;
       }
     }
@@ -1311,10 +882,6 @@ export default function RacesPage() {
       
       // Update the specific field - preserve existing values for gridPosition and overallPosition
       const existingRow = updated[index];
-      // Store the row identifier before updating - use driverId as primary identifier
-      // Ensure rowIdentifier is always defined
-      const rowIdentifier = existingRow.driverId || `temp-${Date.now()}-${index}`;
-      
       updated[index] = { 
         ...existingRow, 
         [field]: value,
@@ -1341,28 +908,6 @@ export default function RacesPage() {
           points: 0,
         };
         updated.push(newResult);
-      }
-      
-      // If overallPosition was updated and this is a heat or final race, re-sort by overallPosition
-      if (field === 'overallPosition' && selectedType && rowIdentifier) {
-        const { raceType } = parseRaceSelection(selectedType);
-        const normalizedRaceType = raceType?.toLowerCase();
-        
-        // Only re-sort for heat and final races, not qualification
-        if (normalizedRaceType === 'heat' || normalizedRaceType === 'final') {
-          // Sort by overallPosition, with null/undefined/0 values at the end
-          updated.sort((a, b) => {
-            const posA = parseInt(a.overallPosition?.toString() || '0') || Infinity;
-            const posB = parseInt(b.overallPosition?.toString() || '0') || Infinity;
-            return posA - posB;
-          });
-          
-          // Store the row identifier to focus after DOM updates
-          focusAfterSortRef.current = {
-            rowIdentifier: rowIdentifier,
-            field: 'overallPosition'
-          };
-        }
       }
       
       return updated;
@@ -1773,11 +1318,10 @@ export default function RacesPage() {
           const cleanFinalType = (finalType || '').replace(/\s+/g, '');
           const resultsSheetId = `${seasonId}${roundId}${cleanRaceDivision}${cleanRaceType}${cleanFinalType}`;
           
-          console.log('Reloading results by resultsSheetId after save:', resultsSheetId, 'raceType:', raceType, 'finalType:', finalType, 'raceDivision:', raceDivision, 'raceName:', selectedType);
+          console.log('Reloading results by resultsSheetId after save:', resultsSheetId, 'raceType:', raceType, 'finalType:', finalType, 'raceDivision:', raceDivision);
           
           // Fetch results using the resultsSheetId - this will return only results with this specific sheet ID
-          // CRITICAL: Pass raceName (selectedType) to filter at database level and prevent cross-contamination
-          const sheetResults = await fetchRaceResults(selectedEvent.id, resultsSheetId, selectedType || undefined);
+          const sheetResults = await fetchRaceResults(selectedEvent.id, resultsSheetId);
           
           // Also fetch all results for the event to update the full event results
           const allEventResults = await fetchRaceResults(selectedEvent.id);
@@ -1826,74 +1370,39 @@ export default function RacesPage() {
             }
             
             // Load results from the specific resultsSheetId
-            // Filter by race type to prevent cross-contamination between qualification, heat, and final results
+            // Since we fetched by resultsSheetId at the database level, all results should already match
             const allSheetResults: any[] = [];
             sheetResults.forEach((divisionResult: any) => {
+              // Include all results from the sheet - they all match the resultsSheetId we queried for
               // Check if this division result matches the race_division or selected division
-              const divisionResultRaceDivision = divisionResult.division; // This is the race_division from the API
+              const matchesRaceDivision = divisionResult.division === raceDivision;
+              const matchesSelectedDivision = divisionResult.division === selectedDivision;
+              const matchesOpen = isOpenDivision(selectedDivision) && (divisionResult.division === 'Open' || divisionResult.division === raceDivision);
               
-              // For non-open divisions, ONLY process divisionResults where raceDivision exactly matches selectedDivision
-              // For open divisions, also check for 'Open' race_division
-              const matchesDivision = !isOpenDivision(selectedDivision) && divisionResultRaceDivision === selectedDivision;
-              const matchesOpen = isOpenDivision(selectedDivision) && (divisionResultRaceDivision === 'Open' || divisionResultRaceDivision === raceDivision);
-              
-              // Only process division results that match the selected division
-              if (!matchesDivision && !matchesOpen) {
-                return; // Skip this divisionResult - it doesn't match
-              }
-              
-              if (divisionResult.results) {
-                // Filter results by race type and final type FIRST to prevent cross-contamination
-                const filteredByRaceType = divisionResult.results.filter((result: any) => {
-                  const resultRaceType = (result.raceType || 'qualification').toLowerCase();
-                  const resultFinalType = result.finalType || '';
-                  
-                  // Must match the selected race type - this is CRITICAL for preventing cross-contamination
-                  if (resultRaceType !== raceType.toLowerCase()) {
-                    return false;
-                  }
-                  
-                  // For qualification with group, must match finalType
-                  if (raceType === 'qualification' && finalType) {
-                    return resultFinalType === finalType;
-                  }
-                  
-                  // For heat and final, must match finalType if specified
-                  if ((raceType === 'heat' || raceType === 'final') && finalType) {
-                    return resultFinalType.toUpperCase() === finalType.toUpperCase();
-                  }
-                  
-                  // If no finalType specified, include all results of that race type
-                  return true;
-                });
-                
-                // For open divisions, include filtered results from the 'Open' divisionResult
-                // For non-open divisions (like Division 2), also verify each result's raceDivision matches
-                if (isOpenDivision(selectedDivision) && divisionResultRaceDivision === 'Open') {
-                  // When selectedDivision is an open division and we're looking at 'Open' race_division results,
-                  // include filtered results from this divisionResult
-                  allSheetResults.push(...filteredByRaceType);
-                } else {
-                  // For exact division matches (like Division 2), filter by result's raceDivision AND race type
-                  // IMPORTANT: Only use raceDivision, NOT result.division (driver's division), to prevent cross-contamination
-                  const filteredResults = filteredByRaceType.filter((result: any) => {
-                    // For non-open divisions, ONLY use raceDivision (never fall back to division)
-                    // This ensures we're filtering by the division the race was run in, not the driver's current division
-                    const resultRaceDivision = result.raceDivision;
-                    if (!resultRaceDivision) {
-                      // If raceDivision is missing, skip this result to prevent cross-contamination
-                      return false;
-                    }
-                    return resultRaceDivision === selectedDivision;
-                  });
-                  allSheetResults.push(...filteredResults);
-                }
+              if (divisionResult.results && (matchesRaceDivision || matchesSelectedDivision || matchesOpen)) {
+                allSheetResults.push(...divisionResult.results);
               }
             });
             
-            // Filter by selectedType (race name) to prevent loading different races
-            // This is CRITICAL to prevent cross-contamination between races in the same division
-            const filteredResults = filterDivisionResultsBySelection(allSheetResults, selectedType);
+            // Since we fetched by resultsSheetId, all results should already match that ID
+            // Just verify they have the correct resultsSheetId, raceType, finalType, and raceDivision
+            let filteredResults = allSheetResults.filter((r: any) => {
+              // Primary filter: must match resultsSheetId (database already filtered by this)
+              if (r.resultsSheetId !== resultsSheetId) return false;
+              
+              // Secondary filters: verify raceType, finalType, and raceDivision match
+              const matchesRaceType = r.raceType?.toLowerCase() === raceType.toLowerCase();
+              const matchesFinalType = (r.finalType || '') === (finalType || '');
+              const matchesRaceDivision = r.raceDivision === raceDivision || r.raceDivision === selectedDivision || 
+                                         (isOpenDivision(selectedDivision) && r.raceDivision === 'Open');
+              
+              return matchesRaceType && matchesFinalType && matchesRaceDivision;
+            });
+            
+            // If no results with strict matching, just use all results from the sheet (they all match resultsSheetId)
+            if (filteredResults.length === 0) {
+              filteredResults = allSheetResults;
+            }
             
             console.log('Loaded results after save:', {
               resultsSheetId,
@@ -1907,23 +1416,8 @@ export default function RacesPage() {
               sampleResult: filteredResults[0]
             });
             
-            // Deduplicate results by driverId to prevent doubling up
-            // Since we're loading by resultsSheetId (which is specific to a race type), we only need to deduplicate by driverId
-            const seenDrivers = new Map<string, any>();
-            const uniqueResults = filteredResults.filter((result: any) => {
-              // Use driverId as the key since resultsSheetId already ensures we're looking at the same race type
-              const key = result.driverId;
-              if (!key) return false; // Skip results without driverId
-              if (seenDrivers.has(key)) {
-                // Skip duplicate - keep the first occurrence
-                return false;
-              }
-              seenDrivers.set(key, result);
-              return true;
-            });
-            
             // Sort results based on race type before setting
-            const sortedResults = sortRaceResults(uniqueResults, selectedType);
+            const sortedResults = sortRaceResults(filteredResults, selectedType);
             setDriverResults([...sortedResults]);
             // Prevent the useEffect from reloading results
             shouldLoadResultsRef.current = false;
@@ -2030,8 +1524,7 @@ export default function RacesPage() {
                       hasResults = selectedEvent.results?.some((r) => 
                         openDivisions.includes(r.division as Division) || r.division === 'Open'
                       ) || false;
-                      // Use the total unique drivers across all open divisions
-                      racerCount = (divisionDriverCounts as any).__openTotal || 0;
+                      racerCount = openDivisions.reduce((sum, div) => sum + (divisionDriverCounts[div] || 0), 0);
                     } else {
                       hasResults = selectedEvent.results?.some((r) => r.division === division) || false;
                       racerCount = divisionDriverCounts[division as Division] || 0;
@@ -2052,15 +1545,25 @@ export default function RacesPage() {
                             setSelectedDivision(firstOpenDiv);
                             setSelectedUIDivision('Open'); // Track that user clicked "Open"
                             setSelectedType(null);
-                            const divisionResults = selectedEvent.results?.find((r) => r.division === firstOpenDiv)?.results || [];
-                            setDriverResults([...divisionResults]);
+                            const divisionResult = selectedEvent.results?.find((r) => r.division === firstOpenDiv);
+                            let divisionResults = divisionResult?.results || [];
+                            // Filter to only include results where raceDivision matches
+                            divisionResults = divisionResults.filter((result: any) => {
+                              return result.raceDivision === 'Open' || isOpenDivision(result.raceDivision);
+                            });
+                            setDriverResults([]); // Clear results, let useEffect load them with proper filtering
                             setTypes([]);
                           } else {
                             setSelectedDivision(division as Division);
                             setSelectedUIDivision(division as Division); // Track UI division
                             setSelectedType(null);
-                            const divisionResults = selectedEvent.results?.find((r) => r.division === division)?.results || [];
-                            setDriverResults([...divisionResults]);
+                            const divisionResult = selectedEvent.results?.find((r) => r.division === division);
+                            let divisionResults = divisionResult?.results || [];
+                            // Filter to only include results where raceDivision exactly matches
+                            divisionResults = divisionResults.filter((result: any) => {
+                              return result.raceDivision === division;
+                            });
+                            setDriverResults([]); // Clear results, let useEffect load them with proper filtering
                             setTypes([]);
                           }
                         }}

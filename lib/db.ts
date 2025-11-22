@@ -156,10 +156,12 @@ export async function initializeDatabase() {
         round_id TEXT NOT NULL,
         driver_id TEXT NOT NULL,
         division TEXT NOT NULL,
+        race_division TEXT,
         race_type TEXT DEFAULT 'qualification',
         final_type TEXT,
         overall_position INTEGER,
         points DECIMAL(10,2) NOT NULL,
+        note TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(round_id, driver_id, race_type, final_type)

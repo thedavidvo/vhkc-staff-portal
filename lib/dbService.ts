@@ -510,29 +510,61 @@ export interface RaceDivisionResult {
 
 export async function getRaceResultsByRound(roundId: string, resultsSheetId?: string, raceName?: string): Promise<RaceDivisionResult[]> {
   // Build query with optional resultsSheetId and raceName filters
+  // Include division_changes to get driver's division at that specific round
   let query;
   if (resultsSheetId && raceName) {
     // Filter by both resultsSheetId AND raceName to prevent cross-contamination
     query = sql`
-      SELECT * FROM race_results
-      WHERE round_id = ${roundId} 
-        AND results_sheet_id = ${resultsSheetId}
-        AND race_name = ${raceName}
-      ORDER BY race_division, grid_position
+      SELECT 
+        rr.*,
+        COALESCE(
+          (SELECT COALESCE(dc.to_division, dc.division_start)
+           FROM division_changes dc
+           WHERE dc.driver_id = rr.driver_id 
+             AND dc.round_id = rr.round_id
+           LIMIT 1),
+          rr.division
+        ) as driver_division_at_round
+      FROM race_results rr
+      WHERE rr.round_id = ${roundId} 
+        AND rr.results_sheet_id = ${resultsSheetId}
+        AND rr.race_name = ${raceName}
+      ORDER BY rr.race_division, rr.grid_position
     `;
   } else if (resultsSheetId) {
     // Filter by resultsSheetId only (may return multiple races)
     query = sql`
-      SELECT * FROM race_results
-      WHERE round_id = ${roundId} AND results_sheet_id = ${resultsSheetId}
-      ORDER BY race_division, grid_position
+      SELECT 
+        rr.*,
+        COALESCE(
+          (SELECT COALESCE(dc.to_division, dc.division_start)
+           FROM division_changes dc
+           WHERE dc.driver_id = rr.driver_id 
+             AND dc.round_id = rr.round_id
+           LIMIT 1),
+          rr.division
+        ) as driver_division_at_round
+      FROM race_results rr
+      WHERE rr.round_id = ${roundId} 
+        AND rr.results_sheet_id = ${resultsSheetId}
+      ORDER BY rr.race_division, rr.grid_position
     `;
   } else {
     // No filters - return all results for the round
     query = sql`
-    SELECT * FROM race_results
-    WHERE round_id = ${roundId}
-      ORDER BY race_division, grid_position
+      SELECT 
+        rr.*,
+        COALESCE(
+          (SELECT COALESCE(dc.to_division, dc.division_start)
+           FROM division_changes dc
+           WHERE dc.driver_id = rr.driver_id 
+             AND dc.round_id = rr.round_id
+           LIMIT 1),
+          rr.division
+        ) as driver_division_at_round
+      FROM race_results rr
+      WHERE rr.round_id = ${roundId}
+      ORDER BY rr.race_division, rr.grid_position
     `;
   }
   
@@ -560,7 +592,8 @@ export async function getRaceResultsByRound(roundId: string, resultsSheetId?: st
       driverName: driver?.name || 'Unknown Driver',
       driverAlias: result.driver_alias || '',
       kartNumber: result.kart_number || '',
-      division: result.division, // Driver's actual division
+      division: result.division, // Driver's actual division in race_results table
+      driverDivision: result.driver_division_at_round, // Driver's division at that round from division_changes
       position: result.grid_position || 0,
       gridPosition: result.grid_position || 0,
       overallPosition: result.overall_position || 0,
@@ -869,7 +902,8 @@ export interface Points {
   seasonId: string;
   roundId: string;
   driverId: string;
-  division: Division;
+  division: Division; // Driver division
+  raceDivision?: Division | 'Open'; // Race division
   raceType: string;
   finalType?: string;
   overallPosition?: number;
@@ -887,6 +921,7 @@ export async function getPointsByRound(roundId: string): Promise<Points[]> {
     roundId: p.round_id,
     driverId: p.driver_id,
     division: p.division as Division,
+    raceDivision: p.race_division as Division | 'Open' | undefined,
     raceType: p.race_type || 'qualification',
     finalType: p.final_type || undefined,
     overallPosition: p.overall_position || undefined,
@@ -907,6 +942,7 @@ export async function getPointsByDriver(driverId: string, seasonId?: string): Pr
     roundId: p.round_id,
     driverId: p.driver_id,
     division: p.division as Division,
+    raceDivision: p.race_division as Division | 'Open' | undefined,
     raceType: p.race_type || 'qualification',
     finalType: p.final_type || undefined,
     overallPosition: p.overall_position || undefined,
@@ -918,13 +954,37 @@ export async function getPointsByDriver(driverId: string, seasonId?: string): Pr
 }
 
 export async function getPointsBySeason(seasonId: string): Promise<Points[]> {
-  const points = await sql`SELECT * FROM points WHERE season_id = ${seasonId} ORDER BY round_id, points DESC` as any[];
+  const points = await sql`
+    SELECT 
+      p.*,
+      d.first_name || ' ' || d.last_name as driver_name,
+      COALESCE(
+        (SELECT COALESCE(dc.to_division, dc.division_start)
+         FROM division_changes dc
+         WHERE dc.driver_id = p.driver_id 
+           AND dc.round_id = p.round_id
+         LIMIT 1),
+        (SELECT DISTINCT rr.division 
+         FROM race_results rr 
+         WHERE rr.driver_id = p.driver_id 
+           AND rr.round_id = p.round_id 
+         LIMIT 1),
+        d.division
+      ) as driver_division
+    FROM points p
+    LEFT JOIN drivers d ON p.driver_id = d.id
+    WHERE p.season_id = ${seasonId} 
+    ORDER BY p.round_id, p.points DESC
+  ` as any[];
   return points.map((p: any) => ({
     id: p.id,
     seasonId: p.season_id,
     roundId: p.round_id,
     driverId: p.driver_id,
+    driverName: p.driver_name || 'Unknown Driver',
     division: p.division as Division,
+    driverDivision: p.driver_division as Division,
+    raceDivision: p.race_division as Division | 'Open' | undefined,
     raceType: p.race_type || 'qualification',
     finalType: p.final_type || undefined,
     overallPosition: p.overall_position || undefined,
@@ -938,17 +998,18 @@ export async function getPointsBySeason(seasonId: string): Promise<Points[]> {
 export async function addPoints(points: Points): Promise<void> {
   await sql`
     INSERT INTO points (
-      id, season_id, round_id, driver_id, division, race_type, final_type,
+      id, season_id, round_id, driver_id, division, race_division, race_type, final_type,
       overall_position, points, note, created_at, updated_at
     ) VALUES (
       ${points.id}, ${points.seasonId}, ${points.roundId}, ${points.driverId},
-      ${points.division}, ${points.raceType || 'qualification'}, ${points.finalType || null},
+      ${points.division}, ${points.raceDivision || null}, ${points.raceType || 'qualification'}, ${points.finalType || null},
       ${points.overallPosition || null}, ${points.points}, ${points.note || null},
       ${points.createdAt || new Date().toISOString()}, ${points.updatedAt || new Date().toISOString()}
     )
     ON CONFLICT (round_id, driver_id, race_type, final_type)
     DO UPDATE SET
       division = EXCLUDED.division,  -- Preserve historical division at time of race
+      race_division = EXCLUDED.race_division,  -- Preserve race division
       overall_position = EXCLUDED.overall_position,
       points = EXCLUDED.points,
       note = EXCLUDED.note,
@@ -959,7 +1020,8 @@ export async function addPoints(points: Points): Promise<void> {
 export async function updatePoints(points: Points): Promise<void> {
   await sql`
     UPDATE points
-    SET division = ${points.division},  -- Preserve historical division
+    SET division = ${points.division},  -- Preserve historical driver division
+        race_division = ${points.raceDivision || null},  -- Preserve race division
         overall_position = ${points.overallPosition || null},
         points = ${points.points},
         note = ${points.note || null},
