@@ -6,7 +6,7 @@ import PageLayout from '@/components/PageLayout';
 import SectionCard from '@/components/SectionCard';
 import { useSeason } from '@/components/SeasonContext';
 import { Driver, Division } from '@/types';
-import { Search, Check, X, Loader2, ChevronDown, ShieldCheck, Users, Sparkles, Calendar, History, Plus, Trash2, Edit2 } from 'lucide-react';
+import { Search, Check, X, Loader2, ChevronDown, ShieldCheck, Users, Sparkles, Calendar, History, Plus, Trash2, Edit2, Square, CheckSquare } from 'lucide-react';
 import RoundPointsEditModal from '@/components/RoundPointsEditModal';
 
 interface PendingDivisionChange {
@@ -127,6 +127,14 @@ export default function DivisionsPage() {
   const [editingDivisionChange, setEditingDivisionChange] = useState<any | null>(null);
   const [showDivisionHistoryModal, setShowDivisionHistoryModal] = useState(false);
   const [selectedDriverHistory, setSelectedDriverHistory] = useState<{id: string, name: string} | null>(null);
+  const [selectedDriverIds, setSelectedDriverIds] = useState<Set<string>>(new Set());
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+  const [bulkEditRoundId, setBulkEditRoundId] = useState<string>('');
+  const [bulkEditFromDivision, setBulkEditFromDivision] = useState<Division | ''>('');
+  const [bulkEditToDivision, setBulkEditToDivision] = useState<Division | ''>('');
+  const [bulkEditChangeType, setBulkEditChangeType] = useState<'promotion' | 'demotion' | 'division_start' | 'mid_season_join'>('promotion');
+  const [bulkEditDivisionStart, setBulkEditDivisionStart] = useState<Division | ''>('');
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   // Fetch drivers from API
   useEffect(() => {
@@ -279,7 +287,7 @@ export default function DivisionsPage() {
 
     // Determine if it's a promotion or demotion
     // Use numeric order for consistency: New=5 (lowest), Division 1=1 (highest)
-    const divisionOrder: Record<Division, number> = {
+    const divisionOrder: Partial<Record<Division, number>> = {
       'Division 1': 1,  // Highest division
       'Division 2': 2,
       'Division 3': 3,
@@ -333,15 +341,15 @@ export default function DivisionsPage() {
       // Determine change type
       // New is the lowest division (5), Division 1 is the highest (1)
       // Moving from higher number to lower number = promotion
-      const divisionOrder: Record<Division, number> = {
+      const divisionOrder: Partial<Record<Division, number>> = {
         'Division 1': 1,  // Highest division
         'Division 2': 2,
         'Division 3': 3,
         'Division 4': 4,
         'New': 5,         // Lowest division (newest drivers)
       };
-      const fromOrder = divisionOrder[oldDivision];
-      const toOrder = divisionOrder[newDivision];
+      const fromOrder = divisionOrder[oldDivision] ?? 5;
+      const toOrder = divisionOrder[newDivision] ?? 5;
       // Promotion: moving to a lower number (better division)
       // Demotion: moving to a higher number (worse division)
       const changeType = toOrder < fromOrder ? 'promotion' : 'demotion';
@@ -460,7 +468,7 @@ export default function DivisionsPage() {
   };
 
   const driversByDivision = useMemo(() => {
-    const grouped: Record<Division, any[]> = {
+    const grouped: Partial<Record<Division, any[]>> = {
       'Division 1': [],
       'Division 2': [],
       'Division 3': [],
@@ -483,6 +491,206 @@ export default function DivisionsPage() {
   const demotions = useMemo(() => {
     return pendingChanges.filter((p) => p.type === 'demotion');
   }, [pendingChanges]);
+
+  // Bulk selection handlers
+  const handleSelectDriver = (driverId: string) => {
+    setSelectedDriverIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(driverId)) {
+        newSet.delete(driverId);
+      } else {
+        newSet.add(driverId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedDriverIds.size === filteredDrivers.length) {
+      setSelectedDriverIds(new Set());
+    } else {
+      setSelectedDriverIds(new Set(filteredDrivers.map(d => d.id)));
+    }
+  };
+
+  // Helper to convert Set to Array for iteration
+  const getSelectedDrivers = useMemo(() => {
+    return drivers.filter(d => selectedDriverIds.has(d.id));
+  }, [drivers, selectedDriverIds]);
+
+  const handleBulkEdit = () => {
+    if (selectedDriverIds.size === 0) {
+      alert('Please select at least one driver');
+      return;
+    }
+    
+    // Set default values based on selected drivers
+    const selectedDrivers = getSelectedDrivers;
+    const divisions = Array.from(new Set(selectedDrivers.map(d => d.division as Division)));
+    
+    // Auto-select first round if available
+    if (rounds.length > 0 && selectedSeason) {
+      const sortedRounds = [...rounds].sort((a, b) => (b.roundNumber || 0) - (a.roundNumber || 0));
+      setBulkEditRoundId(sortedRounds[0]?.id || `pre-season-${selectedSeason.id}`);
+    } else if (selectedSeason) {
+      setBulkEditRoundId(`pre-season-${selectedSeason.id}`);
+    }
+    
+    // If all selected drivers are in the same division, pre-fill from division
+    if (divisions.length === 1) {
+      setBulkEditFromDivision(divisions[0]);
+    } else {
+      setBulkEditFromDivision('');
+    }
+    
+    setBulkEditToDivision('');
+    setBulkEditChangeType('promotion');
+    setBulkEditDivisionStart('');
+    setShowBulkEditModal(true);
+  };
+
+  const handleBulkSave = async () => {
+    if (!selectedSeason || selectedDriverIds.size === 0) return;
+    
+    if (!bulkEditRoundId) {
+      alert('Please select a round');
+      return;
+    }
+
+    // Validate based on change type
+    if (bulkEditChangeType === 'division_start' || bulkEditChangeType === 'mid_season_join') {
+      if (!bulkEditDivisionStart) {
+        alert('Please select division start');
+        return;
+      }
+    } else {
+      if (!bulkEditFromDivision || !bulkEditToDivision) {
+        alert('Please select both from and to divisions');
+        return;
+      }
+      if (bulkEditFromDivision === bulkEditToDivision) {
+        alert('From division and to division must be different');
+        return;
+      }
+    }
+
+    try {
+      setBulkSaving(true);
+      const selectedDrivers = getSelectedDrivers;
+      
+      // Create division changes for each selected driver
+      const promises = selectedDrivers.map(async (driver) => {
+        const changeId = `div-change-${driver.id}-${Date.now()}-${Math.random()}`;
+        const now = new Date().toISOString();
+        
+        let fromDivision: Division | null = bulkEditFromDivision || null;
+        let toDivision: Division | null = bulkEditToDivision || null;
+        let divisionStart: Division | null = bulkEditDivisionStart || null;
+        let changeType = bulkEditChangeType;
+
+        // If from/to not specified, determine from driver's current division
+        if (bulkEditChangeType === 'promotion' || bulkEditChangeType === 'demotion') {
+          if (!fromDivision) {
+            fromDivision = driver.division;
+          }
+          if (!toDivision) {
+            // Skip if no target division specified
+            return null;
+          }
+          
+          // Determine change type based on division order
+          const divisionOrder: Partial<Record<Division, number>> = {
+            'Division 1': 1,
+            'Division 2': 2,
+            'Division 3': 3,
+            'Division 4': 4,
+            'New': 5,
+          };
+          const fromOrder = fromDivision ? (divisionOrder[fromDivision] ?? 5) : 5;
+          const toOrder = toDivision ? (divisionOrder[toDivision] ?? 5) : 5;
+          changeType = toOrder < fromOrder ? 'promotion' : 'demotion';
+        } else {
+          // For division_start and mid_season_join, use divisionStart
+          if (!divisionStart) {
+            divisionStart = driver.division;
+          }
+        }
+
+        const changeData = {
+          id: changeId,
+          seasonId: selectedSeason.id,
+          roundId: bulkEditRoundId,
+          driverId: driver.id,
+          driverName: driver.name,
+          fromDivision: (bulkEditChangeType === 'promotion' || bulkEditChangeType === 'demotion') ? (fromDivision || undefined) : undefined,
+          toDivision: (bulkEditChangeType === 'promotion' || bulkEditChangeType === 'demotion') ? (toDivision || undefined) : undefined,
+          divisionStart: (bulkEditChangeType === 'division_start' || bulkEditChangeType === 'mid_season_join') ? (divisionStart || undefined) : undefined,
+          changeType: changeType,
+          createdAt: now,
+        };
+
+        const response = await fetch('/api/division-changes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(changeData),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to save division change for ${driver.name}`);
+        }
+
+        // Update driver's current division if this is a promotion/demotion
+        if (bulkEditChangeType === 'promotion' || bulkEditChangeType === 'demotion' && toDivision) {
+          const updatedDriver = {
+            ...driver,
+            division: toDivision,
+          };
+
+          const driverResponse = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedDriver),
+          });
+
+          if (!driverResponse.ok) {
+            console.error(`Failed to update driver ${driver.name}`);
+          }
+        }
+
+        return changeData;
+      });
+
+      await Promise.all(promises.filter(p => p !== null));
+
+      // Refresh data
+      const divisionChangesResponse = await fetch(`/api/division-changes?seasonId=${selectedSeason.id}`);
+      if (divisionChangesResponse.ok) {
+        const data = await divisionChangesResponse.json();
+        setDivisionChanges(data);
+      }
+
+      const driversResponse = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
+      if (driversResponse.ok) {
+        const driversData = await driversResponse.json();
+        setDrivers(driversData);
+      }
+
+      // Notify other components
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('vhkc:drivers-updated'));
+      }
+
+      // Clear selection and close modal
+      setSelectedDriverIds(new Set());
+      setShowBulkEditModal(false);
+      alert(`Successfully updated division changes for ${selectedDrivers.length} driver(s)`);
+    } catch (error) {
+      console.error('Failed to save bulk division changes:', error);
+      alert('Failed to save division changes. Please try again.');
+    } finally {
+      setBulkSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -531,7 +739,7 @@ export default function DivisionsPage() {
                     <Users className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-slate-400'}`} />
                   </div>
                   <p className={`text-3xl font-black ${isSelected ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
-                    {driversByDivision[division].length}
+                    {driversByDivision[division]?.length || 0}
                   </p>
                 </button>
               );
@@ -578,16 +786,47 @@ export default function DivisionsPage() {
             <SectionCard
               title={`Search Results (${filteredDrivers.length})`}
               icon={Users}
+              actions={
+                <div className="flex items-center gap-2">
+                  {selectedDriverIds.size > 0 && (
+                    <span className="px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs font-semibold rounded-full">
+                      {selectedDriverIds.size} selected
+                    </span>
+                  )}
+                  {selectedDriverIds.size > 0 && (
+                    <button
+                      onClick={handleBulkEdit}
+                      className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Bulk Edit
+                    </button>
+                  )}
+                </div>
+              }
               noPadding
             >
               <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-400px)]">
                 <table className="w-full">
                     <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-30 shadow-sm">
                       <tr>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider sticky left-0 bg-slate-50 dark:bg-slate-800 z-50 min-w-[200px]">
+                        <th className="px-6 py-4 text-center text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider w-12">
+                          <button
+                            onClick={handleSelectAll}
+                            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
+                            title={selectedDriverIds.size === filteredDrivers.length ? 'Deselect all' : 'Select all'}
+                          >
+                            {selectedDriverIds.size === filteredDrivers.length && filteredDrivers.length > 0 ? (
+                              <CheckSquare className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                            ) : (
+                              <Square className="w-5 h-5 text-slate-400" />
+                            )}
+                          </button>
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider sticky left-12 bg-slate-50 dark:bg-slate-800 z-50 min-w-[200px]">
                           Name
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider sticky left-[200px] bg-slate-50 dark:bg-slate-800 z-50 w-48">
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider sticky left-[248px] bg-slate-50 dark:bg-slate-800 z-50 w-48">
                           Current Division
                         </th>
                         <th className="px-6 py-4 text-center text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
@@ -601,7 +840,7 @@ export default function DivisionsPage() {
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-slate-800">
                       {filteredDrivers.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="px-6 py-12 text-center">
+                          <td colSpan={5} className="px-6 py-12 text-center">
                             <p className="text-slate-500 dark:text-slate-400">
                               No drivers found matching your search criteria.
                             </p>
@@ -617,23 +856,42 @@ export default function DivisionsPage() {
                           });
                           const lastChange = driverChanges[0];
                           
+                          const isSelected = selectedDriverIds.has(driver.id);
+                          
                           return (
                             <tr
                               key={driver.id}
                               className={`group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${
                                 pendingChange ? 'bg-amber-50 dark:bg-amber-900/10' : ''
-                              }`}
+                              } ${isSelected ? 'bg-primary-50 dark:bg-primary-900/10' : ''}`}
                             >
-                              <td className={`px-6 py-4 text-sm font-medium text-slate-900 dark:text-white sticky left-0 z-20 ${
+                              <td className="px-6 py-4 text-center">
+                                <button
+                                  onClick={() => handleSelectDriver(driver.id)}
+                                  className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
+                                  title={isSelected ? 'Deselect' : 'Select'}
+                                >
+                                  {isSelected ? (
+                                    <CheckSquare className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                                  ) : (
+                                    <Square className="w-5 h-5 text-slate-400" />
+                                  )}
+                                </button>
+                              </td>
+                              <td className={`px-6 py-4 text-sm font-medium text-slate-900 dark:text-white sticky left-12 z-20 ${
                                 pendingChange 
                                   ? 'bg-amber-50 dark:bg-amber-900/10 border-l-4 border-l-amber-400 group-hover:bg-amber-50 dark:group-hover:bg-amber-900/10' 
+                                  : isSelected
+                                  ? 'bg-primary-50 dark:bg-primary-900/10 group-hover:bg-primary-50 dark:group-hover:bg-primary-900/10'
                                   : 'bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-800'
                               }`}>
                                 {driver.name}
                               </td>
-                              <td className={`px-6 py-4 text-sm sticky left-[200px] z-20 w-48 ${
+                              <td className={`px-6 py-4 text-sm sticky left-[248px] z-20 w-48 ${
                                 pendingChange 
                                   ? 'bg-amber-50 dark:bg-amber-900/10 group-hover:bg-amber-50 dark:group-hover:bg-amber-900/10' 
+                                  : isSelected
+                                  ? 'bg-primary-50 dark:bg-primary-900/10 group-hover:bg-primary-50 dark:group-hover:bg-primary-900/10'
                                   : 'bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-800'
                               }`}>
                                 <div className="relative inline-block">
@@ -1025,6 +1283,196 @@ export default function DivisionsPage() {
         />
       )}
 
+      {/* Bulk Edit Modal */}
+      {showBulkEditModal && selectedSeason && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  Bulk Edit Division Changes
+                </h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                  {selectedDriverIds.size} driver{selectedDriverIds.size !== 1 ? 's' : ''} selected
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowBulkEditModal(false);
+                  setBulkEditRoundId('');
+                  setBulkEditFromDivision('');
+                  setBulkEditToDivision('');
+                  setBulkEditChangeType('promotion');
+                  setBulkEditDivisionStart('');
+                }}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Change Type */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Change Type
+                </label>
+                <select
+                  value={bulkEditChangeType}
+                  onChange={(e) => {
+                    const newType = e.target.value as 'promotion' | 'demotion' | 'division_start' | 'mid_season_join';
+                    setBulkEditChangeType(newType);
+                    if (newType === 'division_start' || newType === 'mid_season_join') {
+                      setBulkEditFromDivision('');
+                      setBulkEditToDivision('');
+                    } else {
+                      setBulkEditDivisionStart('');
+                    }
+                  }}
+                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                >
+                  <option value="promotion">Promotion / Demotion (Within Season)</option>
+                  <option value="division_start">Pre-Season Division Start</option>
+                  <option value="mid_season_join">Mid-Season Join</option>
+                </select>
+              </div>
+
+              {/* Round Selection */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  {bulkEditChangeType === 'mid_season_join' ? 'Round Joined' : 'Round'}
+                </label>
+                <select
+                  value={bulkEditRoundId}
+                  onChange={(e) => setBulkEditRoundId(e.target.value)}
+                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                >
+                  <option value="">Select a round</option>
+                  <option value={`pre-season-${selectedSeason.id}`}>Pre-Season (Before Season Start)</option>
+                  {[...rounds].sort((a, b) => (a.roundNumber || 0) - (b.roundNumber || 0)).map((round) => (
+                    <option key={round.id} value={round.id}>
+                      Round {round.roundNumber} - {round.location || 'TBD'} {round.date ? `(${round.date})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* From/To Division or Division Start */}
+              {(bulkEditChangeType === 'promotion' || bulkEditChangeType === 'demotion') ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      From Division (optional - will use driver's current division if not specified)
+                    </label>
+                    <select
+                      value={bulkEditFromDivision}
+                      onChange={(e) => setBulkEditFromDivision(e.target.value as Division)}
+                      className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                    >
+                      <option value="">Use driver's current division</option>
+                      <option value="Division 1">Division 1</option>
+                      <option value="Division 2">Division 2</option>
+                      <option value="Division 3">Division 3</option>
+                      <option value="Division 4">Division 4</option>
+                      <option value="New">New</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      To Division
+                    </label>
+                    <select
+                      value={bulkEditToDivision}
+                      onChange={(e) => setBulkEditToDivision(e.target.value as Division)}
+                      className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                    >
+                      <option value="">Select target division</option>
+                      <option value="Division 1">Division 1</option>
+                      <option value="Division 2">Division 2</option>
+                      <option value="Division 3">Division 3</option>
+                      <option value="Division 4">Division 4</option>
+                      <option value="New">New</option>
+                    </select>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Division Start
+                  </label>
+                  <select
+                    value={bulkEditDivisionStart}
+                    onChange={(e) => setBulkEditDivisionStart(e.target.value as Division)}
+                    className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                  >
+                    <option value="">Select division start</option>
+                    <option value="Division 1">Division 1</option>
+                    <option value="Division 2">Division 2</option>
+                    <option value="Division 3">Division 3</option>
+                    <option value="Division 4">Division 4</option>
+                    <option value="New">New</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Selected Drivers List */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Selected Drivers
+                </label>
+                <div className="max-h-40 overflow-y-auto border-2 border-slate-200 dark:border-slate-700 rounded-xl p-3 bg-slate-50 dark:bg-slate-900">
+                  <div className="flex flex-wrap gap-2">
+                    {getSelectedDrivers.map(driver => (
+                      <span
+                        key={driver.id}
+                        className={`px-3 py-1 text-xs font-semibold rounded-full ${getDivisionColor(driver.division)}`}
+                      >
+                        {driver.name} ({driver.division})
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowBulkEditModal(false);
+                  setBulkEditRoundId('');
+                  setBulkEditFromDivision('');
+                  setBulkEditToDivision('');
+                  setBulkEditChangeType('promotion');
+                  setBulkEditDivisionStart('');
+                }}
+                className="flex-1 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkSave}
+                disabled={bulkSaving || !bulkEditRoundId || 
+                  ((bulkEditChangeType === 'promotion' || bulkEditChangeType === 'demotion') && !bulkEditToDivision) ||
+                  ((bulkEditChangeType === 'division_start' || bulkEditChangeType === 'mid_season_join') && !bulkEditDivisionStart)}
+                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {bulkSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Save Changes
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Division History Modal */}
       {showDivisionHistoryModal && selectedDriverHistory && selectedSeason && (
         <DivisionHistoryModal
@@ -1038,6 +1486,7 @@ export default function DivisionsPage() {
           seasonId={selectedSeason.id}
           rounds={rounds}
           divisionChanges={divisionChanges.filter(c => c.driverId === selectedDriverHistory.id)}
+          drivers={drivers}
           onEdit={(change) => {
             setShowDivisionHistoryModal(false);
             setSelectedDriverForChange({ 
@@ -1211,15 +1660,15 @@ function DivisionChangeModal({
       // Default to promotion/demotion for existing rounds
       const selectedRound = rounds.find(r => r.id === selectedRoundId);
       if (selectedRound && fromDivision && toDivision && fromDivision !== toDivision) {
-        const divisionOrder: Record<Division, number> = {
+        const divisionOrder: Partial<Record<Division, number>> = {
           'Division 1': 1,
           'Division 2': 2,
           'Division 3': 3,
           'Division 4': 4,
           'New': 5,
         };
-        const fromOrder = divisionOrder[fromDivision];
-        const toOrder = divisionOrder[toDivision];
+        const fromOrder = divisionOrder[fromDivision] ?? 5;
+        const toOrder = divisionOrder[toDivision] ?? 5;
         setChangeType(toOrder < fromOrder ? 'promotion' : 'demotion');
       }
     }
@@ -1258,15 +1707,15 @@ function DivisionChangeModal({
 
       // Determine change type for regular changes
       if (isRegularChange && fromDivision && toDivision) {
-        const divisionOrder: Record<Division, number> = {
+        const divisionOrder: Partial<Record<Division, number>> = {
           'Division 1': 1,
           'Division 2': 2,
           'Division 3': 3,
           'Division 4': 4,
           'New': 5,
         };
-        const fromOrder = divisionOrder[fromDivision];
-        const toOrder = divisionOrder[toDivision];
+        const fromOrder = divisionOrder[fromDivision] ?? 5;
+        const toOrder = divisionOrder[toDivision] ?? 5;
         finalChangeType = toOrder < fromOrder ? 'promotion' : 'demotion';
       }
 
@@ -1297,14 +1746,8 @@ function DivisionChangeModal({
         }
       }
 
-      // Delete existing change if editing
-      if (existingChange) {
-        await fetch(`/api/division-changes?id=${existingChange.id}&seasonId=${seasonId}`, {
-          method: 'DELETE'
-        });
-      }
-
       // Create/update division change
+      // The API will automatically update if a division change exists for this driver and round
       const response = await fetch('/api/division-changes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1662,6 +2105,7 @@ interface DivisionHistoryModalProps {
   seasonId: string;
   rounds: any[];
   divisionChanges: any[];
+  drivers: any[]; // Add drivers prop to get current division
   onEdit: (change: any) => void;
   onDelete: (changeId: string) => void;
 }
@@ -1669,13 +2113,77 @@ interface DivisionHistoryModalProps {
 function DivisionHistoryModal({
   isOpen,
   onClose,
+  driverId,
   driverName,
   rounds,
   divisionChanges,
+  drivers,
   onEdit,
   onDelete
 }: DivisionHistoryModalProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  
+  // Helper function to get driver's division at a specific round
+  const getDriverDivisionAtRound = (roundId: string, roundNumber: number): Division | undefined => {
+    if (!driverId || !divisionChanges.length) {
+      const d = drivers.find((d: any) => d.id === driverId);
+      return d?.division;
+    }
+    
+    const driverChanges = divisionChanges.filter((c: any) => c.driverId === driverId);
+    if (driverChanges.length === 0) {
+      const d = drivers.find((d: any) => d.id === driverId);
+      return d?.division;
+    }
+    
+    const targetRound = rounds.find((r: any) => r.id === roundId);
+    const targetRoundNumber = targetRound?.roundNumber || roundNumber;
+    const isTargetPreSeason = roundId.startsWith('pre-season-');
+    
+    const sortedChanges = [...driverChanges].sort((a: any, b: any) => {
+      const aIsPreSeason = a.roundId.startsWith('pre-season-');
+      const bIsPreSeason = b.roundId.startsWith('pre-season-');
+      if (aIsPreSeason && !bIsPreSeason) return -1;
+      if (!aIsPreSeason && bIsPreSeason) return 1;
+      if (aIsPreSeason && bIsPreSeason) return 0;
+      const aRound = rounds.find((r: any) => r.id === a.roundId);
+      const bRound = rounds.find((r: any) => r.id === b.roundId);
+      const aRoundNumber = aRound?.roundNumber || 0;
+      const bRoundNumber = bRound?.roundNumber || 0;
+      return aRoundNumber - bRoundNumber;
+    });
+    
+    let mostRecentChange = null;
+    for (const change of sortedChanges) {
+      const changeIsPreSeason = change.roundId.startsWith('pre-season-');
+      if (isTargetPreSeason) {
+        if (changeIsPreSeason) mostRecentChange = change;
+        continue;
+      }
+      if (changeIsPreSeason) {
+        mostRecentChange = change;
+        continue;
+      }
+      const changeRound = rounds.find((r: any) => r.id === change.roundId);
+      const changeRoundNumber = changeRound?.roundNumber || 0;
+      if (changeRoundNumber <= targetRoundNumber) {
+        mostRecentChange = change;
+      } else {
+        break;
+      }
+    }
+    
+    if (mostRecentChange) {
+      if (mostRecentChange.changeType === 'promotion' || mostRecentChange.changeType === 'demotion') {
+        return mostRecentChange.toDivision;
+      } else if (mostRecentChange.changeType === 'division_start' || mostRecentChange.changeType === 'mid_season_join') {
+        return mostRecentChange.divisionStart;
+      }
+    }
+    
+    const d = drivers.find((d: any) => d.id === driverId);
+    return d?.division;
+  };
 
   // Helper to get round number for sorting (pre-season = 0, so it appears first)
   const getRoundNumberForSort = (roundId: string, rounds: any[]): number => {
@@ -1750,6 +2258,32 @@ function DivisionHistoryModal({
                 const roundDisplayName = getRoundDisplayName(change.roundId, rounds);
                 const isPreSeason = change.roundId.startsWith('pre-season-');
                 
+                // Get the driver's division at this round
+                // The division shown should be the division the driver was in FOR that round
+                // For promotion/demotion: show the "from" division (what they were before the change)
+                // For division_start/mid_season_join: show the divisionStart (what they started in)
+                const round = rounds.find((r: any) => r.id === change.roundId);
+                let driverDivisionAtRound: Division | undefined;
+                
+                if (change.changeType === 'promotion' || change.changeType === 'demotion') {
+                  // For promotions/demotions, the driver was in the "from" division at this round
+                  driverDivisionAtRound = change.fromDivision;
+                } else if (change.changeType === 'division_start' || change.changeType === 'mid_season_join') {
+                  // For division start/join, they started in the divisionStart
+                  driverDivisionAtRound = change.divisionStart;
+                } else {
+                  // Fallback: use the helper function
+                  driverDivisionAtRound = getDriverDivisionAtRound(change.roundId, round?.roundNumber || 0);
+                }
+                
+                // Determine the division after this change
+                let divisionAfterChange: Division | undefined;
+                if (change.changeType === 'promotion' || change.changeType === 'demotion') {
+                  divisionAfterChange = change.toDivision;
+                } else if (change.changeType === 'division_start' || change.changeType === 'mid_season_join') {
+                  divisionAfterChange = change.divisionStart;
+                }
+                
                 return (
                   <div
                     key={change.id}
@@ -1757,7 +2291,7 @@ function DivisionHistoryModal({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
                           <span className="text-sm font-semibold text-slate-900 dark:text-white">
                             {isPreSeason ? (
                               <span className="flex items-center gap-1">
@@ -1783,6 +2317,28 @@ function DivisionHistoryModal({
                              'Mid-Season Join'}
                           </span>
                         </div>
+                        {/* Show division change details for promotion/demotion */}
+                        {(change.changeType === 'promotion' || change.changeType === 'demotion') && change.fromDivision && change.toDivision && (
+                          <div className="flex items-center gap-2 mt-2 text-sm">
+                            <span className="text-slate-600 dark:text-slate-400">From:</span>
+                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getDivisionColor(change.fromDivision)}`}>
+                              {change.fromDivision}
+                            </span>
+                            <span className="text-slate-400 dark:text-slate-500">→</span>
+                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getDivisionColor(change.toDivision)}`}>
+                              {change.toDivision}
+                            </span>
+                          </div>
+                        )}
+                        {/* Show division start for division_start and mid_season_join */}
+                        {(change.changeType === 'division_start' || change.changeType === 'mid_season_join') && change.divisionStart && (
+                          <div className="flex items-center gap-2 mt-2 text-sm">
+                            <span className="text-slate-600 dark:text-slate-400">Started in:</span>
+                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getDivisionColor(change.divisionStart)}`}>
+                              {change.divisionStart}
+                            </span>
+                          </div>
+                        )}
                         {change.createdAt && (
                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
                             {new Date(change.createdAt).toLocaleDateString()}

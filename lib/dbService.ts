@@ -378,6 +378,70 @@ export async function addDriver(driver: Driver, seasonId: string): Promise<void>
       ${driver.dateOfBirth || ''}, ${driver.homeTrack || ''}, ${aliases}
     )
   `;
+  
+  // Automatically create a division_changes entry when onboarding a driver
+  // This ensures proper historical division tracking based on when the driver joined
+  try {
+    // Determine if it's start of season or mid-season based on existing race results
+    const rounds = await getRoundsBySeasonId(seasonId);
+    const sortedRounds = rounds.sort((a, b) => (a.roundNumber || 0) - (b.roundNumber || 0));
+    
+    // Check if there are any race results for this season to determine if it's mid-season
+    const raceResultsCheck = await sql`
+      SELECT COUNT(*) as count
+      FROM race_results
+      WHERE round_id IN (SELECT id FROM rounds WHERE season_id = ${seasonId})
+      LIMIT 1
+    ` as any[];
+    
+    const hasRaceResults = (raceResultsCheck[0]?.count || 0) > 0;
+    
+    // Determine round ID and change type based on whether season has started
+    let roundId: string;
+    let changeType: 'division_start' | 'mid_season_join';
+    let divisionStart: Division;
+    
+    // Logic: If race results exist, driver is joining mid-season. Otherwise, it's start of season.
+    if (hasRaceResults) {
+      // Mid-season join: driver is joining after season has started (race results exist)
+      // Use the first round of the season to establish when they joined
+      // This provides a baseline for historical division tracking
+      // Users can adjust the round in the divisions management page if needed
+      roundId = sortedRounds.length > 0 ? sortedRounds[0].id : `pre-season-${seasonId}`;
+      changeType = 'mid_season_join';
+      divisionStart = driver.division;
+    } else {
+      // Start of season: use pre-season round
+      // Driver is being added before any races have occurred
+      roundId = `pre-season-${seasonId}`;
+      changeType = 'division_start';
+      divisionStart = driver.division;
+    }
+    
+    // Create division change entry
+    // Use addDivisionChange to ensure we update if a change already exists for this driver and round
+    const changeId = `div-change-${driver.id}-${Date.now()}`;
+    const now = new Date().toISOString();
+    
+    const divisionChange: DivisionChange = {
+      id: changeId,
+      seasonId: seasonId,
+      roundId: roundId,
+      driverId: driver.id,
+      driverName: driver.name,
+      fromDivision: undefined,
+      toDivision: undefined,
+      divisionStart: divisionStart,
+      changeType: changeType,
+      createdAt: now,
+    };
+    
+    await addDivisionChange(divisionChange);
+  } catch (error) {
+    // If division_changes insertion fails, log but don't fail the driver creation
+    // This ensures driver onboarding can still succeed even if division_changes has issues
+    console.error('Failed to create division_changes entry for driver:', driver.id, error);
+  }
 }
 
 export async function updateDriver(driver: Driver, seasonId?: string): Promise<void> {
@@ -444,16 +508,27 @@ export interface RaceDivisionResult {
   results: (DriverRaceResult & { raceType?: string; raceName?: string; finalType?: string; confirmed?: boolean })[];
 }
 
-export async function getRaceResultsByRound(roundId: string, resultsSheetId?: string): Promise<RaceDivisionResult[]> {
-  // Build query with optional resultsSheetId filter
+export async function getRaceResultsByRound(roundId: string, resultsSheetId?: string, raceName?: string): Promise<RaceDivisionResult[]> {
+  // Build query with optional resultsSheetId and raceName filters
   let query;
-  if (resultsSheetId) {
+  if (resultsSheetId && raceName) {
+    // Filter by both resultsSheetId AND raceName to prevent cross-contamination
+    query = sql`
+      SELECT * FROM race_results
+      WHERE round_id = ${roundId} 
+        AND results_sheet_id = ${resultsSheetId}
+        AND race_name = ${raceName}
+      ORDER BY race_division, grid_position
+    `;
+  } else if (resultsSheetId) {
+    // Filter by resultsSheetId only (may return multiple races)
     query = sql`
       SELECT * FROM race_results
       WHERE round_id = ${roundId} AND results_sheet_id = ${resultsSheetId}
       ORDER BY race_division, grid_position
     `;
   } else {
+    // No filters - return all results for the round
     query = sql`
     SELECT * FROM race_results
     WHERE round_id = ${roundId}
@@ -623,8 +698,26 @@ export async function deleteRaceResult(roundId: string, driverId: string, raceTy
   }
 }
 
-export async function deleteRaceResultsByRaceType(roundId: string, raceType: string): Promise<void> {
-  await sql`DELETE FROM race_results WHERE round_id = ${roundId} AND race_type = ${raceType}`;
+export async function deleteRaceResultsByRaceType(roundId: string, raceType: string, raceDivision?: string, finalType?: string): Promise<void> {
+  // Build the DELETE query with appropriate filters
+  // Always filter by round_id and race_type
+  // Optionally filter by race_division and final_type to ensure we only delete results from the specific division and race group
+  
+  if (raceDivision && finalType) {
+    // Most specific: delete by round, race type, race division, and final type
+    // Use COALESCE to handle cases where race_division might be NULL and fall back to division column
+    await sql`DELETE FROM race_results WHERE round_id = ${roundId} AND race_type = ${raceType} AND COALESCE(race_division, division) = ${raceDivision} AND final_type = ${finalType}`;
+  } else if (raceDivision) {
+    // Delete by round, race type, and race division
+    // Use COALESCE to handle cases where race_division might be NULL and fall back to division column
+    await sql`DELETE FROM race_results WHERE round_id = ${roundId} AND race_type = ${raceType} AND COALESCE(race_division, division) = ${raceDivision}`;
+  } else if (finalType) {
+    // Delete by round, race type, and final type
+    await sql`DELETE FROM race_results WHERE round_id = ${roundId} AND race_type = ${raceType} AND final_type = ${finalType}`;
+  } else {
+    // Fallback: delete by round and race type only (less specific, but maintains backward compatibility)
+    await sql`DELETE FROM race_results WHERE round_id = ${roundId} AND race_type = ${raceType}`;
+  }
 }
 
 // ============================================================================
@@ -781,6 +874,7 @@ export interface Points {
   finalType?: string;
   overallPosition?: number;
   points: number;
+  note?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -797,6 +891,7 @@ export async function getPointsByRound(roundId: string): Promise<Points[]> {
     finalType: p.final_type || undefined,
     overallPosition: p.overall_position || undefined,
     points: parseFloat(p.points) || 0,
+    note: p.note || undefined,
     createdAt: p.created_at || '',
     updatedAt: p.updated_at || '',
   }));
@@ -816,6 +911,7 @@ export async function getPointsByDriver(driverId: string, seasonId?: string): Pr
     finalType: p.final_type || undefined,
     overallPosition: p.overall_position || undefined,
     points: parseFloat(p.points) || 0,
+    note: p.note || undefined,
     createdAt: p.created_at || '',
     updatedAt: p.updated_at || '',
   }));
@@ -833,6 +929,7 @@ export async function getPointsBySeason(seasonId: string): Promise<Points[]> {
     finalType: p.final_type || undefined,
     overallPosition: p.overall_position || undefined,
     points: parseFloat(p.points) || 0,
+    note: p.note || undefined,
     createdAt: p.created_at || '',
     updatedAt: p.updated_at || '',
   }));
@@ -842,17 +939,19 @@ export async function addPoints(points: Points): Promise<void> {
   await sql`
     INSERT INTO points (
       id, season_id, round_id, driver_id, division, race_type, final_type,
-      overall_position, points, created_at, updated_at
+      overall_position, points, note, created_at, updated_at
     ) VALUES (
       ${points.id}, ${points.seasonId}, ${points.roundId}, ${points.driverId},
       ${points.division}, ${points.raceType || 'qualification'}, ${points.finalType || null},
-      ${points.overallPosition || null}, ${points.points}, 
+      ${points.overallPosition || null}, ${points.points}, ${points.note || null},
       ${points.createdAt || new Date().toISOString()}, ${points.updatedAt || new Date().toISOString()}
     )
     ON CONFLICT (round_id, driver_id, race_type, final_type)
     DO UPDATE SET
+      division = EXCLUDED.division,  -- Preserve historical division at time of race
       overall_position = EXCLUDED.overall_position,
       points = EXCLUDED.points,
+      note = EXCLUDED.note,
       updated_at = CURRENT_TIMESTAMP
   `;
 }
@@ -860,8 +959,10 @@ export async function addPoints(points: Points): Promise<void> {
 export async function updatePoints(points: Points): Promise<void> {
   await sql`
     UPDATE points
-    SET overall_position = ${points.overallPosition || null},
+    SET division = ${points.division},  -- Preserve historical division
+        overall_position = ${points.overallPosition || null},
         points = ${points.points},
+        note = ${points.note || null},
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ${points.id}
   `;
@@ -907,17 +1008,61 @@ export interface DivisionChange {
   pointsAdjustments?: Record<string, number>; // roundId -> points adjustment
 }
 
+export async function getDivisionChangeByDriverAndRound(driverId: string, roundId: string): Promise<DivisionChange | null> {
+  const changes = await sql`
+    SELECT * FROM division_changes 
+    WHERE driver_id = ${driverId} AND round_id = ${roundId}
+    LIMIT 1
+  ` as any[];
+  
+  if (changes.length === 0) {
+    return null;
+  }
+  
+  const c = changes[0];
+  return {
+    id: c.id,
+    seasonId: c.season_id,
+    roundId: c.round_id,
+    driverId: c.driver_id,
+    driverName: c.driver_name,
+    fromDivision: c.from_division as Division | undefined,
+    toDivision: c.to_division as Division | undefined,
+    divisionStart: c.division_start as Division | undefined,
+    changeType: c.change_type as 'promotion' | 'demotion' | 'division_start' | 'mid_season_join',
+    createdAt: c.created_at || '',
+  };
+}
+
 export async function addDivisionChange(change: DivisionChange): Promise<void> {
-  await sql`
-    INSERT INTO division_changes (
-      id, season_id, round_id, driver_id, driver_name,
-      from_division, to_division, division_start, change_type, created_at
-    ) VALUES (
-      ${change.id}, ${change.seasonId}, ${change.roundId}, ${change.driverId},
-      ${change.driverName}, ${change.fromDivision || null}, ${change.toDivision || null}, 
-      ${change.divisionStart || null}, ${change.changeType}, ${change.createdAt || new Date().toISOString()}
-    )
-  `;
+  // Check if a division change already exists for this driver and round
+  const existingChange = await getDivisionChangeByDriverAndRound(change.driverId, change.roundId);
+  
+  if (existingChange) {
+    // Update existing division change instead of creating a new one
+    await sql`
+      UPDATE division_changes
+      SET 
+        driver_name = ${change.driverName},
+        from_division = ${change.fromDivision || null},
+        to_division = ${change.toDivision || null},
+        division_start = ${change.divisionStart || null},
+        change_type = ${change.changeType}
+      WHERE driver_id = ${change.driverId} AND round_id = ${change.roundId}
+    `;
+  } else {
+    // Insert new division change
+    await sql`
+      INSERT INTO division_changes (
+        id, season_id, round_id, driver_id, driver_name,
+        from_division, to_division, division_start, change_type, created_at
+      ) VALUES (
+        ${change.id}, ${change.seasonId}, ${change.roundId}, ${change.driverId},
+        ${change.driverName}, ${change.fromDivision || null}, ${change.toDivision || null}, 
+        ${change.divisionStart || null}, ${change.changeType}, ${change.createdAt || new Date().toISOString()}
+      )
+    `;
+  }
   
   // Note: Points adjustments are handled separately by the API
   // The pointsAdjustments field is stored but not processed here

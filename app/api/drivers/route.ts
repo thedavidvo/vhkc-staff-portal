@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
     // Invalidate cache
     cache.invalidate(`drivers:${seasonId}`);
     cache.invalidatePattern('drivers:');
+    cache.invalidatePattern('division-changes:');
     
     return NextResponse.json({ success: true });
   } catch (error) {

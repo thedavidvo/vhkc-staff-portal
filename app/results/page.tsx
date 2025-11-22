@@ -10,7 +10,7 @@ import { getPointsForPosition } from '@/lib/pointsSystem';
 import { Loader2, Filter, Trophy, Search, FileText } from 'lucide-react';
 
 // Helper function to get division color
-const getDivisionColor = (division: Division) => {
+const getDivisionColor = (division: Division | 'Open') => {
   switch (division) {
     case 'Division 1':
       return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
@@ -22,6 +22,8 @@ const getDivisionColor = (division: Division) => {
       return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
     case 'New':
       return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
+    case 'Open':
+      return 'bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200';
     default:
       return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
   }
@@ -44,6 +46,74 @@ const getFinalTypeColor = (finalType?: string) => {
       return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
     case 'F':
       return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
+    default:
+      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
+  }
+};
+
+// Helper function to get race type color
+const getRaceTypeColor = (raceType?: string, finalType?: string) => {
+  if (!raceType) return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
+  
+  const lowerRaceType = raceType.toLowerCase();
+  
+  // For qualification races, use different colors based on group number
+  if (lowerRaceType === 'qualification' && finalType) {
+    // Parse group number from finalType (could be "1", "2", "3", etc. or "A", "B", "C", etc.)
+    const groupStr = finalType.toUpperCase();
+    
+    // If it's a number (1, 2, 3, etc.)
+    const groupNum = parseInt(groupStr, 10);
+    if (!isNaN(groupNum)) {
+      // Use different colors for different qualification groups - more distinct colors
+      switch (groupNum) {
+        case 1:
+          return 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200';
+        case 2:
+          return 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200';
+        case 3:
+          return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
+        case 4:
+          return 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200';
+        case 5:
+          return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
+        case 6:
+          return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
+        default:
+          // For groups beyond 6, cycle through colors
+          const colorIndex = (groupNum - 1) % 6;
+          const colors = [
+            'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200',
+            'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200',
+            'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200',
+            'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200',
+            'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200',
+            'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200',
+          ];
+          return colors[colorIndex];
+      }
+    }
+    
+    // If it's a letter (A, B, C, etc.), use the final type color
+    return getFinalTypeColor(finalType);
+  }
+  
+  // For qualification without finalType, use default cyan
+  if (lowerRaceType === 'qualification') {
+    return 'bg-cyan-100 dark:bg-cyan-900 text-cyan-800 dark:text-cyan-200';
+  }
+  
+  // For heat and final races with finalType, use the final type color
+  if (finalType && (lowerRaceType === 'heat' || lowerRaceType === 'final')) {
+    return getFinalTypeColor(finalType);
+  }
+  
+  // Default colors for race types without finalType
+  switch (lowerRaceType) {
+    case 'heat':
+      return 'bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200';
+    case 'final':
+      return 'bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200';
     default:
       return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
   }
@@ -75,7 +145,7 @@ interface RaceResult {
   date: string;
   driverId: string;
   driverName: string;
-  division: Division; // Race division
+  division: Division | 'Open'; // Race division
   position: number;
   fastestLap: string;
   points: number;
@@ -92,6 +162,7 @@ export default function ResultsPage() {
   const [selectedDivisions, setSelectedDivisions] = useState<Division[]>([]);
   const [selectedRaceType, setSelectedRaceType] = useState<string>('');
   const [selectedRound, setSelectedRound] = useState<string>('');
+  const [selectedFinalType, setSelectedFinalType] = useState<string>('');
   const [sortBy, setSortBy] = useState<'position' | 'time' | 'points'>('position');
   const [drivers, setDrivers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -246,7 +317,9 @@ export default function ResultsPage() {
               if (resultsResponse.ok) {
                 const resultsData = await resultsResponse.json();
                 // Flatten the results structure
+                // divisionResult.division is the race_division (the division the race was run in)
                 resultsData.forEach((divisionResult: any) => {
+                  const raceDivision = divisionResult.division; // This is the race division
                   divisionResult.results?.forEach((result: any) => {
                     allResults.push({
                       roundId: round.id,
@@ -255,7 +328,7 @@ export default function ResultsPage() {
                       date: round.date,
                       driverId: result.driverId,
                       driverName: result.driverName || '',
-                      division: divisionResult.division,
+                      division: raceDivision, // Use race division (race_division) for filtering
                       position: result.position,
                       fastestLap: result.fastestLap || '',
                       points: 0, // Will be calculated dynamically
@@ -287,8 +360,48 @@ export default function ResultsPage() {
     raceResults.forEach(r => {
       if (r.raceType) types.add(r.raceType);
     });
-    return Array.from(types).sort();
+    // Always include qualification, heat, and final if they exist
+    const typeArray = Array.from(types);
+    const orderedTypes: string[] = [];
+    if (typeArray.includes('qualification')) orderedTypes.push('qualification');
+    if (typeArray.includes('heat')) orderedTypes.push('heat');
+    if (typeArray.includes('final')) orderedTypes.push('final');
+    // Add any other types
+    typeArray.forEach(t => {
+      if (!['qualification', 'heat', 'final'].includes(t)) {
+        orderedTypes.push(t);
+      }
+    });
+    return orderedTypes;
   }, [raceResults]);
+
+  // Get available divisions based on race type
+  const availableDivisions = useMemo(() => {
+    if (selectedRaceType === 'heat') {
+      // Heat races: Only Division 1, Division 2, and Open
+      return ['Division 1', 'Division 2', 'Open'] as (Division | 'Open')[];
+    }
+    if (selectedRaceType === 'final') {
+      // Final races: Division 1, Division 2, Division 3, Division 4, New (no Open)
+      return ['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'] as Division[];
+    }
+    // For other race types (qualification), show all divisions
+    return ['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New', 'Open'] as (Division | 'Open')[];
+  }, [selectedRaceType]);
+
+  // Get available final types from current data - filter by selected race type
+  const availableFinalTypes = useMemo(() => {
+    if (!selectedRaceType) return [];
+    
+    const finalTypes = new Set<string>();
+    raceResults.forEach(r => {
+      // Only include final types for the selected race type
+      if (r.raceType === selectedRaceType && r.finalType) {
+        finalTypes.add(r.finalType.toUpperCase());
+      }
+    });
+    return Array.from(finalTypes).sort();
+  }, [raceResults, selectedRaceType]);
 
   // Auto-select the first race type when available race types change
   useEffect(() => {
@@ -296,6 +409,24 @@ export default function ResultsPage() {
       setSelectedRaceType(availableRaceTypes[0]);
     }
   }, [availableRaceTypes, selectedRaceType]);
+
+  // Auto-set division based on race type
+  useEffect(() => {
+    // Ensure selected division is in available divisions
+    if (selectedDivisions.length > 0 && !availableDivisions.includes(selectedDivisions[0] as Division | 'Open')) {
+      // Reset to first available division or empty
+      if (availableDivisions.length > 0) {
+        setSelectedDivisions([availableDivisions[0] as Division]);
+      } else {
+        setSelectedDivisions([]);
+      }
+    }
+  }, [selectedRaceType, availableDivisions, selectedDivisions]);
+
+  // Reset final type when race type changes
+  useEffect(() => {
+    setSelectedFinalType('');
+  }, [selectedRaceType]);
 
   // Filter results first (without points calculation)
   const filteredResults = useMemo(() => {
@@ -309,14 +440,37 @@ export default function ResultsPage() {
       );
     }
 
-    // Filter by divisions (multiple)
+    // Filter by race divisions - use race division, not driver division
     if (selectedDivisions.length > 0) {
-      filtered = filtered.filter(r => selectedDivisions.includes(r.division));
+      filtered = filtered.filter(r => {
+        // r.division is the race division (race_division) from divisionResult.division
+        const raceDiv = r.division;
+        const selectedDiv = selectedDivisions[0];
+        
+        // Handle "Open" division - if Open is selected, include results where race division is "Open"
+        if (raceDiv === 'Open' && selectedDiv === 'Open') {
+          return true;
+        }
+        
+        // For final races, filter by driver division at that round
+        if (selectedRaceType === 'final') {
+          const driverDivision = getDriverDivisionAtRound(r.driverId, r.roundId, r.roundNumber);
+          return driverDivision === selectedDiv;
+        }
+        
+        // For other race types, filter by race division
+        return raceDiv === selectedDiv;
+      });
     }
 
     // Filter by race type (single)
     if (selectedRaceType) {
       filtered = filtered.filter(r => r.raceType && r.raceType === selectedRaceType);
+      
+      // Filter by final type if selected and race type is heat or final (not qualification)
+      if (selectedFinalType && (selectedRaceType === 'heat' || selectedRaceType === 'final')) {
+        filtered = filtered.filter(r => (r.finalType || '').toUpperCase() === selectedFinalType.toUpperCase());
+      }
     }
 
     // Filter by round (single) - always filter if a round is selected
@@ -326,6 +480,15 @@ export default function ResultsPage() {
 
     // Sort based on selected sort option
     return filtered.sort((a, b) => {
+      // If race type is qualification, sort ONLY by fastest lap
+      if (selectedRaceType === 'qualification') {
+        // For qualification, sort ONLY by fastest lap time
+        const timeA = parseTime(a.fastestLap);
+        const timeB = parseTime(b.fastestLap);
+        return timeA - timeB;
+      }
+      
+      // For other race types, use the standard sorting logic
       // First sort by round date
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
@@ -356,7 +519,7 @@ export default function ResultsPage() {
         return a.position - b.position;
       }
     });
-  }, [raceResults, selectedDivisions, selectedRaceType, selectedRound, sortBy, searchQuery]);
+  }, [raceResults, selectedDivisions, selectedRaceType, selectedFinalType, selectedRound, sortBy, searchQuery, getDriverDivisionAtRound]);
 
   // Calculate overall position and points based on selected filters
   // Overall position is simply the ranking within the current filtered and sorted results
@@ -438,9 +601,10 @@ export default function ResultsPage() {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Round Filter - Dropdown (Single) */}
-              <div>
+          {/* Inline Filters */}
+          <div className="flex flex-wrap gap-4 items-end">
+              {/* Round Filter */}
+              <div className="flex-1 min-w-[200px]">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Round
                 </label>
@@ -457,69 +621,96 @@ export default function ResultsPage() {
                 </select>
               </div>
 
-              {/* Division Filter - Multiple */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Divisions (Multiple)
-                </label>
-                <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-300 dark:border-slate-700 rounded-lg p-2">
-                  {['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'].map(division => (
-                    <label key={division} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedDivisions.includes(division as Division)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedDivisions([...selectedDivisions, division as Division]);
-                          } else {
-                            setSelectedDivisions(selectedDivisions.filter(d => d !== division));
-                          }
-                        }}
-                        className="rounded border-slate-300 dark:border-slate-700"
-                      />
-                      <span className="text-sm text-slate-700 dark:text-slate-300">{division}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Race Type Filter - Dropdown (Single) - No "All" option */}
-              <div>
+              {/* Race Type Filter */}
+              <div className="flex-1 min-w-[200px]">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Race Type
                 </label>
                 <select
                   value={selectedRaceType}
-                  onChange={(e) => setSelectedRaceType(e.target.value)}
+                  onChange={(e) => {
+                    const newRaceType = e.target.value;
+                    setSelectedRaceType(newRaceType);
+                    // Clear final type when race type changes
+                    setSelectedFinalType('');
+                  }}
                   className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  {availableRaceTypes.length === 0 ? (
-                    <option value="">No race types available</option>
-                  ) : (
-                    availableRaceTypes.map(type => (
-                      <option key={type} value={type}>
-                        {type.charAt(0).toUpperCase() + type.slice(1)}
-                      </option>
-                    ))
+                  <option value="">All Race Types</option>
+                  {availableRaceTypes.includes('qualification') && (
+                    <option value="qualification">Qualification</option>
+                  )}
+                  {availableRaceTypes.includes('heat') && (
+                    <option value="heat">Heat</option>
+                  )}
+                  {availableRaceTypes.includes('final') && (
+                    <option value="final">Final</option>
                   )}
                 </select>
               </div>
 
-              {/* Sort By Filter */}
-              <div>
+              {/* Final Type / Race Group Filter - Show for heat and final only (not qualification) */}
+              {(selectedRaceType === 'heat' || selectedRaceType === 'final') && availableFinalTypes.length > 0 && (
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    {selectedRaceType === 'heat' ? 'Heat Type' : 'Final Type'}
+                  </label>
+                  <select
+                    value={selectedFinalType}
+                    onChange={(e) => setSelectedFinalType(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="">All {selectedRaceType === 'heat' ? 'Heats' : 'Finals'}</option>
+                    {availableFinalTypes.map(finalType => (
+                      <option key={finalType} value={finalType}>
+                        {selectedRaceType === 'heat' ? `Heat ${finalType}` : `Final ${finalType}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Division Filter - Single select like points management */}
+              <div className="flex-1 min-w-[200px]">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Sort By
+                  {selectedRaceType === 'final' ? 'Driver Division' : 'Race Division'}
                 </label>
                 <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'position' | 'time' | 'points')}
+                  value={selectedDivisions.length > 0 ? selectedDivisions[0] : ''}
+                  onChange={(e) => {
+                    const division = e.target.value;
+                    if (division) {
+                      setSelectedDivisions([division as Division]);
+                    } else {
+                      setSelectedDivisions([]);
+                    }
+                  }}
                   className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="position">By Grid Finish</option>
-                  <option value="time">By Time</option>
-                  <option value="points">By Points</option>
+                  <option value="">All Divisions</option>
+                  {availableDivisions.map(div => (
+                    <option key={div} value={div}>{div}</option>
+                  ))}
                 </select>
               </div>
+
+              {/* Sort By Filter - Hide when qualification is selected */}
+              {selectedRaceType !== 'qualification' && (
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Sort By
+                  </label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'position' | 'time' | 'points')}
+                    className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="position">By Grid Finish</option>
+                    <option value="time">By Time</option>
+                    <option value="points">By Points</option>
+                  </select>
+                </div>
+              )}
             </div>
         </SectionCard>
 
@@ -603,12 +794,12 @@ export default function ResultsPage() {
                           Round {result.roundNumber}: {result.roundName}
                         </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(result.division)}`}>
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(result.division as Division | 'Open')}`}>
                               {result.division}
                             </span>
                           </td>
                         <td className="px-4 py-3">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${result.finalType ? getFinalTypeColor(result.finalType) : 'bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200'}`}>
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getRaceTypeColor(result.raceType, result.finalType)}`}>
                             {formatRaceType(result.raceType, result.finalType)}
                           </span>
                         </td>
