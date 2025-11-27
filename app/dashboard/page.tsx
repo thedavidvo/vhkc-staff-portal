@@ -252,6 +252,7 @@ export default function Dashboard() {
       'Division 3': [],
       'Division 4': [],
       'New': [],
+      'Open': [],
     };
 
     divisions.forEach((division) => {

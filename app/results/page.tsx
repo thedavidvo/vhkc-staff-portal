@@ -676,7 +676,7 @@ export default function ResultsPage() {
                 </div>
               )}
 
-              {/* Race Division Filter - Conditional options based on race type */}
+              {/* Race Division Filter */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Race Division
@@ -688,16 +688,7 @@ export default function ResultsPage() {
                 >
                   <option value="Division 1">Division 1</option>
                   <option value="Division 2">Division 2</option>
-                  {(selectedRaceType === 'qualification' || selectedRaceType === 'heat') && (
-                    <option value="Open">Open</option>
-                  )}
-                  {selectedRaceType === 'final' && (
-                    <>
-                      <option value="Division 3">Division 3</option>
-                      <option value="Division 4">Division 4</option>
-                      <option value="New">New</option>
-                    </>
-                  )}
+                  <option value="Open">Open</option>
                 </select>
               </div>
 

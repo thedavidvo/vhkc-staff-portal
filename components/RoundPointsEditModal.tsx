@@ -189,6 +189,7 @@ export default function RoundPointsEditModal({
         'Division 3': 3,
         'Division 4': 4,
         'New': 5,
+        'Open': 6,
       };
       const fromOrder = divisionOrder[currentDivision];
       const toOrder = divisionOrder[newDivision];

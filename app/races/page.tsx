@@ -662,6 +662,7 @@ export default function RacesPage() {
       'Division 3': 0,
       'Division 4': 0,
       'New': 0,
+      'Open': 0,
     };
     const uniqueDrivers: Record<Division, Set<string>> = {
       'Division 1': new Set(),
@@ -669,6 +670,7 @@ export default function RacesPage() {
       'Division 3': new Set(),
       'Division 4': new Set(),
       'New': new Set(),
+      'Open': new Set(),
     };
     
     // Count unique drivers per division
@@ -691,6 +693,7 @@ export default function RacesPage() {
       'Division 3': uniqueDrivers['Division 3'].size,
       'Division 4': uniqueDrivers['Division 4'].size,
       'New': uniqueDrivers['New'].size,
+      'Open': uniqueDrivers['Open'].size,
     };
     
     return counts;
