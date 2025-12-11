@@ -298,8 +298,22 @@ export default function DivisionsPage() {
     const newDivision = newDiv as Division;
     const currentOrder = divisionOrder[currentDivision] ?? 5;
     const newOrder = divisionOrder[newDivision] ?? 5;
-    // Promotion: moving to a lower number (better division)
-    const type = newOrder < currentOrder ? 'promotion' : 'demotion';
+    
+    // Determine type with special handling for "New" division
+    let type: 'promotion' | 'demotion';
+    if (currentDivision === 'New') {
+      // From New division
+      if (newDivision === 'Division 1' || newDivision === 'Division 2') {
+        type = 'promotion';
+      } else if (newDivision === 'Division 3') {
+        type = 'promotion'; // Treat as promotion for display purposes even though no points change
+      } else {
+        type = 'demotion'; // Division 4 from New
+      }
+    } else {
+      // Standard logic: Promotion = moving to a lower number (better division)
+      type = newOrder < currentOrder ? 'promotion' : 'demotion';
+    }
 
     // Check if this driver already has a pending change
     const existingIndex = pendingChanges.findIndex((p) => p.driverId === driverId);
@@ -350,9 +364,23 @@ export default function DivisionsPage() {
       };
       const fromOrder = divisionOrder[oldDivision] ?? 5;
       const toOrder = divisionOrder[newDivision] ?? 5;
-      // Promotion: moving to a lower number (better division)
-      // Demotion: moving to a higher number (worse division)
-      const changeType = toOrder < fromOrder ? 'promotion' : 'demotion';
+      
+      // Determine change type with special handling for "New" division
+      let changeType: 'promotion' | 'demotion';
+      if (oldDivision === 'New') {
+        // From New division
+        if (newDivision === 'Division 1' || newDivision === 'Division 2') {
+          changeType = 'promotion';
+        } else if (newDivision === 'Division 3') {
+          changeType = 'promotion'; // Treat as promotion for display purposes even though no points change
+        } else {
+          changeType = 'demotion'; // Division 4 from New
+        }
+      } else {
+        // Standard logic: Promotion = moving to a lower number (better division)
+        // Demotion = moving to a higher number (worse division)
+        changeType = toOrder < fromOrder ? 'promotion' : 'demotion';
+      }
 
       // Fetch the driver
       const driverResponse = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
@@ -1642,21 +1670,46 @@ function DivisionChangeModal({
           };
           const fromOrder = divisionOrder[fromDivision] ?? 5;
           const toOrder = divisionOrder[toDivision] ?? 5;
-          const isPromotion = toOrder < fromOrder;
           
           // Apply formula to calculate new total
           let newTotal: number;
-          if (isPromotion) {
-            // Promotion: round points * 0.66, capped at 75
-            newTotal = Math.round(currentTotal * 0.66);
-            newTotal = Math.min(newTotal, 75);
-          } else {
-            // Demotion: round points * 1.66, capped at 75. If result is lower than 20, add 10
-            newTotal = Math.round(currentTotal * 1.66);
-            if (newTotal < 20) {
-              newTotal += 10;
+          
+          // Special handling for transitions from "New" division
+          if (fromDivision === 'New') {
+            if (toDivision === 'Division 1' || toDivision === 'Division 2') {
+              // New -> Division 1 or Division 2: Promotion (0.66 multiplier)
+              newTotal = Math.round(currentTotal * 0.66);
+              newTotal = Math.min(newTotal, 75);
+            } else if (toDivision === 'Division 3') {
+              // New -> Division 3: No change in points
+              newTotal = currentTotal;
+            } else if (toDivision === 'Division 4') {
+              // New -> Division 4: Demotion (1.66 multiplier)
+              newTotal = Math.round(currentTotal * 1.66);
+              if (newTotal < 20) {
+                newTotal += 10;
+              }
+              newTotal = Math.min(newTotal, 75);
+            } else {
+              // Fallback for any other case
+              newTotal = currentTotal;
             }
-            newTotal = Math.min(newTotal, 75);
+          } else {
+            // Standard logic for non-"New" divisions
+            const isPromotion = toOrder < fromOrder;
+            
+            if (isPromotion) {
+              // Promotion: round points * 0.66, capped at 75
+              newTotal = Math.round(currentTotal * 0.66);
+              newTotal = Math.min(newTotal, 75);
+            } else {
+              // Demotion: round points * 1.66, capped at 75. If result is lower than 20, add 10
+              newTotal = Math.round(currentTotal * 1.66);
+              if (newTotal < 20) {
+                newTotal += 10;
+              }
+              newTotal = Math.min(newTotal, 75);
+            }
           }
           
           // Initialize points adjustments with calculated multiplier applied proportionally

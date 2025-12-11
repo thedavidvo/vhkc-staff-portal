@@ -413,8 +413,9 @@ export default function DriversPage() {
         title="Filters & Search"
         className="mb-8"
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="lg:col-span-2 relative">
+        <div className="space-y-4">
+          {/* Search bar - full width */}
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
               type="text"
@@ -424,42 +425,44 @@ export default function DriversPage() {
               className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
             />
           </div>
-          <select
-            value={divisionFilter}
-            onChange={(e) => setDivisionFilter(e.target.value as Division | 'all')}
-            className="px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-          >
-            <option value="all">All Divisions</option>
-            <option value="Division 1">Division 1</option>
-            <option value="Division 2">Division 2</option>
-            <option value="Division 3">Division 3</option>
-            <option value="Division 4">Division 4</option>
-            <option value="New">New</option>
-          </select>
-          <select
-            value={teamFilter}
-            onChange={(e) => setTeamFilter(e.target.value)}
-            className="px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-          >
-            <option value="all">All Teams</option>
-            {teams.map((team) => (
-              <option key={team} value={team}>
-                {team}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="mt-4">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as DriverStatus | 'all')}
-            className="px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-          >
-            <option value="all">All Status</option>
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-            <option value="BANNED">Banned</option>
-          </select>
+          
+          {/* Filters row - division, team, and status inline */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <select
+              value={divisionFilter}
+              onChange={(e) => setDivisionFilter(e.target.value as Division | 'all')}
+              className="px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+            >
+              <option value="all">All Divisions</option>
+              <option value="Division 1">Division 1</option>
+              <option value="Division 2">Division 2</option>
+              <option value="Division 3">Division 3</option>
+              <option value="Division 4">Division 4</option>
+              <option value="New">New</option>
+            </select>
+            <select
+              value={teamFilter}
+              onChange={(e) => setTeamFilter(e.target.value)}
+              className="px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+            >
+              <option value="all">All Teams</option>
+              {teams.map((team) => (
+                <option key={team} value={team}>
+                  {team}
+                </option>
+              ))}
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as DriverStatus | 'all')}
+              className="px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+            >
+              <option value="all">All Status</option>
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+              <option value="BANNED">Banned</option>
+            </select>
+          </div>
         </div>
       </SectionCard>
 
