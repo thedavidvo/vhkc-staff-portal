@@ -12,6 +12,8 @@ interface RoundPoint {
   roundNumber: number;
   points: number;
   division: Division;
+  minorPoints: number; // Heat points
+  majorPoints: number; // Final points
 }
 
 interface RoundPointsEditModalProps {
@@ -122,23 +124,45 @@ export default function RoundPointsEditModal({
             rounds.map((r: any) => [r.id, { location: r.location || 'TBD', roundNumber: r.roundNumber }])
           );
 
-          // Map points to include round names and sort by round number
-          const mappedPoints: RoundPoint[] = points
-            .map((point: any) => {
-              const roundInfo = roundMap.get(point.roundId);
-              return {
-                id: point.id,
+          // Group points by round and aggregate minor (heat) and major (final) points
+          const roundPointsMap = new Map<string, RoundPoint>();
+          
+          points.forEach((point: any) => {
+            const roundInfo = roundMap.get(point.roundId);
+            const roundKey = point.roundId;
+            
+            if (!roundPointsMap.has(roundKey)) {
+              roundPointsMap.set(roundKey, {
+                id: roundKey, // Use roundId as the aggregate id
                 roundId: point.roundId,
                 roundName: roundInfo?.location || 'TBD',
                 roundNumber: roundInfo?.roundNumber || 0,
-                points: point.points || 0,
+                points: 0,
+                minorPoints: 0,
+                majorPoints: 0,
                 division: point.division || currentDivision,
-              };
-            })
-            .sort((a: RoundPoint, b: RoundPoint) => a.roundNumber - b.roundNumber);
+              });
+            }
+            
+            const roundData = roundPointsMap.get(roundKey)!;
+            const pointValue = parseFloat(point.points) || 0;
+            
+            // Aggregate based on race type
+            if (point.raceType === 'final') {
+              roundData.majorPoints += pointValue;
+            } else {
+              roundData.minorPoints += pointValue;
+            }
+            
+            roundData.points = roundData.minorPoints + roundData.majorPoints;
+          });
+
+          const mappedPoints = Array.from(roundPointsMap.values())
+            .sort((a, b) => a.roundNumber - b.roundNumber);
 
           setRoundPoints(mappedPoints);
-          // Initialize edited points with current values
+          
+          // Initialize edited points with current total values
           const initialEdited: Record<string, number> = {};
           mappedPoints.forEach((point) => {
             initialEdited[point.id] = point.points;
@@ -212,22 +236,45 @@ export default function RoundPointsEditModal({
         throw new Error('Failed to update driver division');
       }
 
-      // Update all modified points (round to nearest whole number)
-      const updatePromises = roundPoints
-        .filter((point) => editedPoints[point.id] !== undefined && editedPoints[point.id] !== point.points)
-        .map((point) => {
-          const roundedPoints = Math.round(editedPoints[point.id]);
-          const updatedPoint = {
-            ...point,
-            points: roundedPoints,
-            division: newDivision,
-          };
-          return fetch('/api/points', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updatedPoint),
-          });
+      // Fetch all individual point records for this driver
+      const allPointsResponse = await fetch(`/api/points?driverId=${driverId}&seasonId=${seasonId}`);
+      if (!allPointsResponse.ok) {
+        throw new Error('Failed to fetch individual point records');
+      }
+      const allPoints = await allPointsResponse.json();
+      
+      // Update all modified points - apply proportional changes to each individual race record
+      const updatePromises: Promise<any>[] = [];
+      
+      roundPoints.forEach((roundPoint) => {
+        const editedTotal = editedPoints[roundPoint.id];
+        if (editedTotal === undefined || editedTotal === roundPoint.points) return;
+        
+        // Calculate the multiplier for this round
+        const multiplier = roundPoint.points > 0 ? editedTotal / roundPoint.points : 1;
+        
+        // Update each individual point record for this round proportionally
+        const roundPointRecords = allPoints.filter((p: any) => p.roundId === roundPoint.roundId);
+        
+        roundPointRecords.forEach((record: any) => {
+          const originalPoints = parseFloat(record.points) || 0;
+          const newPoints = Math.round(originalPoints * multiplier);
+          
+          if (newPoints !== originalPoints) {
+            updatePromises.push(
+              fetch('/api/points', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  ...record,
+                  points: newPoints,
+                  division: newDivision,
+                }),
+              })
+            );
+          }
         });
+      });
 
       await Promise.all(updatePromises);
       
@@ -354,7 +401,7 @@ export default function RoundPointsEditModal({
                 <>
                   <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 mb-4">
                     <p className="text-sm text-slate-600 dark:text-slate-400">
-                      Modify the overall points for each round below. Changes will be saved when you click "Confirm Changes".
+                      Modify the total points for each round below. Changes will be applied proportionally to all heats and finals. The breakdown shows Minor (Heat) points and Major (Final) points for reference.
                     </p>
                   </div>
                   
@@ -368,14 +415,19 @@ export default function RoundPointsEditModal({
                       <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                         Round Name
                       </th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                        Breakdown
+                      </th>
                       <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Points
+                        Total Points
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                     {roundPoints.map((point) => {
-                      const hasChanges = editedPoints[point.id] !== point.points;
+                      const editedTotal = editedPoints[point.id] ?? point.points;
+                      const hasChanges = editedTotal !== point.points;
+                      
                       return (
                         <tr
                           key={point.id}
@@ -389,24 +441,28 @@ export default function RoundPointsEditModal({
                           <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
                             {point.roundName}
                           </td>
+                          <td className="px-4 py-3 text-sm text-center">
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                              <span className="font-medium">Minor:</span> {point.minorPoints} <span className="mx-1">|</span> <span className="font-medium">Major:</span> {point.majorPoints}
+                            </div>
+                          </td>
                           <td className="px-4 py-3 text-sm text-right">
                             <div className="flex items-center justify-end gap-2">
                               {hasChanges && (
                                 <span className="text-xs text-slate-500 dark:text-slate-400 line-through">
-                                  {point.points.toFixed(2)}
+                                  {point.points}
                                 </span>
                               )}
                               <input
                                 type="number"
                                 step="1"
                                 min="0"
-                                max="75"
-                                value={Math.round(editedPoints[point.id] ?? point.points)}
+                                value={Math.round(editedTotal)}
                                 onChange={(e) => {
                                   const newValue = parseFloat(e.target.value) || 0;
                                   handlePointsChange(point.id, newValue);
                                 }}
-                                className={`w-24 px-2 py-1 text-right border rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary ${
+                                className={`w-24 px-2 py-1 text-right border rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary font-semibold ${
                                   hasChanges ? 'border-yellow-500 dark:border-yellow-600' : 'border-slate-300 dark:border-slate-700'
                                 }`}
                               />

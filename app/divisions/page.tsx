@@ -1614,6 +1614,14 @@ function DivisionChangeModal({
         return;
       }
       
+      // Need both divisions to calculate adjustment
+      if (!fromDivision || !toDivision || fromDivision === toDivision) {
+        setRoundPoints([]);
+        setPointsAdjustments({});
+        setShowPointsEditor(false);
+        return;
+      }
+      
       try {
         const response = await fetch(`/api/points?driverId=${driverId}&seasonId=${seasonId}`);
         if (response.ok) {
@@ -1621,10 +1629,41 @@ function DivisionChangeModal({
           const roundPoints = points.filter((p: any) => p.roundId === selectedRoundId);
           setRoundPoints(roundPoints);
           
-          // Initialize points adjustments with current values
+          // Calculate current total for this round
+          const currentTotal = roundPoints.reduce((sum: number, p: any) => sum + (p.points || 0), 0);
+          
+          // Determine if this is a promotion or demotion based on from/to divisions
+          const divisionOrder: Partial<Record<Division, number>> = {
+            'Division 1': 1,
+            'Division 2': 2,
+            'Division 3': 3,
+            'Division 4': 4,
+            'New': 5,
+          };
+          const fromOrder = divisionOrder[fromDivision] ?? 5;
+          const toOrder = divisionOrder[toDivision] ?? 5;
+          const isPromotion = toOrder < fromOrder;
+          
+          // Apply formula to calculate new total
+          let newTotal: number;
+          if (isPromotion) {
+            // Promotion: round points * 0.66, capped at 75
+            newTotal = Math.round(currentTotal * 0.66);
+            newTotal = Math.min(newTotal, 75);
+          } else {
+            // Demotion: round points * 1.66, capped at 75. If result is lower than 20, add 10
+            newTotal = Math.round(currentTotal * 1.66);
+            if (newTotal < 20) {
+              newTotal += 10;
+            }
+            newTotal = Math.min(newTotal, 75);
+          }
+          
+          // Initialize points adjustments with calculated multiplier applied proportionally
           const adjustments: Record<string, number> = {};
+          const multiplier = currentTotal > 0 ? newTotal / currentTotal : 1;
           roundPoints.forEach((p: any) => {
-            adjustments[p.id] = p.points || 0;
+            adjustments[p.id] = Math.round((p.points || 0) * multiplier);
           });
           setPointsAdjustments(adjustments);
           
@@ -1640,7 +1679,7 @@ function DivisionChangeModal({
     };
     
     fetchPoints();
-  }, [selectedRoundId, driverId, seasonId, changeType, rounds, existingChange]);
+  }, [selectedRoundId, driverId, seasonId, changeType, rounds, existingChange, fromDivision, toDivision]);
 
   // Determine the current change type based on selected round
   const isPreSeason = selectedRoundId.startsWith('pre-season-');
@@ -1798,7 +1837,7 @@ function DivisionChangeModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 max-w-2xl w-full mx-4">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">
@@ -2008,34 +2047,111 @@ function DivisionChangeModal({
                     <p className="text-xs text-slate-500 dark:text-slate-400">
                       No points recorded for this round yet. Points will be calculated automatically after the division change.
                     </p>
-                  ) : showPointsEditor && (
-                    <div className="space-y-2 mt-2">
-                      {roundPoints.map((point) => (
-                        <div key={point.id} className="flex items-center gap-2">
-                          <span className="text-xs text-slate-600 dark:text-slate-400 flex-1">
-                            {point.raceType || 'Final'} {point.finalType || ''} - Current: {point.points || 0} pts
-                          </span>
-                          <input
-                            type="number"
-                            value={pointsAdjustments[point.id] ?? point.points ?? 0}
-                            onChange={(e) => {
-                              const value = parseInt(e.target.value) || 0;
-                              setPointsAdjustments(prev => ({
-                                ...prev,
-                                [point.id]: value
-                              }));
-                            }}
-                            className="w-24 px-2 py-1 text-sm border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-1 focus:ring-primary-500"
-                            min="0"
-                            placeholder="Points"
-                          />
+                  ) : showPointsEditor && (() => {
+                      // Calculate aggregated totals
+                      const minorPoints = roundPoints.filter((p: any) => p.raceType !== 'final').reduce((sum: number, p: any) => sum + (p.points || 0), 0);
+                      const majorPoints = roundPoints.filter((p: any) => p.raceType === 'final').reduce((sum: number, p: any) => sum + (p.points || 0), 0);
+                      const currentTotal = minorPoints + majorPoints;
+                      
+                      // Calculate adjusted total from individual adjustments
+                      const adjustedTotal = roundPoints.reduce((sum: number, p: any) => sum + (pointsAdjustments[p.id] ?? p.points ?? 0), 0);
+                      
+                      // Determine promotion/demotion for calculation display
+                      const divisionOrder: Partial<Record<Division, number>> = {
+                        'Division 1': 1,
+                        'Division 2': 2,
+                        'Division 3': 3,
+                        'Division 4': 4,
+                        'New': 5,
+                      };
+                      const fromOrder = divisionOrder[fromDivision] ?? 5;
+                      const toOrder = divisionOrder[toDivision] ?? 5;
+                      const isPromotion = toOrder < fromOrder;
+                      
+                      // Show calculation breakdown
+                      let calculationSteps: string[] = [];
+                      if (isPromotion) {
+                        const step1 = currentTotal * 0.66;
+                        const step2 = Math.round(step1);
+                        const step3 = Math.min(step2, 75);
+                        calculationSteps = [
+                          `${currentTotal} × 0.66 = ${step1.toFixed(2)}`,
+                          `Round to ${step2}`,
+                          step3 < step2 ? `Capped at 75` : ''
+                        ].filter(s => s);
+                      } else {
+                        const step1 = currentTotal * 1.66;
+                        const step2 = Math.round(step1);
+                        const step3 = step2 < 20 ? step2 + 10 : step2;
+                        const step4 = Math.min(step3, 75);
+                        calculationSteps = [
+                          `${currentTotal} × 1.66 = ${step1.toFixed(2)}`,
+                          `Round to ${step2}`,
+                          step3 !== step2 ? `Less than 20, add 10 = ${step3}` : '',
+                          step4 < step3 ? `Capped at 75` : ''
+                        ].filter(s => s);
+                      }
+                      
+                      return (
+                        <div className="space-y-2 mt-2">
+                          {/* Calculation Breakdown */}
+                          <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+                            <div className="text-xs font-semibold text-blue-800 dark:text-blue-300 mb-1">
+                              {isPromotion ? '📈 Promotion' : '📉 Demotion'} Calculation:
+                            </div>
+                            <div className="text-xs text-blue-700 dark:text-blue-300 space-y-0.5">
+                              {calculationSteps.map((step, idx) => (
+                                <div key={idx} className="flex items-center gap-1">
+                                  <span className="text-blue-500 dark:text-blue-400">→</span>
+                                  <span>{step}</span>
+                                </div>
+                              ))}
+                              <div className="flex items-center gap-1 font-semibold mt-1 pt-1 border-t border-blue-300 dark:border-blue-700">
+                                <span className="text-blue-500 dark:text-blue-400">✓</span>
+                                <span>Result: {adjustedTotal} pts</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-3 p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-600">
+                            <div className="flex-1">
+                              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                                Minor: {minorPoints} | Major: {majorPoints}
+                              </div>
+                              <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                Current Total: {currentTotal} pts
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <label className="text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                                New Total:
+                              </label>
+                              <input
+                                type="number"
+                                value={adjustedTotal}
+                                onChange={(e) => {
+                                  const newTotal = parseInt(e.target.value) || 0;
+                                  // Calculate multiplier and apply proportionally to all points
+                                  const multiplier = currentTotal > 0 ? newTotal / currentTotal : 1;
+                                  const newAdjustments: Record<string, number> = {};
+                                  roundPoints.forEach((p: any) => {
+                                    newAdjustments[p.id] = Math.round((p.points || 0) * multiplier);
+                                  });
+                                  setPointsAdjustments(newAdjustments);
+                                }}
+                                className="w-24 px-2 py-1.5 text-sm border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-semibold"
+                                min="0"
+                                placeholder="Points"
+                              />
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Adjust the total points for this round. Changes will be applied proportionally to all heats and finals.
+                          </p>
                         </div>
-                      ))}
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                        Adjust points for this round after the division change (e.g., if promoted from New to Division 3 after Round 1)
-                      </p>
-                    </div>
-                  )}
+                      );
+                    })()
+                  }
                 </div>
               )}
             </>

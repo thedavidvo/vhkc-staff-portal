@@ -487,33 +487,22 @@ export default function DriversPage() {
                 </th>
                 <th 
                   className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                  onClick={() => handleSort('firstName')}
-                >
-                  <div className="flex items-center gap-1">
-                    First Name
-                    {sortField === 'firstName' && (
-                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
-                    )}
-                  </div>
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                  onClick={() => handleSort('lastName')}
-                >
-                  <div className="flex items-center gap-1">
-                    Last Name
-                    {sortField === 'lastName' && (
-                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
-                    )}
-                  </div>
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                   onClick={() => handleSort('email')}
                 >
                   <div className="flex items-center gap-1">
                     Email
                     {sortField === 'email' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  onClick={() => handleSort('mobileNumber')}
+                >
+                  <div className="flex items-center gap-1">
+                    Phone Number
+                    {sortField === 'mobileNumber' && (
                       sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
                     )}
                   </div>
@@ -531,17 +520,6 @@ export default function DriversPage() {
                 </th>
                 <th 
                   className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                  onClick={() => handleSort('mobileNumber')}
-                >
-                  <div className="flex items-center gap-1">
-                    Mobile Number
-                    {sortField === 'mobileNumber' && (
-                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
-                    )}
-                  </div>
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase sticky left-[200px] bg-slate-50 dark:bg-slate-800 z-50 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border-r border-slate-200 dark:border-slate-700"
                   onClick={() => handleSort('division')}
                 >
                   <div className="flex items-center gap-1">
@@ -558,17 +536,6 @@ export default function DriversPage() {
                   <div className="flex items-center gap-1">
                     Team Name
                     {sortField === 'teamName' && (
-                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
-                    )}
-                  </div>
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                  onClick={() => handleSort('dateOfBirth')}
-                >
-                  <div className="flex items-center gap-1">
-                    Date of Birth
-                    {sortField === 'dateOfBirth' && (
                       sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
                     )}
                   </div>
@@ -610,34 +577,23 @@ export default function DriversPage() {
                     {driver.name}
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
-                    {driver.firstName || 'N/A'}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
-                    {driver.lastName || 'N/A'}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
                     {driver.email || 'N/A'}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                    {formatMobileNumber(driver.mobileNumber)}
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
                     {driver.aliases && driver.aliases.length > 0 
                       ? driver.aliases.join(', ') 
                       : 'N/A'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
-                    {formatMobileNumber(driver.mobileNumber)}
-                  </td>
-                  <td className="px-4 py-3 text-sm sticky left-[200px] bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 z-20 border-r border-slate-200 dark:border-slate-700">
+                  <td className="px-4 py-3 text-sm">
                     <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(driver.division)}`}>
                       {driver.division}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
                     {driver.teamName || 'N/A'}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
-                    {driver.dateOfBirth 
-                      ? new Date(driver.dateOfBirth).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-                      : 'N/A'}
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getStatusColor(driver.status)}`}>

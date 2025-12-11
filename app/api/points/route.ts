@@ -55,7 +55,6 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const points = await request.json();
-    console.log('POST /api/points received:', points);
     
     if (!points.id || !points.seasonId || !points.roundId || !points.driverId || !points.division || points.points === undefined) {
       const missingFields = [];
@@ -67,12 +66,10 @@ export async function POST(request: NextRequest) {
       if (points.points === undefined) missingFields.push('points');
       
       const errorMsg = `Missing required fields: ${missingFields.join(', ')}`;
-      console.error(errorMsg, points);
       return NextResponse.json({ error: errorMsg }, { status: 400 });
     }
     
     await addPoints(points);
-    console.log('Successfully added points');
     
     // Invalidate cache
     cache.invalidate(`points:round:${points.roundId}`);

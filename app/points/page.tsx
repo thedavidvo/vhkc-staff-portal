@@ -302,16 +302,6 @@ export default function PointsPage() {
                     //          3) current driver division as last fallback
                     const driverDivision = result.driverDivision || result.division || driver?.division;
                     
-                    if (result.driverName && result.driverName.includes('Saad')) {
-                      console.log('Debug Saad driver division:', {
-                        driverName: result.driverName,
-                        resultDriverDivision: result.driverDivision,
-                        resultDivision: result.division,
-                        currentDriverDivision: driver?.division,
-                        finalDriverDivision: driverDivision
-                      });
-                    }
-                    
                     allPoints.push({
                       driverId: result.driverId,
                       driverName: result.driverName || driver?.name || 'Unknown Driver',
@@ -422,23 +412,13 @@ export default function PointsPage() {
   // Filtered saved points based on filters
   const filteredSavedPoints = useMemo(() => {
     let filtered = [...savedPointsList];
-    
-    console.log('Filtering saved points:', {
-      totalSavedPoints: savedPointsList.length,
-      selectedRound,
-      selectedRaceType,
-      selectedFinalType,
-      selectedDriverDivision
-    });
 
     if (selectedRound) {
       filtered = filtered.filter(p => p.roundId === selectedRound);
-      console.log('After round filter:', filtered.length);
     }
 
     if (selectedRaceType) {
       filtered = filtered.filter(p => p.raceType === selectedRaceType);
-      console.log('After race type filter:', filtered.length);
     }
 
     if (selectedRaceType === 'heat' && selectedHeatType) {
@@ -451,15 +431,11 @@ export default function PointsPage() {
       filtered = filtered.filter(p => 
         p.finalType && p.finalType.toUpperCase() === selectedFinalType.toUpperCase()
       );
-      console.log('After final type filter:', filtered.length);
     }
 
     // Filter by driver division only (points table only stores driver division, not race division)
     if (selectedDriverDivision && selectedDriverDivision !== 'All') {
-      console.log('Filtering by driver division:', selectedDriverDivision);
-      console.log('Sample point divisions:', filtered.slice(0, 5).map(p => ({ name: p.driverName, div: p.driverDivision })));
       filtered = filtered.filter(p => p.driverDivision === selectedDriverDivision);
-      console.log('After driver division filter:', filtered.length);
     }
 
     // Apply column sorting if active
@@ -808,12 +784,6 @@ export default function PointsPage() {
         const pointsId = `points-${point.roundId}-${point.driverId}-${point.raceType}-${point.finalType || ''}`;
         
         const divisionToSave = point.driverDivision || point.division;
-        console.log('Saving point:', {
-          driverName: point.driverName,
-          driverDivision: point.driverDivision,
-          division: point.division,
-          divisionToSave
-        });
         
         // Save to points table via API
         const response = await fetch('/api/points', {
@@ -1140,18 +1110,9 @@ export default function PointsPage() {
       // Get driver's division - find from drivers list as fallback
       const driver = drivers.find((d: any) => d.id === noteModalPoint.driverId);
       
-      console.log('Debug note modal point:', {
-        noteModalPoint,
-        driverDivision: noteModalPoint.driverDivision,
-        division: noteModalPoint.division,
-        driverFromList: driver?.division,
-        selectedDivision
-      });
-      
       const driverDivision = noteModalPoint.driverDivision || noteModalPoint.division || driver?.division || selectedDivision;
       
       if (!driverDivision) {
-        console.error('No division found:', { noteModalPoint, driver, selectedDivision });
         alert('Unable to determine driver division. Please try again.');
         return;
       }
@@ -1168,8 +1129,6 @@ export default function PointsPage() {
         points: currentPoints,
         note: noteText, // Save the note
       };
-      
-      console.log('Saving note with data:', requestBody);
       
       // Save to points table via API with note
       const response = await fetch('/api/points', {

@@ -341,6 +341,8 @@ export default function ReportsPage() {
       driversCount: drivers.length,
       pointsCount: points.length,
       participantsCount: participants.length,
+      roundsCount: rounds.length,
+      allRounds: rounds.map(r => ({ id: r.id, name: r.name, roundNumber: r.roundNumber })),
     });
 
     setExporting(true);
@@ -385,6 +387,48 @@ export default function ReportsPage() {
 
       const logoInfo = await loadLogo();
       const logoDataUrl = logoInfo?.dataUrl || null;
+
+      // Load custom fonts
+      const loadFont = async (fontPath: string, fontName: string): Promise<string | null> => {
+        try {
+          const response = await fetch(fontPath);
+          if (response.ok) {
+            const blob = await response.blob();
+            return new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+          }
+        } catch (error) {
+          console.warn(`Could not load font ${fontName}:`, error);
+        }
+        return null;
+      };
+
+      // Load Airstrike and Aero Matics Light fonts
+      const airstrikeFont = await loadFont('/fonts/Airstrike.ttf', 'Airstrike');
+      const aeroMaticsFont = await loadFont('/fonts/AeroMaticsLight.ttf', 'AeroMaticsLight');
+
+      // Add fonts to PDF if loaded successfully
+      if (airstrikeFont) {
+        try {
+          doc.addFileToVFS('Airstrike.ttf', airstrikeFont.split(',')[1]);
+          doc.addFont('Airstrike.ttf', 'Airstrike', 'normal');
+        } catch (e) {
+          console.warn('Error adding Airstrike font:', e);
+        }
+      }
+
+      if (aeroMaticsFont) {
+        try {
+          doc.addFileToVFS('AeroMaticsLight.ttf', aeroMaticsFont.split(',')[1]);
+          doc.addFont('AeroMaticsLight.ttf', 'AeroMaticsLight', 'normal');
+        } catch (e) {
+          console.warn('Error adding AeroMaticsLight font:', e);
+        }
+      }
 
       // ============================================
       // COVER PAGE
@@ -447,21 +491,20 @@ export default function ReportsPage() {
       // Main title - Using 62 DRagz font (helvetica bold as fallback)
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(32);
-      // Note: If 62 DRagz font file is available, load it here using doc.addFont()
-      // For now using helvetica bold as fallback
-      doc.setFont('helvetica', 'bold');
+      // Using Airstrike font for main title
+      doc.setFont(airstrikeFont ? 'Airstrike' : 'helvetica', 'normal');
       const mainTitle = `VHKC RACE RESULTS`;
       doc.text(mainTitle, pageWidth / 2, currentY, { align: 'center' });
       currentY += mainTitleHeight + subtitleSpacing;
       
       doc.setFontSize(18);
-      doc.setFont('helvetica', 'normal');
+      doc.setFont(airstrikeFont ? 'Airstrike' : 'helvetica', 'normal');
       doc.text('OFFICIAL REPORT', pageWidth / 2, currentY, { align: 'center' });
       currentY += subtitleHeight + infoSpacing;
       
       // Build paragraph-style text with reduced spacing
       doc.setFontSize(20);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(airstrikeFont ? 'Airstrike' : 'helvetica', 'normal');
       
       const seasonText = selectedSeason?.name || 'Season';
       const roundText = `Round ${selectedRound.roundNumber || ''}`;
@@ -484,6 +527,344 @@ export default function ReportsPage() {
       if (wrappedText.length > 1) {
         currentY += (wrappedText.length - 1) * 12;
       }
+      
+      // ============================================
+      // PREPARE DATA FOR REPORT
+      // ============================================
+      
+      // Helper to get driver info
+      const getDriverInfo = (driverId: string) => {
+        const driver = drivers.find(d => d.id === driverId);
+        if (!driver) return null;
+        
+        // Ensure aliases is an array
+        let aliasesArray: string[] = [];
+        if (driver.aliases) {
+          if (Array.isArray(driver.aliases)) {
+            aliasesArray = driver.aliases;
+          } else if (typeof driver.aliases === 'string') {
+            aliasesArray = driver.aliases.split(',').map((a: string) => a.trim()).filter((a: string) => a);
+          }
+        }
+        
+        return {
+          ...driver,
+          aliases: aliasesArray,
+        };
+      };
+
+      // Helper to get driver alias (first alias or empty)
+      const getDriverAlias = (driverId: string) => {
+        const driver = getDriverInfo(driverId);
+        if (driver?.aliases && Array.isArray(driver.aliases) && driver.aliases.length > 0) {
+          return driver.aliases[0];
+        }
+        return '';
+      };
+
+      // Prepare Main Driver Data (needed for TOC calculation)
+      // Filter by selected division
+      const allParticipants = (() => {
+        const participantSet = new Set<string>();
+        const participantList: { driverId: string; driverName: string; division: Division }[] = [];
+
+        // Filter race results by selected division
+        const filteredResults = selectedDivision === 'All' 
+          ? raceResults 
+          : raceResults.filter(r => r.division === selectedDivision);
+        
+        filteredResults.forEach((result) => {
+          if (!participantSet.has(result.driverId)) {
+            participantSet.add(result.driverId);
+            participantList.push({
+              driverId: result.driverId,
+              driverName: result.driverName || '',
+              division: result.division,
+            });
+          }
+        });
+
+        return participantList;
+      })();
+
+      const mainDriverData = allParticipants.map(p => {
+        const driver = getDriverInfo(p.driverId);
+        return {
+          driverId: p.driverId,
+          driverName: p.driverName || '',
+          alias: getDriverAlias(p.driverId),
+          division: p.division || '',
+        };
+      }).sort((a: any, b: any) => a.driverName.localeCompare(b.driverName));
+      
+      // Check if there are heat results (needed for TOC)
+      const hasHeat = Object.keys(organizedResults.heats).length > 0;
+      
+      // Prepare Best Times data (needed for TOC)
+      const bestTimesMap = new Map<string, {
+        driverId: string;
+        driverName: string;
+        alias: string;
+        division: Division;
+        bestQualiTime: string;
+        bestHeatTime: string;
+        bestFinalTime: string;
+      }>();
+
+      // Collect best qualifying times
+      organizedResults.qualifying.forEach(q => {
+        if (q.bestTime) {
+          if (!bestTimesMap.has(q.driverId)) {
+            bestTimesMap.set(q.driverId, {
+              driverId: q.driverId,
+              driverName: q.driverName || '',
+              alias: getDriverAlias(q.driverId),
+              division: q.division,
+              bestQualiTime: q.bestTime,
+              bestHeatTime: '-',
+              bestFinalTime: '-',
+            });
+          } else {
+            const entry = bestTimesMap.get(q.driverId)!;
+            const currentBest = parseLapTime(entry.bestQualiTime);
+            const newTime = parseLapTime(q.bestTime);
+            if (newTime < currentBest) {
+              entry.bestQualiTime = q.bestTime;
+            }
+          }
+        }
+      });
+
+      // Collect best heat times
+      Object.values(organizedResults.heats).forEach(heatArray => {
+        heatArray.forEach(h => {
+          if (h.bestTime) {
+            if (!bestTimesMap.has(h.driverId)) {
+              bestTimesMap.set(h.driverId, {
+                driverId: h.driverId,
+                driverName: h.driverName || '',
+                alias: getDriverAlias(h.driverId),
+                division: h.division,
+                bestQualiTime: '-',
+                bestHeatTime: h.bestTime,
+                bestFinalTime: '-',
+              });
+            } else {
+              const entry = bestTimesMap.get(h.driverId)!;
+              const currentBest = parseLapTime(entry.bestHeatTime);
+              const newTime = parseLapTime(h.bestTime);
+              if (newTime < currentBest) {
+                entry.bestHeatTime = h.bestTime;
+              }
+            }
+          }
+        });
+      });
+
+      // Collect best final times
+      Object.values(organizedResults.finals).forEach(finalArray => {
+        finalArray.forEach(f => {
+          if (f.bestTime) {
+            if (!bestTimesMap.has(f.driverId)) {
+              bestTimesMap.set(f.driverId, {
+                driverId: f.driverId,
+                driverName: f.driverName || '',
+                alias: getDriverAlias(f.driverId),
+                division: f.division,
+                bestQualiTime: '-',
+                bestHeatTime: '-',
+                bestFinalTime: f.bestTime,
+              });
+            } else {
+              const entry = bestTimesMap.get(f.driverId)!;
+              const currentBest = parseLapTime(entry.bestFinalTime);
+              const newTime = parseLapTime(f.bestTime);
+              if (newTime < currentBest) {
+                entry.bestFinalTime = f.bestTime;
+              }
+            }
+          }
+        });
+      });
+
+      const bestTimesData = Array.from(bestTimesMap.values()).sort((a, b) => {
+        // Sort by best overall time (considering all race types)
+        const aTime = Math.min(
+          parseLapTime(a.bestQualiTime),
+          parseLapTime(a.bestHeatTime),
+          parseLapTime(a.bestFinalTime)
+        );
+        const bTime = Math.min(
+          parseLapTime(b.bestQualiTime),
+          parseLapTime(b.bestHeatTime),
+          parseLapTime(b.bestFinalTime)
+        );
+        return aTime - bTime;
+      });
+      
+      // Prepare Driver Standings data (needed for TOC)
+      // Filter by selected division
+      const driversInDivision = new Set<string>();
+      const filteredForStandings = selectedDivision === 'All' 
+        ? raceResults 
+        : raceResults.filter(r => r.division === selectedDivision);
+      
+      filteredForStandings.forEach(r => {
+        driversInDivision.add(r.driverId);
+      });
+
+      // Fetch season-wide points but only for drivers who were in this division at this round
+      let seasonPoints: any[] = [];
+      try {
+        if (selectedSeason?.id) {
+          const seasonPointsResponse = await fetch(`/api/points?seasonId=${selectedSeason.id}`);
+          if (seasonPointsResponse.ok) {
+            const allSeasonPoints = await seasonPointsResponse.json();
+            // Filter to only include drivers who raced in the selected division at this round
+            seasonPoints = allSeasonPoints.filter((p: any) => driversInDivision.has(p.driverId));
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to fetch season points for standings:', error);
+      }
+
+      const driverStandingsMap = new Map<string, { driverId: string; driverName: string; alias: string; division: Division; totalPoints: number }>();
+      
+      seasonPoints.forEach(p => {
+        const existing = driverStandingsMap.get(p.driverId);
+        if (existing) {
+          existing.totalPoints += p.points || 0;
+        } else {
+          const driver = getDriverInfo(p.driverId);
+          driverStandingsMap.set(p.driverId, {
+            driverId: p.driverId,
+            driverName: driver?.name || '',
+            alias: getDriverAlias(p.driverId),
+            division: p.division,
+            totalPoints: p.points || 0,
+          });
+        }
+      });
+
+      const driverStandings = Array.from(driverStandingsMap.values())
+        .sort((a, b) => b.totalPoints - a.totalPoints);
+      
+      // Prepare Promotions and Demotions data (needed for TOC)
+      let promotions: any[] = [];
+      let demotions: any[] = [];
+      if (selectedRoundId && selectedSeason?.id) {
+        try {
+          const changesResponse = await fetch(`/api/division-changes?roundId=${selectedRoundId}`);
+          if (changesResponse.ok) {
+            const changes = await changesResponse.json();
+            
+            // Filter by selected division and change type
+            let filteredChanges = changes.filter((c: any) => 
+              c.changeType === 'promotion' || c.changeType === 'demotion'
+            );
+            if (selectedDivision !== 'All') {
+              filteredChanges = filteredChanges.filter((c: any) => c.fromDivision === selectedDivision);
+            }
+            
+            promotions = filteredChanges.filter((c: any) => c.changeType === 'promotion');
+            demotions = filteredChanges.filter((c: any) => c.changeType === 'demotion');
+          }
+        } catch (error) {
+          console.warn('Failed to fetch division changes for TOC:', error);
+        }
+      }
+      
+      // Add new page for Table of Contents
+      doc.addPage();
+      
+      // Professional Header for TOC
+      doc.setFillColor(15, 23, 42); // Dark slate
+      doc.rect(0, 0, pageWidth, 50, 'F');
+      
+      // Add logo to TOC header
+      if (logoInfo) {
+        try {
+          const maxWidth = 35;
+          const maxHeight = 35;
+          const aspectRatio = logoInfo.width / logoInfo.height;
+          
+          let headerLogoWidth = maxWidth;
+          let headerLogoHeight = maxWidth / aspectRatio;
+          
+          if (headerLogoHeight > maxHeight) {
+            headerLogoHeight = maxHeight;
+            headerLogoWidth = maxHeight * aspectRatio;
+          }
+          
+          const logoY = 25 - (headerLogoHeight / 2);
+          doc.addImage(logoInfo.dataUrl, 'PNG', 20, logoY, headerLogoWidth, headerLogoHeight);
+        } catch (e) {
+          console.warn('Error adding logo to TOC header:', e);
+        }
+      }
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont(airstrikeFont ? 'Airstrike' : 'helvetica', 'normal');
+      const tocHeaderText = `${selectedSeason?.name || 'Season'} - Round ${selectedRound.roundNumber || ''}`;
+      const tocHeaderTextX = logoInfo ? (20 + 35 + 10) : pageWidth / 2;
+      const tocHeaderAlign = logoInfo ? 'left' : 'center';
+      doc.text(tocHeaderText, tocHeaderTextX, 25, { align: tocHeaderAlign as any });
+      
+      doc.setFontSize(10);
+      doc.setFont(aeroMaticsFont ? 'AeroMaticsLight' : 'helvetica', 'normal');
+      doc.text('Table of Contents', tocHeaderTextX, 35, { align: tocHeaderAlign as any });
+      
+      doc.setFillColor(59, 130, 246);
+      doc.rect(0, 48, pageWidth, 2, 'F');
+      
+      // Table of Contents section
+      let tocYPos = 70;
+      
+      doc.setFontSize(18);
+      doc.setFont(airstrikeFont ? 'Airstrike' : 'helvetica', 'normal');
+      doc.setTextColor(15, 23, 42);
+      doc.text('Contents', 20, tocYPos);
+      tocYPos += 15;
+      
+      // Store page references for TOC (we'll track actual pages as we add tables)
+      const tocItems: { title: string; page: number }[] = [];
+      const tocPageNumber = doc.internal.getCurrentPageInfo().pageNumber; // Save TOC page number
+      const addTocItem = (title: string) => {
+        // Get current page number when table is actually added
+        const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+        tocItems.push({ title, page: currentPage });
+      };
+      
+      // Function to render TOC (will be called after all content is generated)
+      const renderTOC = () => {
+        // Go back to TOC page
+        doc.setPage(tocPageNumber);
+        
+        // Render TOC items with links
+        doc.setFontSize(11);
+        doc.setFont(aeroMaticsFont ? 'AeroMaticsLight' : 'helvetica', 'normal');
+        doc.setTextColor(30, 41, 59);
+        
+        tocItems.forEach((item, index) => {
+          const itemY = tocYPos + (index * 8);
+          
+          // Make items clickable by adding internal link
+          doc.textWithLink(item.title, 25, itemY, { pageNumber: item.page });
+          
+          // Add dotted line
+          doc.setDrawColor(200, 200, 200);
+          const titleWidth = doc.getTextWidth(item.title);
+          doc.line(30 + titleWidth, itemY - 1, pageWidth - 40, itemY - 1);
+          
+          // Add page number
+          doc.setFont(airstrikeFont ? 'Airstrike' : 'helvetica', 'normal');
+          doc.setTextColor(59, 130, 246);
+          doc.text(item.page.toString(), pageWidth - 25, itemY, { align: 'right' });
+          doc.setFont(aeroMaticsFont ? 'AeroMaticsLight' : 'helvetica', 'normal');
+          doc.setTextColor(30, 41, 59);
+        });
+      };
       
       // Add new page for thank you message
       doc.addPage();
@@ -519,10 +900,10 @@ export default function ReportsPage() {
         }
       }
       
-      // Header text - Using Futura font (helvetica as fallback)
+      // Header text - Using custom fonts
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold'); // Using helvetica as closest to Futura
+      doc.setFont(airstrikeFont ? 'Airstrike' : 'helvetica', 'normal');
       const headerText = `${selectedSeason?.name || 'Season'} - Round ${selectedRound.roundNumber || ''}`;
       const headerTextX = logoInfo ? (20 + headerLogoWidth + 10) : pageWidth / 2;
       const headerAlign = logoInfo ? 'left' : 'center';
@@ -530,7 +911,7 @@ export default function ReportsPage() {
       doc.text(headerText, headerTextX, 25, { align: headerAlign as any });
       
       doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
+      doc.setFont(aeroMaticsFont ? 'AeroMaticsLight' : 'helvetica', 'normal');
       const locationHeader = selectedRound.location || selectedRound.address || 'TBD';
       doc.text(locationHeader, headerTextX, 35, { align: headerAlign as any });
       
@@ -541,23 +922,77 @@ export default function ReportsPage() {
       let yPos = 70;
 
       // Thank You Message
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal'); // Using helvetica as closest to Futura
+      doc.setFontSize(11);
+      doc.setFont(aeroMaticsFont ? 'AeroMaticsLight' : 'helvetica', 'normal');
       doc.setTextColor(30, 41, 59);
       
-      const thankYouMessage = `G'day racers,
+      // Find the next round - compare as strings to handle type mismatches
+      const currentRoundIndex = rounds.findIndex(r => String(r.id) === String(selectedRoundId));
+      const nextRound = currentRoundIndex >= 0 && currentRoundIndex < rounds.length - 1 
+        ? rounds[currentRoundIndex + 1] 
+        : null;
+      
+      let thankYouMessage = `G'day racers,
 
 Thank you for racing with VHKC. We appreciate your continued participation and the effort each driver brings to every event. Your involvement is what allows the series to maintain a strong racing community built on clean competition, steady improvement, and mutual respect on and off the track.
 
 Each round provides valuable opportunities for drivers to refine their skills, build consistency, and gain experience in a structured racing environment. We are grateful for the positive attitude and cooperation shown throughout the session, which helped ensure the event ran smoothly from start to finish. Your commitment to adhering to race procedures, safety expectations, and overall track etiquette contributes directly to the success of our program.
 
+Below, you will find the recorded results from the previous round, including timing data, final placements, and additional session details.`;
+
+      if (nextRound) {
+        thankYouMessage += `
+
+The next round of the Victorian Hire Karting Championship will be ${nextRound.location || nextRound.address || 'TBD'}!
+We're gearing up for another exciting event, and we'd love to see you out on track supporting the drivers and soaking up the atmosphere.
+
+Tickets are now available - secure your spot here:`;
+      } else {
+        // This is the last round of the season
+        thankYouMessage = `G'day racers,
+
+Thank you for racing with VHKC this season - what an exciting season it has been. We've seen incredible racing, great sportsmanship, and a community that continues to grow stronger every round. We appreciate your commitment, your passion, and the energy you bring to the track.
+
 Below, you will find the recorded results from the previous round, including timing data, final placements, and additional session details.
 
-Thank you once again for your involvement with VHKC. We look forward to continuing the momentum and sharing many more successful race events with you.`;
+We can't wait to see you back for another exciting season ahead.`;
+      }
 
       const splitText = doc.splitTextToSize(thankYouMessage, pageWidth - 40);
       doc.text(splitText, 20, yPos, { align: 'left' });
-      yPos += splitText.length * 5 + 20;
+      
+      // Add ticket links if next round exists
+      if (nextRound) {
+       yPos += (splitText.length - 1) * 5 + 6;
+        doc.setTextColor(59, 130, 246); // Blue color for links
+        doc.textWithLink('Division 1', 20, yPos, { url: 'https://www.vhkc.com.au/div1' });
+        yPos += 6;
+
+        doc.textWithLink('Division 2', 20, yPos, { url: 'https://www.vhkc.com.au/div2' });
+        yPos += 6;
+
+        doc.textWithLink('Open Division', 20, yPos, { url: 'https://www.vhkc.com.au/event-list' });
+        yPos += 8;
+
+        doc.setTextColor(30, 41, 59); // Back to normal color
+        const closingText = `Whether you're racing or spectating, this round is set to deliver plenty of action. Don't miss out!
+
+Thank you once again for your involvement with VHKC. We look forward to continuing the momentum and sharing many more successful race events with you.`;
+        const splitClosing = doc.splitTextToSize(closingText, pageWidth - 40);
+        doc.text(splitClosing, 20, yPos, { align: 'left' });
+        yPos += splitClosing.length * 5 + 20;
+      } else {
+        yPos += splitText.length * 5 + 10;
+        const closingText = `
+
+Thank you once again for your involvement with VHKC. We look forward to continuing the momentum and sharing many more successful race events with you.`;
+        const splitClosing = doc.splitTextToSize(closingText, pageWidth - 40);
+        doc.text(splitClosing, 20, yPos, { align: 'left' });
+        yPos += splitClosing.length * 5 + 20;
+      }
+      
+      // Track thank you message page for TOC
+      addTocItem('Thank You Message');
 
       // Helper function to add header to a page
       const addPageHeader = () => {
@@ -592,7 +1027,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
         
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(16);
-        doc.setFont('helvetica', 'bold');
+        doc.setFont(airstrikeFont ? 'Airstrike' : 'helvetica', 'normal');
         const headerText = `${selectedSeason?.name || 'Season'} - Round ${selectedRound.roundNumber || ''}`;
         const headerTextX = logoInfo ? (20 + headerLogoWidth + 10) : pageWidth / 2;
         const headerAlign = logoInfo ? 'left' : 'center';
@@ -600,7 +1035,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
         doc.text(headerText, headerTextX, 25, { align: headerAlign as any });
         
         doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
+        doc.setFont(aeroMaticsFont ? 'AeroMaticsLight' : 'helvetica', 'normal');
         const locationHeader = selectedRound.location || selectedRound.address || 'TBD';
         doc.text(locationHeader, headerTextX, 35, { align: headerAlign as any });
         
@@ -619,12 +1054,12 @@ Thank you once again for your involvement with VHKC. We look forward to continui
         
         let tableYPos = 60;
 
-        // Modern section title with accent - Using Super Brigade font
+        // Modern section title with accent - Using Airstrike font
         doc.setFillColor(59, 130, 246); // Primary blue accent bar
         doc.rect(20, tableYPos - 2, 4, 10, 'F');
         
         doc.setFontSize(11);
-        doc.setFont('helvetica', 'bold');
+        doc.setFont(airstrikeFont ? 'Airstrike' : 'helvetica', 'normal');
         doc.setTextColor(15, 23, 42);
         doc.text(title.toUpperCase(), 28, tableYPos + 4);
         
@@ -652,7 +1087,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
         // Build column styles with appropriate widths
         const columnStyles: any = {};
         if (useRank) {
-          columnStyles[0] = { cellWidth: 15, halign: 'center', fontStyle: 'bold', textColor: [59, 130, 246], font: 'helvetica' };
+          columnStyles[0] = { cellWidth: 15, halign: 'center', fontStyle: 'bold', textColor: [59, 130, 246], font: airstrikeFont ? 'Airstrike' : 'helvetica' };
         }
         
         // Distribute remaining width among other columns
@@ -662,7 +1097,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
         for (let i = 0; i < remainingColumns; i++) {
           columnStyles[colIndex] = { 
             cellWidth: columnWidth, 
-            font: 'helvetica',
+            font: aeroMaticsFont ? 'AeroMaticsLight' : 'helvetica',
             halign: 'left', // Explicitly set left alignment for all columns
             overflow: 'ellipsize', // Prevent wrapping by using ellipsize
           };
@@ -677,22 +1112,22 @@ Thank you once again for your involvement with VHKC. We look forward to continui
           headStyles: { 
             fillColor: [15, 23, 42], // Dark slate
             textColor: [255, 255, 255], 
-            fontStyle: 'bold',
-            fontSize: 7,
+            fontStyle: 'normal',
+            fontSize: 8,
             halign: 'left',
             cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
             lineWidth: 0.5,
             lineColor: [255, 255, 255],
-            font: 'helvetica' // Using helvetica as closest to Futura
+            font: airstrikeFont ? 'Airstrike' : 'helvetica'
           },
           bodyStyles: {
-            fontSize: 6.5,
+            fontSize: 7.5,
             textColor: [30, 41, 59],
             cellPadding: { top: 2, bottom: 2, left: 3, right: 3 },
             lineWidth: 0.2,
             lineColor: [226, 232, 240],
             fontStyle: 'normal',
-            font: 'helvetica' // Using helvetica as closest to Futura
+            font: aeroMaticsFont ? 'AeroMaticsLight' : 'helvetica'
           },
           // Custom styles for badge cells will override these
           alternateRowStyles: {
@@ -707,8 +1142,8 @@ Thank you once again for your involvement with VHKC. We look forward to continui
             cellPadding: 2,
             valign: 'middle',
             minCellHeight: 5,
-            fontSize: 6.5,
-            font: 'helvetica' // Using helvetica as closest to Futura
+            fontSize: 7.5,
+            font: aeroMaticsFont ? 'AeroMaticsLight' : 'helvetica'
           },
           didParseCell: (data: any) => {
             // Apply custom cell styling if provided
@@ -777,7 +1212,8 @@ Thank you once again for your involvement with VHKC. We look forward to continui
                 const badgePadding = baseFontSize * 0.2;
                 data.cell.styles.fillColor = colors.bg;
                 data.cell.styles.textColor = colors.text;
-                data.cell.styles.fontStyle = 'bold';
+                data.cell.styles.fontStyle = 'normal';
+                data.cell.styles.font = aeroMaticsFont ? 'AeroMaticsLight' : 'helvetica';
                 data.cell.styles.fontSize = baseFontSize * 0.95;
                 data.cell.styles.cellPadding = { top: badgePadding, bottom: badgePadding, left: badgePadding, right: badgePadding };
                 data.cell.styles.halign = 'left';
@@ -862,47 +1298,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
         });
       };
 
-      // Helper to get driver info
-      const getDriverInfo = (driverId: string) => {
-        const driver = drivers.find(d => d.id === driverId);
-        if (!driver) return null;
-        
-        // Ensure aliases is an array
-        let aliasesArray: string[] = [];
-        if (driver.aliases) {
-          if (Array.isArray(driver.aliases)) {
-            aliasesArray = driver.aliases;
-          } else if (typeof driver.aliases === 'string') {
-            aliasesArray = driver.aliases.split(',').map((a: string) => a.trim()).filter((a: string) => a);
-          }
-        }
-        
-        return {
-          ...driver,
-          aliases: aliasesArray,
-        };
-      };
-
-      // Helper to get driver alias (first alias or empty)
-      const getDriverAlias = (driverId: string) => {
-        const driver = getDriverInfo(driverId);
-        if (driver?.aliases && Array.isArray(driver.aliases) && driver.aliases.length > 0) {
-          return driver.aliases[0];
-        }
-        return '';
-      };
-
-      // Main Driver Table (Driver Name, Alias, Division)
-      const mainDriverData = participants.map(p => {
-        const driver = getDriverInfo(p.driverId);
-        return {
-          driverId: p.driverId,
-          driverName: p.driverName || '',
-          alias: getDriverAlias(p.driverId),
-          division: p.division || '',
-        };
-      }).sort((a: any, b: any) => a.driverName.localeCompare(b.driverName));
-
+      // Main Driver Table - render it
       if (mainDriverData.length > 0) {
         await addTable(
           'Main Driver Table',
@@ -913,9 +1309,12 @@ Thank you once again for your involvement with VHKC. We look forward to continui
             item.alias,
             item.division,
           ],
-          true, // useRank
-          3 // Division column index (after #, Driver Name, Alias)
+          false, // useRank - no# column for main driver table
+          2 // Division column index (after Driver Name, Alias)
         );
+        addTocItem('Main Driver Table');
+      } else {
+        console.warn('No participants found for main driver table');
       }
 
       // Helper function to get group color for PDF (for Qual Group 1, Heat A, etc.)
@@ -954,7 +1353,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
       };
 
       // Times Tables - Separate into Qualifying, Heat, and Final times
-      const hasHeat = Object.keys(organizedResults.heats).length > 0;
+      // (hasHeat already defined earlier for TOC)
       
       // 1. Qualifying Results - Split by Group
       if (organizedResults.qualifying.length > 0) {
@@ -1000,6 +1399,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
             true, // useRank
             4 // Division column index (after #, Driver Name, Alias, Kart Number)
           );
+          addTocItem(`Qualifying Results - ${groupKey}`);
         }
       }
 
@@ -1037,6 +1437,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
               true, // useRank
               5 // Division column index (after #, Driver Name, Alias, Kart Number, Best Time)
             );
+            addTocItem(`Heat Results - ${heatKey}`);
           }
         }
       }
@@ -1045,7 +1446,10 @@ Thank you once again for your involvement with VHKC. We look forward to continui
       if (Object.keys(organizedResults.finals).length > 0) {
         const combinedFinalData: any[] = [];
         
-        for (const finalKey of Object.keys(organizedResults.finals)) {
+        // Sort final keys alphabetically (A, B, C, etc.)
+        const sortedFinalKeys = Object.keys(organizedResults.finals).sort((a, b) => a.localeCompare(b));
+        
+        for (const finalKey of sortedFinalKeys) {
           const finalResults = organizedResults.finals[finalKey];
           finalResults.forEach(result => {
             const driver = getDriverInfo(result.driverId);
@@ -1062,8 +1466,15 @@ Thank you once again for your involvement with VHKC. We look forward to continui
           });
         }
 
-        // Sort by overall position for overall ranking
-        combinedFinalData.sort((a, b) => (a.overallPosition || 999) - (b.overallPosition || 999));
+        // Sort by final type alphabetically, then by overall position
+        combinedFinalData.sort((a, b) => {
+          // First sort by final type (A, B, C, etc.)
+          const finalTypeCompare = (a.finalType || '').localeCompare(b.finalType || '');
+          if (finalTypeCompare !== 0) return finalTypeCompare;
+          
+          // Then by overall position within each final
+          return (a.overallPosition || 999) - (b.overallPosition || 999);
+        });
 
         await addTable(
           'Final Results',
@@ -1081,98 +1492,10 @@ Thank you once again for your involvement with VHKC. We look forward to continui
           true, // useRank (applies overall ranking)
           3 // Division column index (after #, Driver Name, Alias)
         );
+        addTocItem('Final Results');
       }
 
-      // Best Times Table - Combine best times from all race types
-      const bestTimesMap = new Map<string, {
-        driverId: string;
-        driverName: string;
-        alias: string;
-        division: Division;
-        bestQualiTime: string;
-        bestHeatTime: string;
-        bestFinalTime: string;
-      }>();
-
-      // Collect best qualifying times
-      organizedResults.qualifying.forEach(q => {
-        if (!bestTimesMap.has(q.driverId)) {
-          bestTimesMap.set(q.driverId, {
-            driverId: q.driverId,
-            driverName: q.driverName || '',
-            alias: getDriverAlias(q.driverId),
-            division: q.division,
-            bestQualiTime: q.fastestLap || '-',
-            bestHeatTime: '-',
-            bestFinalTime: '-',
-          });
-        } else {
-          const entry = bestTimesMap.get(q.driverId)!;
-          if (q.fastestLap && parseLapTime(q.fastestLap) < parseLapTime(entry.bestQualiTime)) {
-            entry.bestQualiTime = q.fastestLap;
-          }
-        }
-      });
-
-      // Collect best heat times
-      Object.values(organizedResults.heats).forEach(heatArray => {
-        heatArray.forEach(h => {
-          if (!bestTimesMap.has(h.driverId)) {
-            bestTimesMap.set(h.driverId, {
-              driverId: h.driverId,
-              driverName: h.driverName || '',
-              alias: getDriverAlias(h.driverId),
-              division: h.division,
-              bestQualiTime: '-',
-              bestHeatTime: h.fastestLap || '-',
-              bestFinalTime: '-',
-            });
-          } else {
-            const entry = bestTimesMap.get(h.driverId)!;
-            if (h.fastestLap && parseLapTime(h.fastestLap) < parseLapTime(entry.bestHeatTime)) {
-              entry.bestHeatTime = h.fastestLap;
-            }
-          }
-        });
-      });
-
-      // Collect best final times
-      Object.values(organizedResults.finals).forEach(finalArray => {
-        finalArray.forEach(f => {
-          if (!bestTimesMap.has(f.driverId)) {
-            bestTimesMap.set(f.driverId, {
-              driverId: f.driverId,
-              driverName: f.driverName || '',
-              alias: getDriverAlias(f.driverId),
-              division: f.division,
-              bestQualiTime: '-',
-              bestHeatTime: '-',
-              bestFinalTime: f.fastestLap || '-',
-            });
-          } else {
-            const entry = bestTimesMap.get(f.driverId)!;
-            if (f.fastestLap && parseLapTime(f.fastestLap) < parseLapTime(entry.bestFinalTime)) {
-              entry.bestFinalTime = f.fastestLap;
-            }
-          }
-        });
-      });
-
-      const bestTimesData = Array.from(bestTimesMap.values()).sort((a, b) => {
-        // Sort by best overall time (considering all race types)
-        const aTime = Math.min(
-          parseLapTime(a.bestQualiTime),
-          parseLapTime(a.bestHeatTime),
-          parseLapTime(a.bestFinalTime)
-        );
-        const bTime = Math.min(
-          parseLapTime(b.bestQualiTime),
-          parseLapTime(b.bestHeatTime),
-          parseLapTime(b.bestFinalTime)
-        );
-        return aTime - bTime;
-      });
-
+      // Best Times Table - Render it (data already prepared earlier)
       if (bestTimesData.length > 0) {
         await addTable(
           'Best Times',
@@ -1230,106 +1553,77 @@ Thank you once again for your involvement with VHKC. We look forward to continui
             return null;
           }
         );
+        addTocItem('Best Times');
       }
 
-      // Heat Points (if exists) - Add before Final Points
-      if (hasHeat) {
-        const heatPointsData = points
-          .filter(p => p.raceType === 'heat')
-          .map(p => {
-            const driver = getDriverInfo(p.driverId);
-            return {
-              driverId: p.driverId,
-              driverName: driver?.name || '',
-              alias: getDriverAlias(p.driverId),
-              division: p.division || '',
-              points: p.points || 0,
-            };
-          })
-          .sort((a, b) => b.points - a.points);
+      // Combined Heat and Final Points Table
+      // Filter points by selected division and round
+      const filteredPoints = points.filter(p => {
+        const matchesDivision = selectedDivision === 'All' || p.division === selectedDivision;
+        const matchesRound = p.roundId === selectedRoundId;
+        return matchesDivision && matchesRound && (p.raceType === 'heat' || p.raceType === 'final');
+      });
 
-        if (heatPointsData.length > 0) {
-          await addTable(
-            'Heat Points',
-            heatPointsData,
-            ['Driver Name', 'Alias', 'Division', 'Race Points'],
-            (item) => [
-              item.driverName,
-              item.alias || '',
-              item.division,
-              item.points.toString(),
-            ],
-            true, // useRank
-            3 // Division column index (after #, Driver Name, Alias)
-          );
-        }
-      }
+      // Group points by driver to calculate minor, major, and total
+      const driverPointsMap = new Map<string, {
+        driverId: string;
+        driverName: string;
+        alias: string;
+        division: string;
+        minorPoints: number; // Heat points
+        majorPoints: number; // Final points
+        totalPoints: number;
+      }>();
 
-      // Final Points (Driver Name, Alias, Division, Race Points)
-      const finalPointsData = points
-        .filter(p => p.raceType === 'final')
-        .map(p => {
-          const driver = getDriverInfo(p.driverId);
-          return {
+      filteredPoints.forEach(p => {
+        const driver = getDriverInfo(p.driverId);
+        const driverKey = p.driverId;
+        
+        if (!driverPointsMap.has(driverKey)) {
+          driverPointsMap.set(driverKey, {
             driverId: p.driverId,
             driverName: driver?.name || '',
             alias: getDriverAlias(p.driverId),
             division: p.division || '',
-            points: p.points || 0,
-          };
-        })
-        .sort((a, b) => b.points - a.points);
+            minorPoints: 0,
+            majorPoints: 0,
+            totalPoints: 0,
+          });
+        }
 
-      if (finalPointsData.length > 0) {
+        const driverData = driverPointsMap.get(driverKey)!;
+        if (p.raceType === 'heat') {
+          driverData.minorPoints += p.points || 0;
+        } else if (p.raceType === 'final') {
+          driverData.majorPoints += p.points || 0;
+        }
+        driverData.totalPoints = driverData.minorPoints + driverData.majorPoints;
+      });
+
+      // Convert to array and sort by total points descending
+      const combinedPointsData = Array.from(driverPointsMap.values())
+        .sort((a, b) => b.totalPoints - a.totalPoints);
+
+      if (combinedPointsData.length > 0) {
         await addTable(
-          'Final Points',
-          finalPointsData,
-          ['Driver Name', 'Alias', 'Division', 'Race Points'],
+          hasHeat ? 'Heat & Final Points' : 'Final Points',
+          combinedPointsData,
+          ['Driver Name', 'Alias', 'Division', 'Minor', 'Major', 'Total'],
           (item) => [
             item.driverName,
             item.alias || '',
             item.division,
-            item.points.toString(),
+            item.minorPoints.toString(),
+            item.majorPoints.toString(),
+            item.totalPoints.toString(),
           ],
           true, // useRank
           3 // Division column index (after #, Driver Name, Alias)
         );
+        addTocItem(hasHeat ? 'Heat & Final Points' : 'Final Points');
       }
 
-      // Driver Standings - Fetch season-wide standings
-      let seasonPoints: any[] = [];
-      try {
-        if (selectedSeason?.id) {
-          const seasonPointsResponse = await fetch(`/api/points?seasonId=${selectedSeason.id}`);
-          if (seasonPointsResponse.ok) {
-            seasonPoints = await seasonPointsResponse.json();
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to fetch season points for standings:', error);
-      }
-
-      const driverStandingsMap = new Map<string, { driverId: string; driverName: string; alias: string; division: Division; totalPoints: number }>();
-      
-      seasonPoints.forEach(p => {
-        const existing = driverStandingsMap.get(p.driverId);
-        if (existing) {
-          existing.totalPoints += p.points || 0;
-        } else {
-          const driver = getDriverInfo(p.driverId);
-          driverStandingsMap.set(p.driverId, {
-            driverId: p.driverId,
-            driverName: driver?.name || '',
-            alias: getDriverAlias(p.driverId),
-            division: p.division,
-            totalPoints: p.points || 0,
-          });
-        }
-      });
-
-      const driverStandings = Array.from(driverStandingsMap.values())
-        .sort((a, b) => b.totalPoints - a.totalPoints);
-
+      // Driver Standings - Render it (data already prepared earlier)
       if (driverStandings.length > 0) {
         await addTable(
           'Driver Standings',
@@ -1344,62 +1638,42 @@ Thank you once again for your involvement with VHKC. We look forward to continui
           true, // useRank
           3 // Division column index (after #, Driver Name, Alias)
         );
+        addTocItem('Driver Standings');
       }
 
-      // Promotions and Demotions Section
-      if (selectedRoundId && selectedSeason?.id) {
-        try {
-          const changesResponse = await fetch(`/api/division-changes?roundId=${selectedRoundId}`);
-          if (changesResponse.ok) {
-            const changes = await changesResponse.json();
-            
-            // Filter by selected division - only show drivers that were initially in the selected division
-            // Only show promotions and demotions in reports, not division_start or mid_season_join
-            let filteredChanges = changes.filter((c: any) => 
-              c.changeType === 'promotion' || c.changeType === 'demotion'
-            );
-            if (selectedDivision !== 'All') {
-              filteredChanges = filteredChanges.filter((c: any) => c.fromDivision === selectedDivision);
-            }
-            
-            const promotions = filteredChanges.filter((c: any) => c.changeType === 'promotion');
-            const demotions = filteredChanges.filter((c: any) => c.changeType === 'demotion');
-            
-            if (promotions.length > 0) {
-              await addTable(
-                'Promotions',
-                promotions,
-                ['Driver Name', 'From Division', 'To Division'],
-                (item: any) => [
-                  item.driverName,
-                  item.fromDivision,
-                  item.toDivision,
-                ],
-                true, // useRank
-                2 // From Division column index (0: #, 1: Driver Name, 2: From Division)
-                // To Division will be detected automatically by column name
-              );
-            }
-            
-            if (demotions.length > 0) {
-              await addTable(
-                'Demotions',
-                demotions,
-                ['Driver Name', 'From Division', 'To Division'],
-                (item: any) => [
-                  item.driverName,
-                  item.fromDivision,
-                  item.toDivision,
-                ],
-                true, // useRank
-                2 // From Division column index (0: #, 1: Driver Name, 2: From Division)
-                // To Division will be detected automatically by column name
-              );
-            }
-          }
-        } catch (error) {
-          console.warn('Failed to fetch division changes:', error);
-        }
+      // Promotions and Demotions Section (data already fetched earlier)
+      if (promotions.length > 0) {
+        await addTable(
+          'Promotions',
+          promotions,
+          ['Driver Name', 'From Division', 'To Division'],
+          (item: any) => [
+            item.driverName,
+            item.fromDivision,
+            item.toDivision,
+          ],
+          true, // useRank
+          2 // From Division column index (0: #, 1: Driver Name, 2: From Division)
+          // To Division will be detected automatically by column name
+        );
+        addTocItem('Promotions');
+      }
+      
+      if (demotions.length > 0) {
+        await addTable(
+          'Demotions',
+          demotions,
+          ['Driver Name', 'From Division', 'To Division'],
+          (item: any) => [
+            item.driverName,
+            item.fromDivision,
+            item.toDivision,
+          ],
+          true, // useRank
+          2 // From Division column index (0: #, 1: Driver Name, 2: From Division)
+          // To Division will be detected automatically by column name
+        );
+        addTocItem('Demotions');
       }
 
       // Team Standings - Aggregate points by team
@@ -1438,6 +1712,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
           ],
           false // No rank column for team standings
         );
+        addTocItem('Team Standings');
       }
 
       // Modern professional footer
@@ -1456,11 +1731,14 @@ Thank you once again for your involvement with VHKC. We look forward to continui
         // Footer text
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal'); // Using helvetica as closest to Futura
+        doc.setFont(airstrikeFont ? 'Airstrike' : 'helvetica', 'normal');
         const footerText = `VHKC Race Results Report | Page ${i} of ${totalPages}`;
         doc.text(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' });
       }
 
+      // Render TOC with correct page numbers now that all content is generated
+      renderTOC();
+      
       // Generate filename
       const roundName = selectedRound.location?.replace(/[^a-z0-9]/gi, '_') || `Round_${selectedRound.roundNumber || ''}`;
       const dateStr = selectedRound.date ? new Date(selectedRound.date).toISOString().split('T')[0] : '';

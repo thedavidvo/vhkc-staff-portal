@@ -42,7 +42,6 @@ const navItems: NavItem[] = [
   { name: 'Divisions', href: '/divisions', icon: ShieldCheck, category: 'management' },
   { name: 'Standings', href: '/standings', icon: BarChart3, category: 'data' },
   { name: 'Teams', href: '/teams', icon: UsersRound, category: 'management' },
-  { name: 'Compare', href: '/compare', icon: GitCompare, category: 'data' },
   { name: 'Reports', href: '/reports', icon: FileText, category: 'data' },
 ];
 
@@ -50,7 +49,9 @@ const bottomNavItems: NavItem[] = [
   { name: 'Locations', href: '/locations', icon: MapPin, category: 'settings' },
 ];
 
-const comingSoonItems: NavItem[] = [];
+const comingSoonItems: NavItem[] = [
+  { name: 'Compare', href: '/compare', icon: GitCompare, category: 'data' },
+];
 
 export default function Sidebar() {
   const { isCollapsed, setIsCollapsed } = useSidebar();

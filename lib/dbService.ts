@@ -590,16 +590,6 @@ export async function getRaceResultsByRound(roundId: string, resultsSheetId?: st
     
     const driver = driverMap.get(result.driver_id);
     
-    // Debug logging for driver division lookup
-    if (driver?.name && driver.name.includes('Saad')) {
-      console.log('Debug getRaceResultsByRound for Saad:', {
-        driverName: driver.name,
-        resultDivision: result.division,
-        driverDivisionAtRound: result.driver_division_at_round,
-        raceDivision
-      });
-    }
-    
     divisionMap.get(raceDivision)!.push({
       driverId: result.driver_id,
       driverName: driver?.name || 'Unknown Driver',
@@ -1018,15 +1008,6 @@ export async function addPoints(points: Points): Promise<void> {
     const normalizedFinalType = points.finalType && points.finalType.trim() !== '' ? points.finalType : null;
     const raceType = points.raceType || 'qualification';
     
-    console.log('addPoints called with:', { 
-      roundId: points.roundId, 
-      driverId: points.driverId, 
-      raceType, 
-      finalType: normalizedFinalType,
-      points: points.points,
-      note: points.note 
-    });
-    
     // Check if record exists
     let existingRecord;
     if (normalizedFinalType === null) {
@@ -1051,9 +1032,6 @@ export async function addPoints(points: Points): Promise<void> {
     
     if (existingRecord.length > 0) {
       // Update existing record
-      console.log('Updating existing record:', existingRecord[0].id);
-      
-      // Ensure division is not null
       if (!points.division) {
         throw new Error('Division is required to update points');
       }
@@ -1072,7 +1050,6 @@ export async function addPoints(points: Points): Promise<void> {
       `;
     } else {
       // Insert new record
-      console.log('Inserting new record');
       await sql`
         INSERT INTO points (
           id, season_id, round_id, driver_id, division, race_type, final_type,
@@ -1092,10 +1069,7 @@ export async function addPoints(points: Points): Promise<void> {
 }
 
 export async function updatePoints(points: Points): Promise<void> {
-  console.log('updatePoints called with:', points);
-  
   if (!points.division) {
-    console.error('Division is null in updatePoints:', points);
     throw new Error('Division is required to update points');
   }
   

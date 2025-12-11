@@ -32,6 +32,7 @@ interface RaceHistoryProps {
 export default function RaceHistory({ races, drivers = [], points = [], rounds = [] }: RaceHistoryProps) {
   const [selectedRaceId, setSelectedRaceId] = useState<string | null>(null);
   const [selectedDivision, setSelectedDivision] = useState<Division>('Division 1');
+  const [raceResults, setRaceResults] = useState<any[]>([]);
 
   // Show all races sorted by round number (first race at top)
   const sortedRaces = [...races].sort(
@@ -66,6 +67,29 @@ export default function RaceHistory({ races, drivers = [], points = [], rounds =
     // Only run when sortedRaces changes, not when selectedRaceId changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortedRaces]);
+
+  // Fetch race results for selected race
+  useEffect(() => {
+    if (selectedRaceId) {
+      fetch(`/api/race-results?roundId=${selectedRaceId}`)
+        .then(res => res.ok ? res.json() : [])
+        .then(data => {
+          // Flatten the nested structure { division, results } to a flat array
+          const flatResults: any[] = [];
+          if (Array.isArray(data)) {
+            data.forEach((divisionData: any) => {
+              if (divisionData.results && Array.isArray(divisionData.results)) {
+                flatResults.push(...divisionData.results);
+              }
+            });
+          }
+          setRaceResults(flatResults);
+        })
+        .catch(() => setRaceResults([]));
+    } else {
+      setRaceResults([]);
+    }
+  }, [selectedRaceId]);
 
   // Calculate standings by division - round-specific if race is selected, overall otherwise
   const standings = useMemo(() => {
@@ -104,45 +128,92 @@ export default function RaceHistory({ races, drivers = [], points = [], rounds =
 
       return driversInDivision;
     } else {
-      // Race selected - show standings for this specific round
+      // Race selected - show standings sorted by final race position
       const roundId = selectedRace.id;
       
+      // Get final race results for this division
+      // Filter by raceName contains 'final', division match, and valid overallPosition
+      const finalResults = raceResults.filter((r: any) => {
+        const isFinal = (r.raceName || '').toLowerCase().includes('final');
+        const divisionMatch = r.driverDivision === selectedDivision;
+        const hasPosition = r.overallPosition !== null && r.overallPosition !== undefined;
+        
+        return isFinal && divisionMatch && hasPosition;
+      });
+
       // Get points for this specific round
       const roundPoints = points.filter((p: any) => p.roundId === roundId);
-      
-      // Group points by driver and division
-      const driverPointsMap: Record<string, { driver: any; points: number; division: Division }> = {};
-      
-      roundPoints.forEach((point: any) => {
-        const driverId = point.driverId;
-        const driver = drivers.find(d => d.id === driverId);
-        
-        if (driver && point.division === selectedDivision) {
-          if (!driverPointsMap[driverId]) {
-            driverPointsMap[driverId] = {
-              driver,
-              points: 0,
-              division: point.division,
-            };
+
+      // If we have final results, sort by race position
+      if (finalResults.length > 0) {
+        // Sort by final type alphabetically (A, B, C, D) and then by overall position
+        finalResults.sort((a: any, b: any) => {
+          // Sort by finalType alphabetically first
+          const finalTypeA = (a.finalType || '').toUpperCase();
+          const finalTypeB = (b.finalType || '').toUpperCase();
+          
+          if (finalTypeA !== finalTypeB) {
+            return finalTypeA.localeCompare(finalTypeB);
           }
-          driverPointsMap[driverId].points += parseFloat(point.points) || 0;
-        }
-      });
-      
-      // Convert to array and sort by points
-      const standingsList = Object.values(driverPointsMap)
-        .map(({ driver, points: totalPoints }) => ({
-          ...driver,
-          totalPoints,
-          roundsParticipated: 1, // For round-specific, it's always 1 round
-        }))
-        .sort((a, b) => b.totalPoints - a.totalPoints)
-        .map((driver, index) => ({
-          ...driver,
-          position: index + 1,
-        }));
-      
-      return standingsList;
+          
+          // Then sort by overall position
+          const posA = parseInt(String(a.overallPosition)) || 999;
+          const posB = parseInt(String(b.overallPosition)) || 999;
+          return posA - posB;
+        });
+        
+        // Map drivers with their results - assign sequential positions for this division
+        const standingsList = finalResults.map((result: any, index: number) => {
+          const driver = drivers.find(d => d.id === result.driverId);
+          const driverPoints = roundPoints.filter((p: any) => p.driverId === result.driverId);
+          const totalPoints = driverPoints.reduce((sum, p) => sum + (parseFloat(p.points) || 0), 0);
+          
+          return {
+            ...(driver || { id: result.driverId, name: result.driverName || 'Unknown Driver', teamName: result.teamName }),
+            totalPoints,
+            roundsParticipated: 1,
+            position: index + 1, // Sequential position within this division (1, 2, 3...)
+            finalType: result.finalType,
+            overallPosition: result.overallPosition,
+          };
+        });
+        
+        return standingsList;
+      } else {
+        // No final results yet - fall back to points-based sorting
+        const driverPointsMap: Record<string, { driver: any; points: number; division: Division }> = {};
+        
+        roundPoints.forEach((point: any) => {
+          const driverId = point.driverId;
+          const driver = drivers.find(d => d.id === driverId);
+          
+          if (driver && point.division === selectedDivision) {
+            if (!driverPointsMap[driverId]) {
+              driverPointsMap[driverId] = {
+                driver,
+                points: 0,
+                division: point.division,
+              };
+            }
+            driverPointsMap[driverId].points += parseFloat(point.points) || 0;
+          }
+        });
+        
+        // Convert to array and sort by points
+        const standingsList = Object.values(driverPointsMap)
+          .map(({ driver, points: totalPoints }) => ({
+            ...driver,
+            totalPoints,
+            roundsParticipated: 1,
+          }))
+          .sort((a, b) => b.totalPoints - a.totalPoints)
+          .map((driver, index) => ({
+            ...driver,
+            position: index + 1,
+          }));
+        
+        return standingsList;
+      }
     }
   }, [drivers, points, selectedDivision, selectedRace]);
 
@@ -157,13 +228,13 @@ export default function RaceHistory({ races, drivers = [], points = [], rounds =
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Panel 1: Race List */}
       <div className="lg:col-span-1">
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden h-full flex flex-col">
           <div className="p-4 border-b border-slate-200 dark:border-slate-700">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
               Races
             </h3>
           </div>
-          <div className="overflow-y-auto max-h-[600px]">
+          <div className="overflow-y-auto flex-1">
             {sortedRaces.length === 0 ? (
               <div className="p-8 text-center text-slate-500 dark:text-slate-400">
                 No races available.
@@ -264,72 +335,83 @@ export default function RaceHistory({ races, drivers = [], points = [], rounds =
             </div>
           </div>
           
-          <div className="overflow-y-auto flex-1">
+          <div className="overflow-y-auto flex-1" style={{ maxHeight: 'calc(100vh - 500px)', minHeight: '400px' }}>
             {standings.length === 0 ? (
               <div className="p-8 text-center text-slate-500 dark:text-slate-400">
                 No drivers found in {selectedDivision}
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50 dark:bg-slate-800">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Pos
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Driver
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                        Points
-                      </th>
-                      {!selectedRace && (
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                          Rounds
-                        </th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
-                    {standings.map((driver) => (
-                      <tr
-                        key={driver.id}
-                        className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                      >
-                        <td className="px-4 py-3 whitespace-nowrap">
+              <div className="p-4">
+                {/* Podium - Top 3 */}
+                {standings.slice(0, 3).length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase mb-3">
+                      Podium
+                    </h4>
+                    <div className="space-y-2">
+                      {standings.slice(0, 3).map((driver) => (
+                        <div
+                          key={driver.id}
+                          className="flex items-center gap-3 p-3 bg-gradient-to-r from-slate-50 to-white dark:from-slate-800 dark:to-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
+                        >
                           <div className="flex items-center gap-2">
                             {getRankIcon(driver.position)}
-                            <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                            <span className="text-lg font-bold text-slate-900 dark:text-white">
                               {driver.position}
                             </span>
                           </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-sm font-medium text-slate-900 dark:text-white">
-                            {driver.name}
-                          </div>
-                          {driver.teamName && (
-                            <div className="text-xs text-slate-500 dark:text-slate-400">
-                              {driver.teamName}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                              {driver.name}
                             </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-right">
-                          <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                            {driver.teamName && (
+                              <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                {driver.teamName}
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                              {Math.round(driver.totalPoints)}
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                              pts
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Remaining Drivers */}
+                {standings.slice(3).length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase mb-3">
+                      Other Finishers
+                    </h4>
+                    <div className="space-y-1">
+                      {standings.slice(3).map((driver) => (
+                        <div
+                          key={driver.id}
+                          className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded transition-colors"
+                        >
+                          <span className="text-sm font-semibold text-slate-600 dark:text-slate-400 w-8">
+                            {driver.position}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm text-slate-900 dark:text-white truncate">
+                              {driver.name}
+                            </div>
+                          </div>
+                          <div className="text-sm font-medium text-slate-600 dark:text-slate-400">
                             {Math.round(driver.totalPoints)}
                           </div>
-                        </td>
-                        {!selectedRace && (
-                          <td className="px-4 py-3 whitespace-nowrap text-right">
-                            <div className="text-sm text-slate-600 dark:text-slate-400">
-                              {driver.roundsParticipated}
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
