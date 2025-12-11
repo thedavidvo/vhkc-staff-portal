@@ -613,23 +613,23 @@ export default function ReportsPage() {
 
       // Collect best qualifying times
       organizedResults.qualifying.forEach(q => {
-        if (q.bestTime) {
+        if (q.fastestLap) {
           if (!bestTimesMap.has(q.driverId)) {
             bestTimesMap.set(q.driverId, {
               driverId: q.driverId,
               driverName: q.driverName || '',
               alias: getDriverAlias(q.driverId),
               division: q.division,
-              bestQualiTime: q.bestTime,
+              bestQualiTime: q.fastestLap,
               bestHeatTime: '-',
               bestFinalTime: '-',
             });
           } else {
             const entry = bestTimesMap.get(q.driverId)!;
             const currentBest = parseLapTime(entry.bestQualiTime);
-            const newTime = parseLapTime(q.bestTime);
+            const newTime = parseLapTime(q.fastestLap);
             if (newTime < currentBest) {
-              entry.bestQualiTime = q.bestTime;
+              entry.bestQualiTime = q.fastestLap;
             }
           }
         }
@@ -638,7 +638,7 @@ export default function ReportsPage() {
       // Collect best heat times
       Object.values(organizedResults.heats).forEach(heatArray => {
         heatArray.forEach(h => {
-          if (h.bestTime) {
+          if (h.fastestLap) {
             if (!bestTimesMap.has(h.driverId)) {
               bestTimesMap.set(h.driverId, {
                 driverId: h.driverId,
@@ -646,15 +646,15 @@ export default function ReportsPage() {
                 alias: getDriverAlias(h.driverId),
                 division: h.division,
                 bestQualiTime: '-',
-                bestHeatTime: h.bestTime,
+                bestHeatTime: h.fastestLap,
                 bestFinalTime: '-',
               });
             } else {
               const entry = bestTimesMap.get(h.driverId)!;
               const currentBest = parseLapTime(entry.bestHeatTime);
-              const newTime = parseLapTime(h.bestTime);
+              const newTime = parseLapTime(h.fastestLap);
               if (newTime < currentBest) {
-                entry.bestHeatTime = h.bestTime;
+                entry.bestHeatTime = h.fastestLap;
               }
             }
           }
@@ -664,7 +664,7 @@ export default function ReportsPage() {
       // Collect best final times
       Object.values(organizedResults.finals).forEach(finalArray => {
         finalArray.forEach(f => {
-          if (f.bestTime) {
+          if (f.fastestLap) {
             if (!bestTimesMap.has(f.driverId)) {
               bestTimesMap.set(f.driverId, {
                 driverId: f.driverId,
@@ -673,14 +673,14 @@ export default function ReportsPage() {
                 division: f.division,
                 bestQualiTime: '-',
                 bestHeatTime: '-',
-                bestFinalTime: f.bestTime,
+                bestFinalTime: f.fastestLap,
               });
             } else {
               const entry = bestTimesMap.get(f.driverId)!;
               const currentBest = parseLapTime(entry.bestFinalTime);
-              const newTime = parseLapTime(f.bestTime);
+              const newTime = parseLapTime(f.fastestLap);
               if (newTime < currentBest) {
-                entry.bestFinalTime = f.bestTime;
+                entry.bestFinalTime = f.fastestLap;
               }
             }
           }
