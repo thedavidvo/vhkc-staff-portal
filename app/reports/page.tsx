@@ -474,7 +474,16 @@ export default function ReportsPage() {
       if (locationText && locationText !== 'TBD') infoParts.push(locationText);
       
       const infoParagraph = infoParts.join(' • ');
-      doc.text(infoParagraph, pageWidth / 2, currentY, { align: 'center' });
+      
+      // Use splitTextToSize to wrap text if it's too long
+      const maxWidth = pageWidth - 40; // Account for margins
+      const wrappedText = doc.splitTextToSize(infoParagraph, maxWidth);
+      doc.text(wrappedText, pageWidth / 2, currentY, { align: 'center' });
+      
+      // Adjust spacing if text wrapped to multiple lines
+      if (wrappedText.length > 1) {
+        currentY += (wrappedText.length - 1) * 12;
+      }
       
       // Add new page for thank you message
       doc.addPage();
@@ -601,7 +610,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
 
 
       // Modern professional table helper function - Each table on new page
-      const addTable = async (title: string, data: any[], columns: string[], getRowData: (item: any) => any[], useRank: boolean = true, divisionColumnIndex?: number, groupColumnIndex?: number) => {
+      const addTable = async (title: string, data: any[], columns: string[], getRowData: (item: any) => any[], useRank: boolean = true, divisionColumnIndex?: number, groupColumnIndex?: number, customCellStyle?: (rowIndex: number, colIndex: number, cellData: any, item: any) => { fillColor?: [number, number, number]; textColor?: [number, number, number]; fontStyle?: string } | null) => {
         if (data.length === 0) return;
 
         // Always start on a new page for each table
@@ -702,6 +711,27 @@ Thank you once again for your involvement with VHKC. We look forward to continui
             font: 'helvetica' // Using helvetica as closest to Futura
           },
           didParseCell: (data: any) => {
+            // Apply custom cell styling if provided
+            if (data.section === 'body' && customCellStyle) {
+              const rowIndex = data.row.index;
+              const colIndex = data.column.index;
+              const cellData = Array.isArray(data.cell.text) ? data.cell.text[0] : data.cell.text;
+              const item = tableData[rowIndex] ? data.table.body[rowIndex].raw : null;
+              
+              const customStyle = customCellStyle(rowIndex, colIndex, cellData, item);
+              if (customStyle) {
+                if (customStyle.fillColor) {
+                  data.cell.styles.fillColor = customStyle.fillColor;
+                }
+                if (customStyle.textColor) {
+                  data.cell.styles.textColor = customStyle.textColor;
+                }
+                if (customStyle.fontStyle) {
+                  data.cell.styles.fontStyle = customStyle.fontStyle;
+                }
+              }
+            }
+            
             // Ensure all body cells have left alignment unless they're special columns (rank, division, group)
             if (data.section === 'body') {
               const isRankColumn = useRank && data.column.index === 0;
@@ -862,14 +892,13 @@ Thank you once again for your involvement with VHKC. We look forward to continui
         return '';
       };
 
-      // Main Driver Table (Driver Name, Alias, Home Track, Division)
+      // Main Driver Table (Driver Name, Alias, Division)
       const mainDriverData = participants.map(p => {
         const driver = getDriverInfo(p.driverId);
         return {
           driverId: p.driverId,
           driverName: p.driverName || '',
           alias: getDriverAlias(p.driverId),
-          homeTrack: driver?.homeTrack || '',
           division: p.division || '',
         };
       }).sort((a: any, b: any) => a.driverName.localeCompare(b.driverName));
@@ -878,15 +907,14 @@ Thank you once again for your involvement with VHKC. We look forward to continui
         await addTable(
           'Main Driver Table',
           mainDriverData,
-          ['Driver Name', 'Alias', 'Home Track', 'Division'],
+          ['Driver Name', 'Alias', 'Division'],
           (item) => [
             item.driverName,
             item.alias,
-            item.homeTrack,
             item.division,
           ],
           true, // useRank
-          4 // Division column index (after #, Driver Name, Alias, Home Track)
+          3 // Division column index (after #, Driver Name, Alias)
         );
       }
 
@@ -928,119 +956,59 @@ Thank you once again for your involvement with VHKC. We look forward to continui
       // Times Tables - Separate into Qualifying, Heat, and Final times
       const hasHeat = Object.keys(organizedResults.heats).length > 0;
       
-      // 1. Qualifying Times Table
+      // 1. Qualifying Results - Split by Group
       if (organizedResults.qualifying.length > 0) {
-        const qualTimesData = organizedResults.qualifying.map(q => ({
-          driverId: q.driverId,
-          driverName: q.driverName || '',
-          alias: getDriverAlias(q.driverId),
-          division: q.division || '',
-          qualRank: q.position || 0,
-          qualTime: q.fastestLap || '',
-          qualKartNumber: q.kartNumber || '',
-          group: q.raceName || q.finalType || '',
-        })).sort((a, b) => {
-          const rankA = typeof a.qualRank === 'number' ? a.qualRank : (typeof a.qualRank === 'string' ? parseInt(a.qualRank, 10) : 999);
-          const rankB = typeof b.qualRank === 'number' ? b.qualRank : (typeof b.qualRank === 'string' ? parseInt(b.qualRank, 10) : 999);
-          return (isNaN(rankA) ? 999 : rankA) - (isNaN(rankB) ? 999 : rankB);
-        });
-
-        await addTable(
-          'Qualifying Times',
-          qualTimesData,
-          ['Driver Name', 'Alias', 'Division', 'Rank', 'Time', 'Kart Number', 'Group'],
-          (item) => [
-            item.driverName,
-            item.alias || '',
-            item.division,
-            item.qualRank?.toString() || '',
-            item.qualTime || '-',
-            item.qualKartNumber || '',
-            item.group || '',
-          ],
-          true, // useRank
-          3, // Division column index (after #, Driver Name, Alias)
-          7 // Group column index (after #, Driver Name, Alias, Division, Rank, Time, Kart Number)
-        );
-      }
-
-      // 2. Qualifying Results (Driver Name, Alias, Kart Number, Division, Best Time, Group, Rank)
-      if (organizedResults.qualifying.length > 0) {
-        const qualData = organizedResults.qualifying.map(q => {
-          const driver = getDriverInfo(q.driverId);
-          return {
+        // Group qualifying results by group/finalType
+        const qualByGroup: { [key: string]: any[] } = {};
+        organizedResults.qualifying.forEach(q => {
+          // Use raceName if available, otherwise construct from finalType
+          const groupKey = q.raceName || (q.finalType ? `Qual Group ${q.finalType}` : 'Qualifying');
+          if (!qualByGroup[groupKey]) qualByGroup[groupKey] = [];
+          qualByGroup[groupKey].push({
             ...q,
             alias: getDriverAlias(q.driverId),
-            group: q.raceName || q.finalType || '',
-          };
-        }).sort((a, b) => (a.position || 999) - (b.position || 999));
-
-        await addTable(
-          'Qualifying Results',
-          qualData,
-          ['Driver Name', 'Alias', 'Kart Number', 'Division', 'Best Time', 'Group', 'Rank'],
-          (item) => [
-            item.driverName || '',
-            item.alias || '',
-            item.kartNumber || '',
-            item.division || '',
-            item.fastestLap || '-',
-            item.group || '',
-            item.position?.toString() || '',
-          ],
-          true, // useRank
-          4, // Division column index (after #, Driver Name, Alias, Kart Number)
-          6 // Group column index (after #, Driver Name, Alias, Kart Number, Division, Best Time)
-        );
-      }
-
-      // 3. Heat Times Table (if exists)
-      if (hasHeat) {
-        const heatTimesData: any[] = [];
-        Object.keys(organizedResults.heats).forEach(heatKey => {
-          organizedResults.heats[heatKey].forEach(h => {
-            heatTimesData.push({
-              driverId: h.driverId,
-              driverName: h.driverName || '',
-              alias: getDriverAlias(h.driverId),
-              division: h.division || '',
-              heatRank: h.position || '',
-              heatTime: h.fastestLap || '',
-              heatKartNumber: h.kartNumber || '',
-              group: heatKey,
-            });
+            group: groupKey,
           });
         });
-        
-        heatTimesData.sort((a, b) => {
-          if (a.group !== b.group) {
-            return a.group.localeCompare(b.group);
-          }
-          return (a.heatRank || 999) - (b.heatRank || 999);
-        });
 
-        await addTable(
-          'Heat Times',
-          heatTimesData,
-          ['Driver Name', 'Alias', 'Division', 'Rank', 'Time', 'Kart Number', 'Group'],
-          (item) => [
-            item.driverName || '',
-            item.alias || '',
-            item.division || '',
-            item.heatRank?.toString() || '',
-            item.heatTime || '-',
-            item.heatKartNumber || '',
-            item.group || '',
-          ],
-          true, // useRank
-          3, // Division column index (after #, Driver Name, Alias)
-          7 // Group column index (after #, Driver Name, Alias, Division, Rank, Time, Kart Number)
-        );
+        // Create a table for each qualifying group - Sort numerically by group number
+        const sortedGroupKeys = Object.keys(qualByGroup).sort((a, b) => {
+          // Extract group numbers for numerical sorting (e.g., "Qual Group 1" -> 1)
+          const aMatch = a.match(/(\d+)/);
+          const bMatch = b.match(/(\d+)/);
+          if (aMatch && bMatch) {
+            return parseInt(aMatch[1]) - parseInt(bMatch[1]);
+          }
+          // Fallback to alphabetical sorting if no numbers found
+          return a.localeCompare(b);
+        });
+        
+        for (const groupKey of sortedGroupKeys) {
+          const qualData = qualByGroup[groupKey].sort((a, b) => (a.overallPosition || a.position || 999) - (b.overallPosition || b.position || 999));
+
+          await addTable(
+            `Qualifying Results - ${groupKey}`,
+            qualData,
+            ['Driver Name', 'Alias', 'Kart Number', 'Division', 'Best Time'],
+            (item) => [
+              item.driverName || '',
+              item.alias || '',
+              item.kartNumber || '',
+              item.division || '',
+              item.fastestLap || '-',
+            ],
+            true, // useRank
+            4 // Division column index (after #, Driver Name, Alias, Kart Number)
+          );
+        }
       }
 
-      // 4. Heat Results (if exists)
+      // 3. Heat Results (if exists)
       if (hasHeat) {
-        for (const heatKey of Object.keys(organizedResults.heats)) {
+        // Sort heat keys alphabetically (A, B, C, etc.)
+        const sortedHeatKeys = Object.keys(organizedResults.heats).sort();
+        
+        for (const heatKey of sortedHeatKeys) {
           const heatResults = organizedResults.heats[heatKey];
           if (heatResults.length > 0) {
             const heatData = heatResults.map(h => {
@@ -1052,19 +1020,18 @@ Thank you once again for your involvement with VHKC. We look forward to continui
                 points: driverPoint?.points || 0,
                 group: heatKey,
               };
-            }).sort((a, b) => (a.position || 999) - (b.position || 999));
+            }).sort((a, b) => (a.overallPosition || a.position || 999) - (b.overallPosition || b.position || 999));
 
             await addTable(
               `Heat Results - ${heatKey}`,
               heatData,
-              ['Driver Name', 'Alias', 'Kart Number', 'Best Time', 'Division', 'Position', 'Points'],
+              ['Driver Name', 'Alias', 'Kart Number', 'Best Time', 'Division', 'Points'],
               (item) => [
                 item.driverName || '',
                 item.alias || '',
                 item.kartNumber || '',
                 item.fastestLap || '-',
                 item.division || '',
-                item.position?.toString() || '',
                 item.points?.toString() || '0',
               ],
               true, // useRank
@@ -1074,93 +1041,194 @@ Thank you once again for your involvement with VHKC. We look forward to continui
         }
       }
 
-      // 5. Final Times Table
-      const finalTimesData: any[] = [];
-      Object.keys(organizedResults.finals).forEach(finalKey => {
-        organizedResults.finals[finalKey].forEach(f => {
-          finalTimesData.push({
-            driverId: f.driverId,
-            driverName: f.driverName || '',
-            alias: getDriverAlias(f.driverId),
-            division: f.division || '',
-            finalRank: f.position || '',
-            finalTime: f.fastestLap || '',
-            finalKartNumber: f.kartNumber || '',
-            group: finalKey,
+      // 4. Final Results - Combined with Overall Ranking
+      if (Object.keys(organizedResults.finals).length > 0) {
+        const combinedFinalData: any[] = [];
+        
+        for (const finalKey of Object.keys(organizedResults.finals)) {
+          const finalResults = organizedResults.finals[finalKey];
+          finalResults.forEach(result => {
+            const driver = getDriverInfo(result.driverId);
+            const driverPoint = points.find(p => p.driverId === result.driverId && p.raceType === 'final' && (p.finalType === finalKey || !p.finalType));
+            combinedFinalData.push({
+              ...result,
+              alias: getDriverAlias(result.driverId),
+              divisionPlacing: result.position || '',
+              points: driverPoint?.points || 0,
+              gridPosition: result.gridPosition || '',
+              overallPosition: result.overallPosition || result.position || '',
+              finalType: finalKey,
+            });
           });
-        });
-      });
-      
-      finalTimesData.sort((a, b) => {
-        if (a.group !== b.group) {
-          return a.group.localeCompare(b.group);
         }
-        return (a.finalRank || 999) - (b.finalRank || 999);
-      });
 
-      if (finalTimesData.length > 0) {
-        await addTable(
-          'Final Times',
-          finalTimesData,
-          ['Driver Name', 'Alias', 'Division', 'Rank', 'Time', 'Kart Number', 'Group'],
-          (item) => [
-            item.driverName || '',
-            item.alias || '',
-            item.division || '',
-            item.finalRank?.toString() || '',
-            item.finalTime || '-',
-            item.finalKartNumber || '',
-            item.group || '',
-          ],
-          true, // useRank
-          3, // Division column index (after #, Driver Name, Alias)
-          7 // Group column index (after #, Driver Name, Alias, Division, Rank, Time, Kart Number)
-        );
-      }
-
-      // Final Results (Driver Name, Alias, Kart Number, Best Time, Division, Division Placing, Points, Grid Position, Overall Position, movement)
-      const finalData: any[] = [];
-      for (const finalKey of Object.keys(organizedResults.finals)) {
-        const finalResults = organizedResults.finals[finalKey];
-        finalResults.forEach(result => {
-          const driver = getDriverInfo(result.driverId);
-          const driverPoint = points.find(p => p.driverId === result.driverId && p.raceType === 'final' && (p.finalType === finalKey || !p.finalType));
-          finalData.push({
-            ...result,
-            alias: getDriverAlias(result.driverId),
-            divisionPlacing: result.position || '',
-            points: driverPoint?.points || 0,
-            gridPosition: result.gridPosition || '',
-            overallPosition: result.overallPosition || result.position || '',
-            movement: '', // Movement would need to be calculated from previous round
-            finalType: finalKey,
-          });
-        });
-      }
-
-      if (finalData.length > 0) {
-        finalData.sort((a, b) => {
-          // Sort by final type first, then by position
-          if (a.finalType !== b.finalType) {
-            return a.finalType.localeCompare(b.finalType);
-          }
-          return (a.position || 999) - (b.position || 999);
-        });
+        // Sort by overall position for overall ranking
+        combinedFinalData.sort((a, b) => (a.overallPosition || 999) - (b.overallPosition || 999));
 
         await addTable(
           'Final Results',
-          finalData,
-          ['Driver Name', 'Alias', 'Kart Number', 'Best Time', 'Division', 'Division Placing'],
+          combinedFinalData,
+          ['Driver Name', 'Alias', 'Division', 'Final Type', 'Kart Number', 'Best Time', 'Points'],
           (item) => [
             item.driverName || '',
             item.alias || '',
+            item.division || '',
+            item.finalType || '',
             item.kartNumber || '',
             item.fastestLap || '-',
+            item.points?.toString() || '0',
+          ],
+          true, // useRank (applies overall ranking)
+          3 // Division column index (after #, Driver Name, Alias)
+        );
+      }
+
+      // Best Times Table - Combine best times from all race types
+      const bestTimesMap = new Map<string, {
+        driverId: string;
+        driverName: string;
+        alias: string;
+        division: Division;
+        bestQualiTime: string;
+        bestHeatTime: string;
+        bestFinalTime: string;
+      }>();
+
+      // Collect best qualifying times
+      organizedResults.qualifying.forEach(q => {
+        if (!bestTimesMap.has(q.driverId)) {
+          bestTimesMap.set(q.driverId, {
+            driverId: q.driverId,
+            driverName: q.driverName || '',
+            alias: getDriverAlias(q.driverId),
+            division: q.division,
+            bestQualiTime: q.fastestLap || '-',
+            bestHeatTime: '-',
+            bestFinalTime: '-',
+          });
+        } else {
+          const entry = bestTimesMap.get(q.driverId)!;
+          if (q.fastestLap && parseLapTime(q.fastestLap) < parseLapTime(entry.bestQualiTime)) {
+            entry.bestQualiTime = q.fastestLap;
+          }
+        }
+      });
+
+      // Collect best heat times
+      Object.values(organizedResults.heats).forEach(heatArray => {
+        heatArray.forEach(h => {
+          if (!bestTimesMap.has(h.driverId)) {
+            bestTimesMap.set(h.driverId, {
+              driverId: h.driverId,
+              driverName: h.driverName || '',
+              alias: getDriverAlias(h.driverId),
+              division: h.division,
+              bestQualiTime: '-',
+              bestHeatTime: h.fastestLap || '-',
+              bestFinalTime: '-',
+            });
+          } else {
+            const entry = bestTimesMap.get(h.driverId)!;
+            if (h.fastestLap && parseLapTime(h.fastestLap) < parseLapTime(entry.bestHeatTime)) {
+              entry.bestHeatTime = h.fastestLap;
+            }
+          }
+        });
+      });
+
+      // Collect best final times
+      Object.values(organizedResults.finals).forEach(finalArray => {
+        finalArray.forEach(f => {
+          if (!bestTimesMap.has(f.driverId)) {
+            bestTimesMap.set(f.driverId, {
+              driverId: f.driverId,
+              driverName: f.driverName || '',
+              alias: getDriverAlias(f.driverId),
+              division: f.division,
+              bestQualiTime: '-',
+              bestHeatTime: '-',
+              bestFinalTime: f.fastestLap || '-',
+            });
+          } else {
+            const entry = bestTimesMap.get(f.driverId)!;
+            if (f.fastestLap && parseLapTime(f.fastestLap) < parseLapTime(entry.bestFinalTime)) {
+              entry.bestFinalTime = f.fastestLap;
+            }
+          }
+        });
+      });
+
+      const bestTimesData = Array.from(bestTimesMap.values()).sort((a, b) => {
+        // Sort by best overall time (considering all race types)
+        const aTime = Math.min(
+          parseLapTime(a.bestQualiTime),
+          parseLapTime(a.bestHeatTime),
+          parseLapTime(a.bestFinalTime)
+        );
+        const bTime = Math.min(
+          parseLapTime(b.bestQualiTime),
+          parseLapTime(b.bestHeatTime),
+          parseLapTime(b.bestFinalTime)
+        );
+        return aTime - bTime;
+      });
+
+      if (bestTimesData.length > 0) {
+        await addTable(
+          'Best Times',
+          bestTimesData,
+          ['Driver Name', 'Alias', 'Division', 'Best Quali Time', 'Best Heat Time', 'Best Final Time'],
+          (item) => [
+            item.driverName || '',
+            item.alias || '',
             item.division || '',
-            item.divisionPlacing?.toString() || '',
+            item.bestQualiTime || '-',
+            item.bestHeatTime || '-',
+            item.bestFinalTime || '-',
           ],
           true, // useRank
-          5 // Division column index (after #, Driver Name, Alias, Kart Number, Best Time)
+          3, // Division column index (after #, Driver Name, Alias)
+          undefined, // No group column
+          (rowIndex, colIndex, cellData, item) => {
+            // Highlight the best time in yellow
+            // Column indices: 0=#, 1=Driver Name, 2=Alias, 3=Division, 4=Best Quali Time, 5=Best Heat Time, 6=Best Final Time
+            const dataItem = bestTimesData[rowIndex];
+            if (!dataItem) return null;
+            
+            // Get the three times
+            const qualiTime = parseLapTime(dataItem.bestQualiTime);
+            const heatTime = parseLapTime(dataItem.bestHeatTime);
+            const finalTime = parseLapTime(dataItem.bestFinalTime);
+            
+            // Find the best (minimum) time
+            const bestTime = Math.min(qualiTime, heatTime, finalTime);
+            
+            // Highlight the cell if it contains the best time
+            if (colIndex === 4 && qualiTime === bestTime && qualiTime !== Infinity) {
+              // Best Quali Time column and it's the best time
+              return {
+                fillColor: [255, 253, 208], // Pastel yellow
+                textColor: [120, 53, 15], // Dark brown text
+                fontStyle: 'bold'
+              };
+            } else if (colIndex === 5 && heatTime === bestTime && heatTime !== Infinity) {
+              // Best Heat Time column and it's the best time
+              return {
+                fillColor: [255, 253, 208], // Pastel yellow
+                textColor: [120, 53, 15], // Dark brown text
+                fontStyle: 'bold'
+              };
+            } else if (colIndex === 6 && finalTime === bestTime && finalTime !== Infinity) {
+              // Best Final Time column and it's the best time
+              return {
+                fillColor: [255, 253, 208], // Pastel yellow
+                textColor: [120, 53, 15], // Dark brown text
+                fontStyle: 'bold'
+              };
+            }
+            
+            return null;
+          }
         );
       }
 

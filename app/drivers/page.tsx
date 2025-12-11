@@ -575,17 +575,6 @@ export default function DriversPage() {
                 </th>
                 <th 
                   className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                  onClick={() => handleSort('homeTrack')}
-                >
-                  <div className="flex items-center gap-1">
-                    Home Track
-                    {sortField === 'homeTrack' && (
-                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
-                    )}
-                  </div>
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                   onClick={() => handleSort('status')}
                 >
                   <div className="flex items-center gap-1">
@@ -649,9 +638,6 @@ export default function DriversPage() {
                     {driver.dateOfBirth 
                       ? new Date(driver.dateOfBirth).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
                       : 'N/A'}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
-                    {driver.homeTrack || 'N/A'}
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getStatusColor(driver.status)}`}>

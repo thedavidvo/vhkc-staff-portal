@@ -518,10 +518,11 @@ export async function getRaceResultsByRound(roundId: string, resultsSheetId?: st
       SELECT 
         rr.*,
         COALESCE(
-          (SELECT COALESCE(dc.to_division, dc.division_start)
+          (SELECT COALESCE(dc.from_division, dc.division_start)
            FROM division_changes dc
            WHERE dc.driver_id = rr.driver_id 
-             AND dc.round_id = rr.round_id
+             AND (dc.round_id = rr.round_id OR dc.round_id IS NULL)
+           ORDER BY dc.round_id DESC NULLS LAST
            LIMIT 1),
           rr.division
         ) as driver_division_at_round
@@ -537,10 +538,11 @@ export async function getRaceResultsByRound(roundId: string, resultsSheetId?: st
       SELECT 
         rr.*,
         COALESCE(
-          (SELECT COALESCE(dc.to_division, dc.division_start)
+          (SELECT COALESCE(dc.from_division, dc.division_start)
            FROM division_changes dc
            WHERE dc.driver_id = rr.driver_id 
-             AND dc.round_id = rr.round_id
+             AND (dc.round_id = rr.round_id OR dc.round_id IS NULL)
+           ORDER BY dc.round_id DESC NULLS LAST
            LIMIT 1),
           rr.division
         ) as driver_division_at_round
@@ -555,10 +557,11 @@ export async function getRaceResultsByRound(roundId: string, resultsSheetId?: st
       SELECT 
         rr.*,
         COALESCE(
-          (SELECT COALESCE(dc.to_division, dc.division_start)
+          (SELECT COALESCE(dc.from_division, dc.division_start)
            FROM division_changes dc
            WHERE dc.driver_id = rr.driver_id 
-             AND dc.round_id = rr.round_id
+             AND (dc.round_id = rr.round_id OR dc.round_id IS NULL)
+           ORDER BY dc.round_id DESC NULLS LAST
            LIMIT 1),
           rr.division
         ) as driver_division_at_round
@@ -586,6 +589,16 @@ export async function getRaceResultsByRound(roundId: string, resultsSheetId?: st
     }
     
     const driver = driverMap.get(result.driver_id);
+    
+    // Debug logging for driver division lookup
+    if (driver?.name && driver.name.includes('Saad')) {
+      console.log('Debug getRaceResultsByRound for Saad:', {
+        driverName: driver.name,
+        resultDivision: result.division,
+        driverDivisionAtRound: result.driver_division_at_round,
+        raceDivision
+      });
+    }
     
     divisionMap.get(raceDivision)!.push({
       driverId: result.driver_id,
@@ -731,13 +744,20 @@ export async function deleteRaceResult(roundId: string, driverId: string, raceTy
   }
 }
 
-export async function deleteRaceResultsByRaceType(roundId: string, raceType: string, raceDivision?: string, finalType?: string): Promise<void> {
+export async function deleteRaceResultsByRaceType(roundId: string, raceType: string, raceDivision?: string, finalType?: string, raceName?: string): Promise<void> {
   // Build the DELETE query with appropriate filters
   // Always filter by round_id and race_type
-  // Optionally filter by race_division and final_type to ensure we only delete results from the specific division and race group
+  // Optionally filter by race_division, final_type, and race_name to ensure we only delete results from the specific race
   
-  if (raceDivision && finalType) {
-    // Most specific: delete by round, race type, race division, and final type
+  if (raceName && raceDivision) {
+    // Most specific: delete by round, race type, race name, and division
+    // This ensures we only delete the specific race for a specific division (e.g., Division 2's "Final A")
+    await sql`DELETE FROM race_results WHERE round_id = ${roundId} AND race_type = ${raceType} AND race_name = ${raceName} AND COALESCE(race_division, division) = ${raceDivision}`;
+  } else if (raceName) {
+    // Delete by round, race type, and race name (without division filter)
+    await sql`DELETE FROM race_results WHERE round_id = ${roundId} AND race_type = ${raceType} AND race_name = ${raceName}`;
+  } else if (raceDivision && finalType) {
+    // Delete by round, race type, race division, and final type
     // Use COALESCE to handle cases where race_division might be NULL and fall back to division column
     await sql`DELETE FROM race_results WHERE round_id = ${roundId} AND race_type = ${raceType} AND COALESCE(race_division, division) = ${raceDivision} AND final_type = ${finalType}`;
   } else if (raceDivision) {
@@ -921,7 +941,6 @@ export async function getPointsByRound(roundId: string): Promise<Points[]> {
     roundId: p.round_id,
     driverId: p.driver_id,
     division: p.division as Division,
-    raceDivision: p.race_division as Division | 'Open' | undefined,
     raceType: p.race_type || 'qualification',
     finalType: p.final_type || undefined,
     overallPosition: p.overall_position || undefined,
@@ -942,7 +961,6 @@ export async function getPointsByDriver(driverId: string, seasonId?: string): Pr
     roundId: p.round_id,
     driverId: p.driver_id,
     division: p.division as Division,
-    raceDivision: p.race_division as Division | 'Open' | undefined,
     raceType: p.race_type || 'qualification',
     finalType: p.final_type || undefined,
     overallPosition: p.overall_position || undefined,
@@ -959,7 +977,7 @@ export async function getPointsBySeason(seasonId: string): Promise<Points[]> {
       p.*,
       d.first_name || ' ' || d.last_name as driver_name,
       COALESCE(
-        (SELECT COALESCE(dc.to_division, dc.division_start)
+        (SELECT COALESCE(dc.from_division, dc.division_start)
          FROM division_changes dc
          WHERE dc.driver_id = p.driver_id 
            AND dc.round_id = p.round_id
@@ -984,7 +1002,6 @@ export async function getPointsBySeason(seasonId: string): Promise<Points[]> {
     driverName: p.driver_name || 'Unknown Driver',
     division: p.division as Division,
     driverDivision: p.driver_division as Division,
-    raceDivision: p.race_division as Division | 'Open' | undefined,
     raceType: p.race_type || 'qualification',
     finalType: p.final_type || undefined,
     overallPosition: p.overall_position || undefined,
@@ -996,32 +1013,95 @@ export async function getPointsBySeason(seasonId: string): Promise<Points[]> {
 }
 
 export async function addPoints(points: Points): Promise<void> {
-  await sql`
-    INSERT INTO points (
-      id, season_id, round_id, driver_id, division, race_division, race_type, final_type,
-      overall_position, points, note, created_at, updated_at
-    ) VALUES (
-      ${points.id}, ${points.seasonId}, ${points.roundId}, ${points.driverId},
-      ${points.division}, ${points.raceDivision || null}, ${points.raceType || 'qualification'}, ${points.finalType || null},
-      ${points.overallPosition || null}, ${points.points}, ${points.note || null},
-      ${points.createdAt || new Date().toISOString()}, ${points.updatedAt || new Date().toISOString()}
-    )
-    ON CONFLICT (round_id, driver_id, race_type, final_type)
-    DO UPDATE SET
-      division = EXCLUDED.division,  -- Preserve historical division at time of race
-      race_division = EXCLUDED.race_division,  -- Preserve race division
-      overall_position = EXCLUDED.overall_position,
-      points = EXCLUDED.points,
-      note = EXCLUDED.note,
-      updated_at = CURRENT_TIMESTAMP
-  `;
+  try {
+    // Normalize finalType: convert empty string to null for consistent constraint handling
+    const normalizedFinalType = points.finalType && points.finalType.trim() !== '' ? points.finalType : null;
+    const raceType = points.raceType || 'qualification';
+    
+    console.log('addPoints called with:', { 
+      roundId: points.roundId, 
+      driverId: points.driverId, 
+      raceType, 
+      finalType: normalizedFinalType,
+      points: points.points,
+      note: points.note 
+    });
+    
+    // Check if record exists
+    let existingRecord;
+    if (normalizedFinalType === null) {
+      existingRecord = await sql`
+        SELECT id FROM points 
+        WHERE round_id = ${points.roundId} 
+          AND driver_id = ${points.driverId} 
+          AND race_type = ${raceType}
+          AND (final_type IS NULL OR final_type = '')
+        LIMIT 1
+      `;
+    } else {
+      existingRecord = await sql`
+        SELECT id FROM points 
+        WHERE round_id = ${points.roundId} 
+          AND driver_id = ${points.driverId} 
+          AND race_type = ${raceType}
+          AND final_type = ${normalizedFinalType}
+        LIMIT 1
+      `;
+    }
+    
+    if (existingRecord.length > 0) {
+      // Update existing record
+      console.log('Updating existing record:', existingRecord[0].id);
+      
+      // Ensure division is not null
+      if (!points.division) {
+        throw new Error('Division is required to update points');
+      }
+      
+      await sql`
+        UPDATE points
+        SET division = ${points.division},
+            overall_position = ${points.overallPosition || null},
+            points = ${points.points},
+            note = ${points.note || null},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE round_id = ${points.roundId} 
+          AND driver_id = ${points.driverId} 
+          AND race_type = ${raceType}
+          AND ${normalizedFinalType === null ? sql`(final_type IS NULL OR final_type = '')` : sql`final_type = ${normalizedFinalType}`}
+      `;
+    } else {
+      // Insert new record
+      console.log('Inserting new record');
+      await sql`
+        INSERT INTO points (
+          id, season_id, round_id, driver_id, division, race_type, final_type,
+          overall_position, points, note, created_at, updated_at
+        ) VALUES (
+          ${points.id}, ${points.seasonId}, ${points.roundId}, ${points.driverId},
+          ${points.division}, ${raceType}, ${normalizedFinalType},
+          ${points.overallPosition || null}, ${points.points}, ${points.note || null},
+          ${points.createdAt || new Date().toISOString()}, ${points.updatedAt || new Date().toISOString()}
+        )
+      `;
+    }
+  } catch (error) {
+    console.error('Error in addPoints:', error);
+    throw error;
+  }
 }
 
 export async function updatePoints(points: Points): Promise<void> {
+  console.log('updatePoints called with:', points);
+  
+  if (!points.division) {
+    console.error('Division is null in updatePoints:', points);
+    throw new Error('Division is required to update points');
+  }
+  
   await sql`
     UPDATE points
     SET division = ${points.division},  -- Preserve historical driver division
-        race_division = ${points.raceDivision || null},  -- Preserve race division
         overall_position = ${points.overallPosition || null},
         points = ${points.points},
         note = ${points.note || null},

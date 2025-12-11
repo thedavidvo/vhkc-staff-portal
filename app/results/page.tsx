@@ -386,20 +386,6 @@ export default function ResultsPage() {
     setSelectedFinalType('');
   }, [selectedRaceType]);
 
-  // Auto-select first heat type when available
-  useEffect(() => {
-    if (availableHeatTypes.length > 0 && !selectedHeatType) {
-      setSelectedHeatType(availableHeatTypes[0]);
-    }
-  }, [availableHeatTypes, selectedHeatType]);
-
-  // Auto-select first final type when available
-  useEffect(() => {
-    if (availableFinalTypes.length > 0 && !selectedFinalType) {
-      setSelectedFinalType(availableFinalTypes[0]);
-    }
-  }, [availableFinalTypes, selectedFinalType]);
-
   // Filter results first (without points calculation)
   const filteredResults = useMemo(() => {
     let filtered = [...raceResults];
@@ -450,7 +436,8 @@ export default function ResultsPage() {
         return timeA - timeB;
       }
       
-      // For heat and final races, sort by race finish (position)
+      // For heat and final races, sort by finalType then race finish (position)
+      // This applies whether a specific type is selected or "All Final Types" is chosen
       if (selectedRaceType === 'heat' || selectedRaceType === 'final') {
         // First sort by finalType (A before B before C, etc.)
         const finalTypeA = a.finalType?.toUpperCase() || 'Z';
@@ -581,7 +568,7 @@ export default function ResultsPage() {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
               {/* Round Filter */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">

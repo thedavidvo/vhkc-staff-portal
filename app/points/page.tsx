@@ -297,7 +297,20 @@ export default function PointsPage() {
                     const driver = drivers.find((d: any) => d.id === result.driverId);
                     
                     // Determine driver's division at this round
-                    const driverDivision = result.driverDivision || driver?.division || result.division;
+                    // Priority: 1) driverDivision from race results (with division_changes lookup)
+                    //          2) division field from race results (driver's division stored in race_results)
+                    //          3) current driver division as last fallback
+                    const driverDivision = result.driverDivision || result.division || driver?.division;
+                    
+                    if (result.driverName && result.driverName.includes('Saad')) {
+                      console.log('Debug Saad driver division:', {
+                        driverName: result.driverName,
+                        resultDriverDivision: result.driverDivision,
+                        resultDivision: result.division,
+                        currentDriverDivision: driver?.division,
+                        finalDriverDivision: driverDivision
+                      });
+                    }
                     
                     allPoints.push({
                       driverId: result.driverId,
@@ -387,8 +400,8 @@ export default function PointsPage() {
             ...point,
               roundNumber: round?.roundNumber || 0,
             roundName: round?.location || 'TBD',
-            raceDivision: point.division, // Race division
-            driverDivision: point.driverDivision || point.division, // Driver division at that round
+            // The division field in points table stores the driver's division at that round
+            driverDivision: point.division,
             };
           });
           
@@ -409,13 +422,23 @@ export default function PointsPage() {
   // Filtered saved points based on filters
   const filteredSavedPoints = useMemo(() => {
     let filtered = [...savedPointsList];
+    
+    console.log('Filtering saved points:', {
+      totalSavedPoints: savedPointsList.length,
+      selectedRound,
+      selectedRaceType,
+      selectedFinalType,
+      selectedDriverDivision
+    });
 
     if (selectedRound) {
       filtered = filtered.filter(p => p.roundId === selectedRound);
+      console.log('After round filter:', filtered.length);
     }
 
     if (selectedRaceType) {
       filtered = filtered.filter(p => p.raceType === selectedRaceType);
+      console.log('After race type filter:', filtered.length);
     }
 
     if (selectedRaceType === 'heat' && selectedHeatType) {
@@ -428,16 +451,15 @@ export default function PointsPage() {
       filtered = filtered.filter(p => 
         p.finalType && p.finalType.toUpperCase() === selectedFinalType.toUpperCase()
       );
+      console.log('After final type filter:', filtered.length);
     }
 
-    // Filter by race division
-    if (selectedDivision) {
-      filtered = filtered.filter(p => p.raceDivision === selectedDivision);
-    }
-
-    // Filter by driver division
+    // Filter by driver division only (points table only stores driver division, not race division)
     if (selectedDriverDivision && selectedDriverDivision !== 'All') {
+      console.log('Filtering by driver division:', selectedDriverDivision);
+      console.log('Sample point divisions:', filtered.slice(0, 5).map(p => ({ name: p.driverName, div: p.driverDivision })));
       filtered = filtered.filter(p => p.driverDivision === selectedDriverDivision);
+      console.log('After driver division filter:', filtered.length);
     }
 
     // Apply column sorting if active
@@ -450,6 +472,21 @@ export default function PointsPage() {
       return [...filtered].sort((a, b) => {
         const comparison = b.points - a.points;
         return savedSortDirection === 'asc' ? -comparison : comparison;
+      });
+    }
+
+    // When "All Final Types" is selected for heats or finals, sort by finalType then position
+    if ((selectedRaceType === 'heat' || selectedRaceType === 'final') && !selectedHeatType && !selectedFinalType) {
+      return [...filtered].sort((a, b) => {
+        // First sort by finalType (A before B before C, etc.)
+        const finalTypeA = a.finalType?.toUpperCase() || 'Z';
+        const finalTypeB = b.finalType?.toUpperCase() || 'Z';
+        if (finalTypeA !== finalTypeB) {
+          return finalTypeA.localeCompare(finalTypeB);
+        }
+        
+        // Then by race finish position
+        return a.position - b.position;
       });
     }
 
@@ -528,33 +565,39 @@ export default function PointsPage() {
         p.raceType === 'heat'
       );
       
-      // Sort by points (considering edits) - this allows dynamic movement when editing
-      // Points take priority over race type when editing
+      // Sort by overallPosition from database (which comes from race results)
+      // This ensures consistency with the results tab
       const sorted = [...group].sort((a, b) => {
-      const aKey = `${a.driverId}-${a.roundId}-${a.raceType}-${a.finalType || ''}`;
-      const bKey = `${b.driverId}-${b.roundId}-${b.raceType}-${b.finalType || ''}`;
-      const aPoints = editingPoints[aKey] !== undefined ? editingPoints[aKey] : (savedPoints[aKey] || a.points);
-      const bPoints = editingPoints[bKey] !== undefined ? editingPoints[bKey] : (savedPoints[bKey] || b.points);
-      
-      // Primary sort: by points (higher first) - this enables dynamic movement
-      if (bPoints !== aPoints) {
-        return bPoints - aPoints;
-      }
-      
-        // Secondary sort: by race type priority (Final A > Final B > ...) when points are equal
+        // Primary sort: by overallPosition (from race results database)
+        if (a.overallPosition && b.overallPosition && a.overallPosition !== b.overallPosition) {
+          return a.overallPosition - b.overallPosition;
+        }
+        
+        // Fallback for ties or missing overallPosition: sort by points
+        const aKey = `${a.driverId}-${a.roundId}-${a.raceType}-${a.finalType || ''}`;
+        const bKey = `${b.driverId}-${b.roundId}-${b.raceType}-${b.finalType || ''}`;
+        const aPoints = editingPoints[aKey] !== undefined ? editingPoints[aKey] : (savedPoints[aKey] || a.points);
+        const bPoints = editingPoints[bKey] !== undefined ? editingPoints[bKey] : (savedPoints[bKey] || b.points);
+        
+        if (bPoints !== aPoints) {
+          return bPoints - aPoints;
+        }
+        
+        // Tertiary sort: by race type priority (Final A > Final B > ...) when points are equal
         const aPriority = getRaceTypePriority(a.raceType || 'qualification', a.finalType);
         const bPriority = getRaceTypePriority(b.raceType || 'qualification', b.finalType);
-      if (aPriority !== bPriority) {
-        return aPriority - bPriority;
-      }
-      
-      // Tertiary sort: by driver name for consistency
-      return a.driverName.localeCompare(b.driverName);
-    });
+        if (aPriority !== bPriority) {
+          return aPriority - bPriority;
+        }
+        
+        // Final sort: by driver name for consistency
+        return a.driverName.localeCompare(b.driverName);
+      });
 
-      // Assign overall positions sequentially across all race types
-    sorted.forEach((point, index) => {
-        const newOverallPosition = index + 1;
+      // Use existing overall positions from database, don't recalculate
+      sorted.forEach((point, index) => {
+        // Use the overallPosition from the database (race results)
+        const existingOverallPosition = point.overallPosition || (index + 1);
       
       const key = `${point.driverId}-${point.roundId}-${point.raceType}-${point.finalType || ''}`;
       const hasEdit = editingPoints[key] !== undefined;
@@ -573,7 +616,7 @@ export default function PointsPage() {
         // Use major points for final if heat race exists, minor points for heat if heat race exists
           const raceType = point.raceType || 'qualification';
         finalPoints = getPointsForPosition(
-            newOverallPosition,
+            existingOverallPosition,
           raceType as 'qualification' | 'heat' | 'final',
           hasHeatRace
         );
@@ -581,7 +624,7 @@ export default function PointsPage() {
       
       pointsWithOverallPosition.push({
         ...point,
-          overallPosition: newOverallPosition,
+          overallPosition: existingOverallPosition,
         points: finalPoints,
         });
       });
@@ -593,6 +636,101 @@ export default function PointsPage() {
       if (roundCompare !== 0) return roundCompare;
       return a.overallPosition - b.overallPosition;
     });
+
+    // Special sorting for "All Final Types" or "All Heat Types"
+    // Sort by final type alphabetically, then by overall position
+    if ((selectedRaceType === 'heat' && !selectedHeatType) || (selectedRaceType === 'final' && !selectedFinalType)) {
+      sorted = [...sorted].sort((a, b) => {
+        // First sort by round (most recent first)
+        const roundCompare = b.roundNumber - a.roundNumber;
+        if (roundCompare !== 0) return roundCompare;
+        
+        // Then sort by finalType alphabetically (A, B, C, etc.)
+        const finalTypeA = (a.finalType || '').toUpperCase();
+        const finalTypeB = (b.finalType || '').toUpperCase();
+        if (finalTypeA !== finalTypeB) {
+          return finalTypeA.localeCompare(finalTypeB);
+        }
+        
+        // Finally sort by overall position
+        return a.overallPosition - b.overallPosition;
+      });
+      
+      // Recalculate overall positions based on this filtered/sorted view
+      // Positions should be sequential across all results in the filtered view (1, 2, 3, ...)
+      sorted = sorted.map((point, index) => {
+        const newOverallPosition = index + 1;
+        const key = `${point.driverId}-${point.roundId}-${point.raceType}-${point.finalType || ''}`;
+        const hasEdit = editingPoints[key] !== undefined;
+        const hasSaved = savedPoints[key] !== undefined;
+        
+        let finalPoints: number;
+        
+        // If points are being edited, use the edited value (don't recalculate)
+        if (hasEdit) {
+          finalPoints = editingPoints[key];
+        } else if (hasSaved) {
+          // If points were previously saved, use saved value
+          finalPoints = savedPoints[key];
+        } else {
+          // Recalculate points based on new overall position
+          const hasHeatRace = driverPoints.some(p => 
+            p.roundId === point.roundId && 
+            p.division === point.division &&
+            p.raceType === 'heat'
+          );
+          const raceType = point.raceType || 'qualification';
+          finalPoints = getPointsForPosition(
+            newOverallPosition,
+            raceType as 'qualification' | 'heat' | 'final',
+            hasHeatRace
+          );
+        }
+        
+        return {
+          ...point,
+          overallPosition: newOverallPosition,
+          points: finalPoints,
+        };
+      });
+    } else {
+      // For single race type selection, recalculate positions sequentially
+      sorted = sorted.map((point, index) => {
+        const newOverallPosition = index + 1;
+        const key = `${point.driverId}-${point.roundId}-${point.raceType}-${point.finalType || ''}`;
+        const hasEdit = editingPoints[key] !== undefined;
+        const hasSaved = savedPoints[key] !== undefined;
+        
+        let finalPoints: number;
+        
+        // If points are being edited, use the edited value (don't recalculate)
+        if (hasEdit) {
+          finalPoints = editingPoints[key];
+        } else if (hasSaved) {
+          // If points were previously saved, use saved value
+          finalPoints = savedPoints[key];
+        } else {
+          // Recalculate points based on new overall position
+          const hasHeatRace = driverPoints.some(p => 
+            p.roundId === point.roundId && 
+            p.division === point.division &&
+            p.raceType === 'heat'
+          );
+          const raceType = point.raceType || 'qualification';
+          finalPoints = getPointsForPosition(
+            newOverallPosition,
+            raceType as 'qualification' | 'heat' | 'final',
+            hasHeatRace
+          );
+        }
+        
+        return {
+          ...point,
+          overallPosition: newOverallPosition,
+          points: finalPoints,
+        };
+      });
+    }
 
     // Apply column sorting if active
     if (sortColumn === 'driver') {
@@ -669,6 +807,14 @@ export default function PointsPage() {
         
         const pointsId = `points-${point.roundId}-${point.driverId}-${point.raceType}-${point.finalType || ''}`;
         
+        const divisionToSave = point.driverDivision || point.division;
+        console.log('Saving point:', {
+          driverName: point.driverName,
+          driverDivision: point.driverDivision,
+          division: point.division,
+          divisionToSave
+        });
+        
         // Save to points table via API
         const response = await fetch('/api/points', {
           method: 'POST',
@@ -678,16 +824,18 @@ export default function PointsPage() {
             seasonId: selectedSeason.id,
             roundId: point.roundId,
             driverId: point.driverId,
-            division: point.division,
+            division: divisionToSave, // Save driver division (for historical tracking)
             raceType: point.raceType || 'qualification',
-            finalType: point.finalType || undefined,
+            finalType: point.finalType && point.finalType.trim() !== '' ? point.finalType : null,
             overallPosition: point.overallPosition,
             points: currentPoints,
           }),
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to save points for ${point.driverName}`);
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Failed to save points:', errorData);
+          throw new Error(`Failed to save points for ${point.driverName}: ${errorData.error || 'Unknown error'}`);
         }
       }
 
@@ -750,18 +898,22 @@ export default function PointsPage() {
                       hasHeatRace
                     );
                     
-                  const driver = drivers.find((d: any) => d.id === result.driverId);
+                    const driver = drivers.find((d: any) => d.id === result.driverId);
+                    
+                    // Determine driver's division at this round (same logic as initial fetch)
+                    const driverDivision = result.driverDivision || result.division || driver?.division;
                     
                     allPoints.push({
                       driverId: result.driverId,
                       driverName: result.driverName || driver?.name || 'Unknown Driver',
-                    division: result.division,
+                      division: result.division, // Race division
+                      driverDivision: driverDivision, // Driver's division at that round
                       roundId: round.id,
                       roundName: round.location || 'TBD',
                       roundNumber: round.roundNumber || 0,
                       position: result.position || result.gridPosition || 0,
-                    overallPosition: overallPosition,
-                    points: points,
+                      overallPosition: overallPosition,
+                      points: points,
                       confirmed: result.confirmed || false,
                       raceType: result.raceType || 'qualification',
                       finalType: result.finalType || '',
@@ -974,7 +1126,10 @@ export default function PointsPage() {
 
   // Handle save note for point change
   const handleSaveNote = async () => {
-    if (!noteModalPoint || !selectedSeason) return;
+    if (!noteModalPoint || !selectedSeason) {
+      alert('Missing required data. Please try again.');
+      return;
+    }
 
     const key = `${noteModalPoint.driverId}-${noteModalPoint.roundId}-${noteModalPoint.raceType}-${noteModalPoint.finalType || ''}`;
     const currentPoints = editingPoints[key] !== undefined ? editingPoints[key] : (savedPoints[key] || noteModalPoint.points);
@@ -982,26 +1137,51 @@ export default function PointsPage() {
     try {
       const pointsId = `points-${noteModalPoint.roundId}-${noteModalPoint.driverId}-${noteModalPoint.raceType}-${noteModalPoint.finalType || ''}`;
       
+      // Get driver's division - find from drivers list as fallback
+      const driver = drivers.find((d: any) => d.id === noteModalPoint.driverId);
+      
+      console.log('Debug note modal point:', {
+        noteModalPoint,
+        driverDivision: noteModalPoint.driverDivision,
+        division: noteModalPoint.division,
+        driverFromList: driver?.division,
+        selectedDivision
+      });
+      
+      const driverDivision = noteModalPoint.driverDivision || noteModalPoint.division || driver?.division || selectedDivision;
+      
+      if (!driverDivision) {
+        console.error('No division found:', { noteModalPoint, driver, selectedDivision });
+        alert('Unable to determine driver division. Please try again.');
+        return;
+      }
+      
+      const requestBody = {
+        id: pointsId,
+        seasonId: selectedSeason.id,
+        roundId: noteModalPoint.roundId,
+        driverId: noteModalPoint.driverId,
+        division: driverDivision,
+        raceType: noteModalPoint.raceType || 'qualification',
+        finalType: noteModalPoint.finalType && noteModalPoint.finalType.trim() !== '' ? noteModalPoint.finalType : null,
+        overallPosition: noteModalPoint.overallPosition,
+        points: currentPoints,
+        note: noteText, // Save the note
+      };
+      
+      console.log('Saving note with data:', requestBody);
+      
       // Save to points table via API with note
       const response = await fetch('/api/points', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: pointsId,
-          seasonId: selectedSeason.id,
-          roundId: noteModalPoint.roundId,
-          driverId: noteModalPoint.driverId,
-          division: noteModalPoint.division,
-          raceType: noteModalPoint.raceType || 'qualification',
-          finalType: noteModalPoint.finalType || undefined,
-          overallPosition: noteModalPoint.overallPosition,
-          points: currentPoints,
-          note: noteText, // Save the note
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save note');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to save note:', errorData);
+        throw new Error(errorData.error || 'Failed to save note');
       }
 
       // Update saved points to include this point with note
@@ -1014,7 +1194,8 @@ export default function PointsPage() {
       alert('Note saved successfully!');
     } catch (error) {
       console.error('Error saving note:', error);
-      alert('Failed to save note. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save note. Please try again.';
+      alert(errorMessage);
     }
   };
 
@@ -1049,6 +1230,8 @@ export default function PointsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: point.id,
+          division: point.division, // Required by updatePoints
+          overallPosition: point.overallPosition, // Required by updatePoints
           points: newPoints,
           note: point.note, // Preserve existing note
           updatedAt: new Date().toISOString(),
@@ -1056,7 +1239,9 @@ export default function PointsPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update points');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to update points:', errorData);
+        throw new Error(errorData.error || 'Failed to update points');
       }
 
       // Refresh saved points
@@ -1186,7 +1371,7 @@ export default function PointsPage() {
           title="Filters"
           className="mb-8"
         >
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
               <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Round
@@ -1308,7 +1493,6 @@ export default function PointsPage() {
                   <option value="Division 3">Division 3</option>
                   <option value="Division 4">Division 4</option>
                   <option value="New">New</option>
-                  <option value="Open">Open</option>
                   </select>
                 </div>
               </div>
@@ -1804,9 +1988,6 @@ export default function PointsPage() {
                           Driver Division
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
-                          Race Division
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                           Race Type
                         </th>
                             <th 
@@ -1830,7 +2011,7 @@ export default function PointsPage() {
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                       {filteredSavedPoints.length === 0 ? (
                         <tr>
-                              <td colSpan={8} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+                              <td colSpan={7} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
                                 No saved points found. Adjust your filters or save some points first.
                           </td>
                         </tr>
@@ -1857,13 +2038,8 @@ export default function PointsPage() {
                                   {point.driverName || 'Unknown'}
                               </td>
                               <td className="px-4 py-3">
-                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(point.driverDivision || point.raceDivision)}`}>
-                                  {point.driverDivision || point.raceDivision}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3">
-                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(point.raceDivision)}`}>
-                                  {point.raceDivision}
+                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(point.driverDivision)}`}>
+                                  {point.driverDivision}
                                 </span>
                               </td>
                               <td className="px-4 py-3">
@@ -1962,6 +2138,9 @@ export default function PointsPage() {
                                                         headers: { 'Content-Type': 'application/json' },
                                                         body: JSON.stringify({
                                                           id: point.id,
+                                                          division: point.division, // Keep original division from database
+                                                          overallPosition: point.overallPosition,
+                                                          points: point.points,
                                                           note: noteText || point.note,
                                                           updatedAt: new Date().toISOString(),
                                                         }),
@@ -2041,6 +2220,9 @@ export default function PointsPage() {
                                                         headers: { 'Content-Type': 'application/json' },
                                                         body: JSON.stringify({
                                                           id: point.id,
+                                                          division: point.division, // Keep original division from database
+                                                          overallPosition: point.overallPosition,
+                                                          points: point.points,
                                                           note: noteText,
                                                           updatedAt: new Date().toISOString(),
                                                         }),

@@ -433,7 +433,7 @@ export default function StandingsPage() {
                         {driver.roundPoints.map((round: { roundId: string; roundNumber: number; roundName: string; location: string; points: number }) => (
                           <div
                             key={round.roundId}
-                            className="bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-2 min-w-[100px] flex-shrink-0"
+                            className="bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-2 w-[100px] flex-shrink-0"
                           >
                             <div className="text-xs text-slate-600 dark:text-slate-400 mb-0.5">
                               R{round.roundNumber}
@@ -448,7 +448,7 @@ export default function StandingsPage() {
                         ))}
                         
                         {driver.dropRound && (
-                          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg border-2 border-red-200 dark:border-red-800 p-2 min-w-[100px] flex-shrink-0">
+                          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg border-2 border-red-200 dark:border-red-800 p-2 w-[100px] flex-shrink-0">
                             <div className="text-xs text-red-700 dark:text-red-400 mb-0.5 font-semibold">
                               Drop
                             </div>
@@ -540,7 +540,7 @@ export default function StandingsPage() {
                         {team.roundPoints.map((round: { roundId: string; roundNumber: number; roundName: string; location: string; points: number }) => (
                           <div
                             key={round.roundId}
-                            className="bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-2 min-w-[100px] flex-shrink-0"
+                            className="bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-2 w-[100px] flex-shrink-0"
                           >
                             <div className="text-xs text-slate-600 dark:text-slate-400 mb-0.5">
                               R{round.roundNumber}

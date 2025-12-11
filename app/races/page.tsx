@@ -285,12 +285,15 @@ export default function RacesPage() {
   const shouldLoadResultsRef = useRef(true); // Track if we should load results from saved data
 
   // Fetch race results for a specific round
-  const fetchRaceResults = async (roundId: string, resultsSheetId?: string) => {
+  const fetchRaceResults = async (roundId: string, resultsSheetId?: string, raceName?: string) => {
     try {
-      // Always include roundId, and optionally include resultsSheetId for specific sheet filtering
+      // Always include roundId, and optionally include resultsSheetId and raceName for specific sheet filtering
       let url = `/api/race-results?roundId=${roundId}`;
       if (resultsSheetId) {
         url += `&resultsSheetId=${resultsSheetId}`;
+      }
+      if (raceName) {
+        url += `&raceName=${encodeURIComponent(raceName)}`;
       }
       const response = await fetch(url);
       if (response.ok) {
@@ -364,9 +367,9 @@ export default function RacesPage() {
         
         // If we found a resultsSheetId, fetch all results for that sheet
         if (resultsSheetId) {
-          console.log('Loading results by resultsSheetId:', resultsSheetId);
+          console.log('Loading results by resultsSheetId:', resultsSheetId, 'raceName:', selectedType);
           const loadSheetResults = async () => {
-            const sheetResults = await fetchRaceResults(selectedEvent.id, resultsSheetId!);
+            const sheetResults = await fetchRaceResults(selectedEvent.id, resultsSheetId!, selectedType);
             
             // Flatten results from the selected division only
             // Handle "Open" division - if selectedDivision is one of openDivisions, also check for "Open" race_division
@@ -561,9 +564,9 @@ export default function RacesPage() {
           
           // If we have a resultsSheetId, fetch all results for that sheet but filter by selectedDivision
           if (sheetId) {
-            console.log('Loading results by resultsSheetId:', sheetId);
+            console.log('Loading results by resultsSheetId:', sheetId, 'raceName:', typeToUse);
             const loadSheetResults = async () => {
-              const sheetResults = await fetchRaceResults(selectedEvent.id, sheetId!);
+              const sheetResults = await fetchRaceResults(selectedEvent.id, sheetId!, typeToUse);
               
               // Flatten results from the selected division only
               // Handle "Open" division - if selectedDivision is one of openDivisions, also check for "Open" race_division
@@ -790,8 +793,9 @@ export default function RacesPage() {
     
     if (raceType && selectedEvent) {
       try {
-        // Delete race results from Google Sheets
-        const response = await fetch(`/api/race-results?roundId=${selectedEvent.id}&raceType=${raceType}`, {
+        // Delete race results from Google Sheets - include division to avoid cross-division deletion
+        const raceDivisionParam = selectedDivision ? `&raceDivision=${encodeURIComponent(selectedDivision)}` : '';
+        const response = await fetch(`/api/race-results?roundId=${selectedEvent.id}&raceType=${raceType}&raceName=${encodeURIComponent(typeName)}${raceDivisionParam}`, {
           method: 'DELETE',
         });
         
@@ -1321,10 +1325,10 @@ export default function RacesPage() {
           const cleanFinalType = (finalType || '').replace(/\s+/g, '');
           const resultsSheetId = `${seasonId}${roundId}${cleanRaceDivision}${cleanRaceType}${cleanFinalType}`;
           
-          console.log('Reloading results by resultsSheetId after save:', resultsSheetId, 'raceType:', raceType, 'finalType:', finalType, 'raceDivision:', raceDivision);
+          console.log('Reloading results by resultsSheetId after save:', resultsSheetId, 'raceType:', raceType, 'finalType:', finalType, 'raceDivision:', raceDivision, 'raceName:', selectedType);
           
-          // Fetch results using the resultsSheetId - this will return only results with this specific sheet ID
-          const sheetResults = await fetchRaceResults(selectedEvent.id, resultsSheetId);
+          // Fetch results using the resultsSheetId and raceName - this will return only results with this specific sheet ID and race name
+          const sheetResults = await fetchRaceResults(selectedEvent.id, resultsSheetId, selectedType);
           
           // Also fetch all results for the event to update the full event results
           const allEventResults = await fetchRaceResults(selectedEvent.id);
@@ -1527,7 +1531,8 @@ export default function RacesPage() {
                       hasResults = selectedEvent.results?.some((r) => 
                         openDivisions.includes(r.division as Division) || r.division === 'Open'
                       ) || false;
-                      racerCount = openDivisions.reduce((sum, div) => sum + (divisionDriverCounts[div] || 0), 0);
+                      // Sum counts from Division 3, 4, New, and also the 'Open' division itself
+                      racerCount = openDivisions.reduce((sum, div) => sum + (divisionDriverCounts[div] || 0), 0) + (divisionDriverCounts['Open'] || 0);
                     } else {
                       hasResults = selectedEvent.results?.some((r) => r.division === division) || false;
                       racerCount = divisionDriverCounts[division as Division] || 0;

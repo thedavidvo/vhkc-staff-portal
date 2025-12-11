@@ -170,6 +170,7 @@ export async function DELETE(request: NextRequest) {
     const raceType = searchParams.get('raceType');
     const finalType = searchParams.get('finalType');
     const raceDivision = searchParams.get('raceDivision');
+    const raceName = searchParams.get('raceName');
     
     // If driverId is provided, delete specific race result
     if (roundId && driverId) {
@@ -181,8 +182,8 @@ export async function DELETE(request: NextRequest) {
         await deletePointsByRaceResult(roundId, driverId, raceType, finalType || undefined);
       }
     } else if (roundId && raceType) {
-      // Delete all race results of a specific type, optionally filtered by raceDivision and finalType
-      await deleteRaceResultsByRaceType(roundId, raceType, raceDivision || undefined, finalType || undefined);
+      // Delete all race results of a specific type, optionally filtered by raceDivision, finalType, and raceName
+      await deleteRaceResultsByRaceType(roundId, raceType, raceDivision || undefined, finalType || undefined, raceName || undefined);
     } else {
       return NextResponse.json({ error: 'roundId and either driverId or raceType required' }, { status: 400 });
     }

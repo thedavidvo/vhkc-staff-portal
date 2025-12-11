@@ -55,12 +55,24 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const points = await request.json();
+    console.log('POST /api/points received:', points);
     
     if (!points.id || !points.seasonId || !points.roundId || !points.driverId || !points.division || points.points === undefined) {
-      return NextResponse.json({ error: 'id, seasonId, roundId, driverId, division, and points are required' }, { status: 400 });
+      const missingFields = [];
+      if (!points.id) missingFields.push('id');
+      if (!points.seasonId) missingFields.push('seasonId');
+      if (!points.roundId) missingFields.push('roundId');
+      if (!points.driverId) missingFields.push('driverId');
+      if (!points.division) missingFields.push('division');
+      if (points.points === undefined) missingFields.push('points');
+      
+      const errorMsg = `Missing required fields: ${missingFields.join(', ')}`;
+      console.error(errorMsg, points);
+      return NextResponse.json({ error: errorMsg }, { status: 400 });
     }
     
     await addPoints(points);
+    console.log('Successfully added points');
     
     // Invalidate cache
     cache.invalidate(`points:round:${points.roundId}`);
@@ -71,7 +83,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in POST /api/points:', error);
-    return NextResponse.json({ error: 'Failed to save points' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Failed to save points';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
