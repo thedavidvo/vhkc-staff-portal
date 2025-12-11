@@ -1009,26 +1009,23 @@ export async function addPoints(points: Points): Promise<void> {
     const raceType = points.raceType || 'qualification';
     
     // Check if record exists
-    let existingRecord;
-    if (normalizedFinalType === null) {
-      existingRecord = await sql`
-        SELECT id FROM points 
-        WHERE round_id = ${points.roundId} 
-          AND driver_id = ${points.driverId} 
-          AND race_type = ${raceType}
-          AND (final_type IS NULL OR final_type = '')
-        LIMIT 1
-      `;
-    } else {
-      existingRecord = await sql`
-        SELECT id FROM points 
-        WHERE round_id = ${points.roundId} 
-          AND driver_id = ${points.driverId} 
-          AND race_type = ${raceType}
-          AND final_type = ${normalizedFinalType}
-        LIMIT 1
-      `;
-    }
+    const existingRecord = normalizedFinalType === null
+      ? await sql`
+          SELECT id FROM points 
+          WHERE round_id = ${points.roundId} 
+            AND driver_id = ${points.driverId} 
+            AND race_type = ${raceType}
+            AND (final_type IS NULL OR final_type = '')
+          LIMIT 1
+        ` as any[]
+      : await sql`
+          SELECT id FROM points 
+          WHERE round_id = ${points.roundId} 
+            AND driver_id = ${points.driverId} 
+            AND race_type = ${raceType}
+            AND final_type = ${normalizedFinalType}
+          LIMIT 1
+        ` as any[];
     
     if (existingRecord.length > 0) {
       // Update existing record
