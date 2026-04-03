@@ -49,7 +49,7 @@ interface PreviewChange {
 const REQUIRED_COLUMNS = ['guest first name', 'guest last name', 'payment status'];
 
 function normalizeHeader(header: string): string {
-  return header.trim().toLowerCase();
+  return header.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
 function parseAmount(rawValue: string): number {
@@ -94,14 +94,8 @@ function normalizePaymentStatus(rawValue: string): ImportPaymentStatus {
   return 'pending';
 }
 
-function parseCsv(rawContent: string): string[][] {
+function parseCsvWithDelimiter(content: string, delimiter: string): string[][] {
   const rows: string[][] = [];
-  // Strip UTF-8 BOM (\uFEFF) which is commonly prepended by Excel/Wix exports
-  const content = rawContent.replace(/^\uFEFF/, '');
-  const firstLine = content.split(/\r?\n/).find((line) => line.trim().length > 0) || '';
-  // Prefer tab if any tab character is present in the header line
-  const delimiter = firstLine.includes('\t') ? '\t' : ',';
-
   let currentField = '';
   let currentRow: string[] = [];
   let inQuotes = false;
@@ -151,6 +145,30 @@ function parseCsv(rawContent: string): string[][] {
   }
 
   return rows;
+}
+
+function parseCsv(rawContent: string): string[][] {
+  // Strip UTF-8 BOM and any leading null bytes / zero-width characters
+  const content = rawContent.replace(/^[\uFEFF\u0000\u200B]+/, '');
+
+  // Try delimiters in priority order; pick the one where the header row contains
+  // the most required column matches, falling back to tab if tied.
+  const candidates = ['\t', ',', ';'];
+  let bestRows: string[][] = [];
+  let bestMatches = -1;
+
+  for (const delimiter of candidates) {
+    const rows = parseCsvWithDelimiter(content, delimiter);
+    if (rows.length < 1) continue;
+    const headers = rows[0].map((h) => h.trim().toLowerCase().replace(/\s+/g, ' '));
+    const matches = REQUIRED_COLUMNS.filter((col) => headers.includes(col)).length;
+    if (matches > bestMatches) {
+      bestMatches = matches;
+      bestRows = rows;
+    }
+  }
+
+  return bestRows;
 }
 
 function buildDriverKey(firstName: string, lastName: string, email: string): string {
