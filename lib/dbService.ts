@@ -1248,7 +1248,40 @@ export interface Payment {
   updatedAt?: string;
 }
 
+let paymentsTableEnsured = false;
+
+async function ensurePaymentsTable(): Promise<void> {
+  if (paymentsTableEnsured) return;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS payments (
+      id TEXT PRIMARY KEY,
+      season_id TEXT NOT NULL,
+      round_id TEXT NOT NULL,
+      driver_id TEXT NOT NULL,
+      amount DECIMAL(10,2) NOT NULL,
+      status TEXT DEFAULT 'pending',
+      payment_method TEXT,
+      stripe_payment_intent_id TEXT,
+      payment_date TEXT,
+      reference_number TEXT,
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  await sql`CREATE INDEX IF NOT EXISTS idx_payments_season_id ON payments(season_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_payments_round_id ON payments(round_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_payments_driver_id ON payments(driver_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_payments_stripe_id ON payments(stripe_payment_intent_id)`;
+
+  paymentsTableEnsured = true;
+}
+
 export async function createPayment(payment: Payment): Promise<void> {
+  await ensurePaymentsTable();
+
   await sql`
     INSERT INTO payments (
       id, season_id, round_id, driver_id, amount, status,
@@ -1266,6 +1299,8 @@ export async function createPayment(payment: Payment): Promise<void> {
 }
 
 export async function getPaymentsByRound(roundId: string): Promise<Payment[]> {
+  await ensurePaymentsTable();
+
   const payments = await sql`
     SELECT * FROM payments WHERE round_id = ${roundId}
     ORDER BY created_at DESC
@@ -1289,6 +1324,8 @@ export async function getPaymentsByRound(roundId: string): Promise<Payment[]> {
 }
 
 export async function getPaymentsByDriver(driverId: string): Promise<Payment[]> {
+  await ensurePaymentsTable();
+
   const payments = await sql`
     SELECT * FROM payments WHERE driver_id = ${driverId}
     ORDER BY created_at DESC
@@ -1312,6 +1349,8 @@ export async function getPaymentsByDriver(driverId: string): Promise<Payment[]> 
 }
 
 export async function getPaymentsBySeason(seasonId: string): Promise<Payment[]> {
+  await ensurePaymentsTable();
+
   const payments = await sql`
     SELECT * FROM payments WHERE season_id = ${seasonId}
     ORDER BY created_at DESC
@@ -1335,6 +1374,8 @@ export async function getPaymentsBySeason(seasonId: string): Promise<Payment[]> 
 }
 
 export async function updatePayment(payment: Payment): Promise<void> {
+  await ensurePaymentsTable();
+
   await sql`
     UPDATE payments SET
       amount = ${payment.amount},
@@ -1349,6 +1390,8 @@ export async function updatePayment(payment: Payment): Promise<void> {
 }
 
 export async function deletePayment(id: string): Promise<void> {
+  await ensurePaymentsTable();
+
   await sql`DELETE FROM payments WHERE id = ${id}`;
 }
 
