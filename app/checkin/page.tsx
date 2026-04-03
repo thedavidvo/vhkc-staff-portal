@@ -6,9 +6,11 @@ import PageLayout from '@/components/PageLayout';
 import SectionCard from '@/components/SectionCard';
 import { useSeason } from '@/components/SeasonContext';
 import { Driver, Division, DriverStatus } from '@/types';
-import { Loader2, Edit, Save, X, CheckCircle2, Circle, Search, Filter, UserCheck, UserX, Users, UserRoundCheck, UserRoundX, UsersRound, ClipboardCheck } from 'lucide-react';
+import { Loader2, Edit, Save, X, CheckCircle2, Circle, Search, Filter, UserCheck, UserX, Users, UserRoundCheck, UserRoundX, UsersRound, ClipboardCheck, DollarSign, Download } from 'lucide-react';
+import { exportDriverListToCSV, downloadCSV } from '@/lib/csvExport';
 
 type DriverStatusFilter = 'all' | 'checkedIn' | 'notCheckedIn';
+type PaymentStatusFilter = 'all' | 'paid' | 'pending' | 'notPaid';
 
 // Helper function to get division color
 const getDivisionColor = (division: Division) => {
@@ -81,10 +83,12 @@ export default function CheckInPage() {
   const [rounds, setRounds] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [checkIns, setCheckIns] = useState<Record<string, boolean>>({});
+  const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRound, setSelectedRound] = useState<string>('');
   const [saving, setSaving] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<DriverStatusFilter>('all');
+  const [paymentFilter, setPaymentFilter] = useState<PaymentStatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [divisionFilter, setDivisionFilter] = useState<Division | 'all'>('all');
   
@@ -133,30 +137,46 @@ export default function CheckInPage() {
     fetchData();
   }, [selectedSeason, selectedRound]);
 
-  // Fetch check-ins when round changes
+  // Fetch check-ins and payments when round changes
   useEffect(() => {
-    const fetchCheckIns = async () => {
+    const fetchCheckInsAndPayments = async () => {
       if (!selectedRound) return;
 
       try {
-        const response = await fetch(`/api/checkin?roundId=${selectedRound}`);
-        if (response.ok) {
-          const data = await response.json();
+        const [checkInResponse, paymentsResponse] = await Promise.all([
+          fetch(`/api/checkin?roundId=${selectedRound}`),
+          fetch(`/api/payments?roundId=${selectedRound}`),
+        ]);
+        
+        if (checkInResponse.ok) {
+          const data = await checkInResponse.json();
           const checkInsMap: Record<string, boolean> = {};
           (Array.isArray(data) ? data : []).forEach((checkIn: any) => {
             checkInsMap[checkIn.driverId] = checkIn.checkedIn;
           });
           setCheckIns(checkInsMap);
         }
+
+        if (paymentsResponse.ok) {
+          const paymentsData = await paymentsResponse.json();
+          setPayments(paymentsData);
+        }
       } catch (error) {
-        console.error('Failed to fetch check ins:', error);
+        console.error('Failed to fetch check ins and payments:', error);
       }
     };
 
-    fetchCheckIns();
+    fetchCheckInsAndPayments();
   }, [selectedRound]);
 
-  // Filter drivers based on status filter, search query, and division
+  // Helper to get payment status for a driver
+  const getPaymentStatus = (driverId: string) => {
+    const payment = payments.find(p => p.driverId === driverId);
+    if (!payment) return 'notPaid';
+    return payment.status === 'paid' ? 'paid' : 'pending';
+  };
+
+  // Filter drivers based on status filter, search query, division, and payment
   const filteredDrivers = useMemo(() => {
     let filtered = [...drivers];
     
@@ -165,6 +185,14 @@ export default function CheckInPage() {
       filtered = filtered.filter(driver => checkIns[driver.id] === true);
     } else if (statusFilter === 'notCheckedIn') {
       filtered = filtered.filter(driver => checkIns[driver.id] !== true);
+    }
+    
+    // Filter by payment status
+    if (paymentFilter !== 'all') {
+      filtered = filtered.filter(driver => {
+        const status = getPaymentStatus(driver.id);
+        return status === paymentFilter;
+      });
     }
     
     // Filter by division
@@ -185,7 +213,7 @@ export default function CheckInPage() {
     }
     
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
-  }, [drivers, checkIns, statusFilter, searchQuery, divisionFilter]);
+  }, [drivers, checkIns, statusFilter, paymentFilter, searchQuery, divisionFilter, payments]);
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -283,6 +311,27 @@ export default function CheckInPage() {
     setEditForm({ ...editForm, aliases: newAliases.length > 0 ? newAliases : [''] });
   };
 
+  const handleExportForVenue = async () => {
+    if (!selectedRound || !selectedSeason) {
+      alert('Please select a round');
+      return;
+    }
+
+    const round = rounds.find(r => r.id === selectedRound);
+    if (!round) return;
+
+    // Apply current filters to export
+    const filters = {
+      division: divisionFilter !== 'all' ? divisionFilter : undefined,
+      paymentStatus: paymentFilter !== 'all' ? paymentFilter : undefined,
+      checkInStatus: statusFilter !== 'all' ? statusFilter : undefined,
+    };
+
+    const csvContent = exportDriverListToCSV(filteredDrivers, payments, checkIns, round, filters);
+    const filename = `venue_driver_list_round${round.roundNumber}_${new Date().toISOString().split('T')[0]}.csv`;
+    downloadCSV(csvContent, filename);
+  };
+
   if (loading) {
     return (
       <>
@@ -307,6 +356,17 @@ export default function CheckInPage() {
         title="Check In"
         subtitle="Track driver attendance for each round"
         icon={ClipboardCheck}
+        headerActions={
+          selectedRound && (
+            <button
+              onClick={handleExportForVenue}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl hover:from-green-600 hover:to-green-700 transition-all font-medium shadow-lg hover:shadow-xl"
+            >
+              <Download className="w-5 h-5" />
+              Export for Venue
+            </button>
+          )
+        }
       >
         {/* Stats Boxes */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -411,8 +471,8 @@ export default function CheckInPage() {
               title="Search & Filter"
               className="mb-8"
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Search */}
+              <div className="grid grid-cols-1 gap-4">
+                {/* Search - Full Width */}
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <input
@@ -424,21 +484,53 @@ export default function CheckInPage() {
                   />
                 </div>
 
-                {/* Division Filter */}
-                <div className="relative">
-                  <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <select
-                    value={divisionFilter}
-                    onChange={(e) => setDivisionFilter(e.target.value as Division | 'all')}
-                    className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-                  >
-                    <option value="all">All Divisions</option>
-                    <option value="Division 1">Division 1</option>
-                    <option value="Division 2">Division 2</option>
-                    <option value="Division 3">Division 3</option>
-                    <option value="Division 4">Division 4</option>
-                    <option value="New">New</option>
-                  </select>
+                {/* Filters Row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Division Filter */}
+                  <div className="relative">
+                    <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <select
+                      value={divisionFilter}
+                      onChange={(e) => setDivisionFilter(e.target.value as Division | 'all')}
+                      className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                    >
+                      <option value="all">All Divisions</option>
+                      <option value="Division 1">Division 1</option>
+                      <option value="Division 2">Division 2</option>
+                      <option value="Division 3">Division 3</option>
+                      <option value="Division 4">Division 4</option>
+                      <option value="New">New</option>
+                    </select>
+                  </div>
+
+                  {/* Check-In Status Filter */}
+                  <div className="relative">
+                    <UserCheck className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value as DriverStatusFilter)}
+                      className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                    >
+                      <option value="all">All Check-In Status</option>
+                      <option value="checkedIn">Checked In</option>
+                      <option value="notCheckedIn">Not Checked In</option>
+                    </select>
+                  </div>
+
+                  {/* Payment Status Filter */}
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <select
+                      value={paymentFilter}
+                      onChange={(e) => setPaymentFilter(e.target.value as PaymentStatusFilter)}
+                      className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                    >
+                      <option value="all">All Payment Status</option>
+                      <option value="paid">Paid</option>
+                      <option value="pending">Pending</option>
+                      <option value="notPaid">Not Paid</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </SectionCard>
@@ -463,6 +555,9 @@ export default function CheckInPage() {
                           Division
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                          Payment
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
                           Check-In Status
                         </th>
                         <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
@@ -473,7 +568,7 @@ export default function CheckInPage() {
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                       {filteredDrivers.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+                          <td colSpan={6} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
                             No drivers found.
                           </td>
                         </tr>
@@ -483,6 +578,7 @@ export default function CheckInPage() {
                             ? driver.aliases.filter((a: string) => a && a.trim() !== '')
                             : [];
                           const isCheckedIn = checkIns[driver.id] === true;
+                          const paymentStatus = getPaymentStatus(driver.id);
                           
                           return (
                             <tr key={driver.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
@@ -516,6 +612,24 @@ export default function CheckInPage() {
                                 <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getDivisionColor(driver.division)}`}>
                                   {driver.division}
                                 </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                {paymentStatus === 'paid' ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+                                    <DollarSign className="w-3 h-3" />
+                                    Paid
+                                  </span>
+                                ) : paymentStatus === 'pending' ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200">
+                                    <DollarSign className="w-3 h-3" />
+                                    Pending
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200">
+                                    <DollarSign className="w-3 h-3" />
+                                    Not Paid
+                                  </span>
+                                )}
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-2">

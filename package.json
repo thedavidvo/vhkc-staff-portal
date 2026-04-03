@@ -13,6 +13,9 @@
     "migrate-remove-fields": "tsx scripts/migrate-remove-unused-fields.ts",
     "migrate-add-points": "tsx scripts/migrate-add-points-table.ts",
     "migrate-add-mobile": "tsx scripts/migrate-add-mobile-number.ts",
+    "migrate-incidents-licenses": "tsx scripts/run-sql-migration.ts scripts/migrate-add-incidents-licenses.sql",
+    "migrate-sql": "tsx scripts/run-sql-migration.ts",
+    "migrate-fks": "tsx scripts/run-sql-migration.ts scripts/migrate-add-foreign-keys.sql",
     "migrate-rounds-location-id": "tsx scripts/migrate-rounds-location-id.ts",
     "migrate-remove-rounds-name": "tsx scripts/migrate-remove-rounds-name.ts",
     "import-drivers-csv": "tsx scripts/import-drivers-csv.ts"
@@ -30,7 +33,8 @@
     "next": "^14.2.33",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "recharts": "^3.4.1"
+    "recharts": "^3.4.1",
+    "stripe": "^20.0.0"
   },
   "devDependencies": {
     "@types/jspdf": "^1.3.3",

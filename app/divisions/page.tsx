@@ -6,7 +6,7 @@ import PageLayout from '@/components/PageLayout';
 import SectionCard from '@/components/SectionCard';
 import { useSeason } from '@/components/SeasonContext';
 import { Driver, Division } from '@/types';
-import { Search, Check, X, Loader2, ChevronDown, ShieldCheck, Users, Sparkles, Calendar, History, Plus, Trash2, Edit2, Square, CheckSquare } from 'lucide-react';
+import { Search, Check, X, Loader2, ChevronDown, ShieldCheck, Users, Sparkles, Calendar, History, Plus, Trash2, Edit2, Square, CheckSquare, CheckCircle } from 'lucide-react';
 import RoundPointsEditModal from '@/components/RoundPointsEditModal';
 
 interface PendingDivisionChange {
@@ -135,6 +135,9 @@ export default function DivisionsPage() {
   const [bulkEditChangeType, setBulkEditChangeType] = useState<'promotion' | 'demotion' | 'division_start' | 'mid_season_join'>('promotion');
   const [bulkEditDivisionStart, setBulkEditDivisionStart] = useState<Division | ''>('');
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [raceCountsByDriver, setRaceCountsByDriver] = useState<Record<string, number>>({});
+  const [overrideReason, setOverrideReason] = useState<string>('');
+  const [showOverrideWarning, setShowOverrideWarning] = useState(false);
 
   // Fetch drivers from API
   useEffect(() => {
@@ -147,7 +150,11 @@ export default function DivisionsPage() {
 
       try {
         setLoading(true);
-        const response = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
+        const [driversRes, roundsRes] = await Promise.all([
+          fetch(`/api/drivers?seasonId=${selectedSeason.id}`),
+          fetch(`/api/rounds?seasonId=${selectedSeason.id}`)
+        ]);
+        const response = driversRes;
         if (response.ok) {
           const data = await response.json();
           setDrivers(data);
@@ -185,6 +192,32 @@ export default function DivisionsPage() {
       };
     }
   }, [selectedSeason]);
+
+  // Rounds already fetched in parallel with drivers
+  useEffect(() => {
+    const fetchRaceCounts = async () => {
+      if (!selectedSeason || drivers.length === 0) return;
+      
+      // Fetch race counts for all drivers
+      const counts: Record<string, number> = {};
+      await Promise.all(
+        drivers.map(async (driver) => {
+          try {
+            const response = await fetch(`/api/drivers/race-count?driverId=${driver.id}&seasonId=${selectedSeason.id}`);
+            if (response.ok) {
+              const data = await response.json();
+              counts[driver.id] = data.raceCount || 0;
+            }
+          } catch (error) {
+            console.error(`Failed to fetch race count for driver ${driver.id}:`, error);
+          }
+        })
+      );
+      setRaceCountsByDriver(counts);
+    };
+
+    fetchRaceCounts();
+  }, [selectedSeason, drivers]);
 
   // Fetch rounds from API
   useEffect(() => {
@@ -429,6 +462,37 @@ export default function DivisionsPage() {
       if (!changeResponse.ok) {
         console.warn('Failed to save division change record');
       }
+
+      // Log to audit table if driver was locked
+      const raceCount = raceCountsByDriver[driverId] || 0;
+      const wasLocked = raceCount >= 2;
+      
+      if (wasLocked) {
+        const auditEntry = {
+          changeId: changeId,
+          driverId: driverId,
+          oldDivision: oldDivision,
+          newDivision: newDivision,
+          wasLocked: true,
+          raceCountAtChange: raceCount,
+          reason: overrideReason,
+          changedBy: 'Admin', // TODO: Get from auth context
+          changedAt: new Date().toISOString(),
+        };
+
+        try {
+          await fetch('/api/division-change-audit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(auditEntry),
+          });
+        } catch (auditError) {
+          console.error('Failed to log audit entry:', auditError);
+        }
+      }
+
+      // Clear override reason
+      setOverrideReason('');
 
       // Refresh drivers and division changes
       const refreshedDriversResponse = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
@@ -1237,6 +1301,54 @@ export default function DivisionsPage() {
                   </p>
                 </div>
               )}
+              
+              {/* Division Lock Warning */}
+              {pendingDivisionUpdate && (() => {
+                const raceCount = raceCountsByDriver[pendingDivisionUpdate.driverId] || 0;
+                const isLocked = raceCount >= 2;
+                
+                if (isLocked) {
+                  return (
+                    <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-200 dark:border-orange-800 rounded-xl">
+                      <div className="flex items-start gap-2 mb-3">
+                        <ShieldCheck className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-orange-900 dark:text-orange-100 mb-1">
+                            Division Locked
+                          </p>
+                          <p className="text-xs text-orange-700 dark:text-orange-300">
+                            This driver has raced in {raceCount} rounds. Division changes require admin override.
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-orange-800 dark:text-orange-200 mb-2">
+                          Override Reason (Required) *
+                        </label>
+                        <textarea
+                          value={overrideReason}
+                          onChange={(e) => setOverrideReason(e.target.value)}
+                          placeholder="Explain why this division change is needed..."
+                          className="w-full px-3 py-2 border-2 border-orange-300 dark:border-orange-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        <p className="text-xs text-green-700 dark:text-green-300">
+                          Driver has {raceCount} race{raceCount !== 1 ? 's' : ''}. Division change allowed.
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+              })()}
             </div>
 
             <div className="flex gap-3">
@@ -1251,7 +1363,18 @@ export default function DivisionsPage() {
                 Cancel
               </button>
               <button
-                onClick={handleCurrentDivisionChange}
+                onClick={() => {
+                  if (pendingDivisionUpdate) {
+                    const raceCount = raceCountsByDriver[pendingDivisionUpdate.driverId] || 0;
+                    const isLocked = raceCount >= 2;
+                    
+                    if (isLocked && !overrideReason.trim()) {
+                      alert('Please provide a reason for overriding the division lock');
+                      return;
+                    }
+                  }
+                  handleCurrentDivisionChange();
+                }}
                 disabled={updatingDriverId !== null || !selectedRoundId}
                 className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >

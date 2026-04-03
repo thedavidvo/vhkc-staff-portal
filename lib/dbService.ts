@@ -1228,3 +1228,349 @@ export async function deleteDivisionChange(id: string): Promise<void> {
   await sql`DELETE FROM division_changes WHERE id = ${id}`;
 }
 
+// ============================================================================
+// PAYMENT OPERATIONS
+// ============================================================================
+
+export interface Payment {
+  id: string;
+  seasonId: string;
+  roundId: string;
+  driverId: string;
+  amount: number;
+  status: 'paid' | 'pending' | 'failed' | 'refunded';
+  paymentMethod?: string;
+  stripePaymentIntentId?: string;
+  paymentDate?: string;
+  referenceNumber?: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export async function createPayment(payment: Payment): Promise<void> {
+  await sql`
+    INSERT INTO payments (
+      id, season_id, round_id, driver_id, amount, status,
+      payment_method, stripe_payment_intent_id, payment_date,
+      reference_number, notes, created_at, updated_at
+    ) VALUES (
+      ${payment.id}, ${payment.seasonId}, ${payment.roundId}, ${payment.driverId},
+      ${payment.amount}, ${payment.status}, ${payment.paymentMethod || null},
+      ${payment.stripePaymentIntentId || null}, ${payment.paymentDate || null},
+      ${payment.referenceNumber || null}, ${payment.notes || null},
+      ${payment.createdAt || new Date().toISOString()},
+      ${payment.updatedAt || new Date().toISOString()}
+    )
+  `;
+}
+
+export async function getPaymentsByRound(roundId: string): Promise<Payment[]> {
+  const payments = await sql`
+    SELECT * FROM payments WHERE round_id = ${roundId}
+    ORDER BY created_at DESC
+  ` as any[];
+  
+  return payments.map((p: any) => ({
+    id: p.id,
+    seasonId: p.season_id,
+    roundId: p.round_id,
+    driverId: p.driver_id,
+    amount: parseFloat(p.amount),
+    status: p.status,
+    paymentMethod: p.payment_method,
+    stripePaymentIntentId: p.stripe_payment_intent_id,
+    paymentDate: p.payment_date,
+    referenceNumber: p.reference_number,
+    notes: p.notes,
+    createdAt: p.created_at,
+    updatedAt: p.updated_at,
+  }));
+}
+
+export async function getPaymentsByDriver(driverId: string): Promise<Payment[]> {
+  const payments = await sql`
+    SELECT * FROM payments WHERE driver_id = ${driverId}
+    ORDER BY created_at DESC
+  ` as any[];
+  
+  return payments.map((p: any) => ({
+    id: p.id,
+    seasonId: p.season_id,
+    roundId: p.round_id,
+    driverId: p.driver_id,
+    amount: parseFloat(p.amount),
+    status: p.status,
+    paymentMethod: p.payment_method,
+    stripePaymentIntentId: p.stripe_payment_intent_id,
+    paymentDate: p.payment_date,
+    referenceNumber: p.reference_number,
+    notes: p.notes,
+    createdAt: p.created_at,
+    updatedAt: p.updated_at,
+  }));
+}
+
+export async function getPaymentsBySeason(seasonId: string): Promise<Payment[]> {
+  const payments = await sql`
+    SELECT * FROM payments WHERE season_id = ${seasonId}
+    ORDER BY created_at DESC
+  ` as any[];
+  
+  return payments.map((p: any) => ({
+    id: p.id,
+    seasonId: p.season_id,
+    roundId: p.round_id,
+    driverId: p.driver_id,
+    amount: parseFloat(p.amount),
+    status: p.status,
+    paymentMethod: p.payment_method,
+    stripePaymentIntentId: p.stripe_payment_intent_id,
+    paymentDate: p.payment_date,
+    referenceNumber: p.reference_number,
+    notes: p.notes,
+    createdAt: p.created_at,
+    updatedAt: p.updated_at,
+  }));
+}
+
+export async function updatePayment(payment: Payment): Promise<void> {
+  await sql`
+    UPDATE payments SET
+      amount = ${payment.amount},
+      status = ${payment.status},
+      payment_method = ${payment.paymentMethod || null},
+      payment_date = ${payment.paymentDate || null},
+      reference_number = ${payment.referenceNumber || null},
+      notes = ${payment.notes || null},
+      updated_at = ${new Date().toISOString()}
+    WHERE id = ${payment.id}
+  `;
+}
+
+export async function deletePayment(id: string): Promise<void> {
+  await sql`DELETE FROM payments WHERE id = ${id}`;
+}
+
+export async function getDriverRaceCount(driverId: string, seasonId: string): Promise<number> {
+  const result = await sql`
+    SELECT COUNT(DISTINCT round_id) as count
+    FROM race_results
+    WHERE driver_id = ${driverId}
+    AND round_id IN (SELECT id FROM rounds WHERE season_id = ${seasonId})
+  ` as any[];
+  
+  return result[0]?.count || 0;
+}
+
+// ============================================================================
+// INCIDENT OPERATIONS
+// ============================================================================
+
+export interface Incident {
+  id: string;
+  seasonId: string;
+  roundId: string;
+  driverId: string;
+  incidentType: string;
+  severity?: string;
+  incidentPoints: number;
+  pointsToDeduct: number;
+  pointsDeducted: number;
+  description: string;
+  reportedBy?: string;
+  confirmed: boolean;
+  confirmedAt?: string;
+  confirmedBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export async function createIncident(incident: Incident): Promise<void> {
+  // Calculate severity based on points
+  const severity = incident.pointsToDeduct === 7 ? 'Minor' : 'Major';
+
+  const seasons = await sql`
+    SELECT id FROM seasons WHERE id = ${incident.seasonId}
+  ` as any[];
+
+  if (seasons.length === 0) {
+    throw new Error('Selected season does not exist');
+  }
+
+  const rounds = await sql`
+    SELECT id, season_id FROM rounds WHERE id = ${incident.roundId}
+  ` as any[];
+
+  if (rounds.length === 0) {
+    throw new Error('Selected round does not exist');
+  }
+
+  if (rounds[0].season_id !== incident.seasonId) {
+    throw new Error('Selected round does not belong to the current season');
+  }
+
+  const drivers = await sql`
+    SELECT id, season_id FROM drivers WHERE id = ${incident.driverId}
+  ` as any[];
+
+  if (drivers.length === 0) {
+    throw new Error('Selected driver does not exist');
+  }
+
+  if (drivers[0].season_id !== incident.seasonId) {
+    throw new Error('Selected driver does not belong to the current season');
+  }
+  
+  await sql`
+    INSERT INTO incidents (
+      id, season_id, round_id, driver_id, incident_type, severity,
+      incident_points, points_to_deduct, points_deducted, description, reported_by,
+      confirmed, created_at, updated_at
+    ) VALUES (
+      ${incident.id}, ${incident.seasonId}, ${incident.roundId}, ${incident.driverId},
+      ${incident.incidentType}, ${severity}, ${incident.incidentPoints || 0}, ${incident.pointsToDeduct},
+      ${incident.pointsDeducted || 0}, ${incident.description}, ${incident.reportedBy || null},
+      ${incident.confirmed || false}, ${incident.createdAt || new Date().toISOString()},
+      ${incident.updatedAt || new Date().toISOString()}
+    )
+  `;
+}
+
+export async function getIncidentsBySeason(seasonId: string): Promise<Incident[]> {
+  const incidents = await sql`
+    SELECT * FROM incidents WHERE season_id = ${seasonId}
+    ORDER BY created_at DESC
+  ` as any[];
+  
+  return incidents.map((i: any) => ({
+    id: i.id,
+    seasonId: i.season_id,
+    roundId: i.round_id,
+    driverId: i.driver_id,
+    incidentType: i.incident_type,
+    severity: i.severity,
+    incidentPoints: i.incident_points || 0,
+    pointsToDeduct: i.points_to_deduct,
+    pointsDeducted: i.points_deducted,
+    description: i.description,
+    reportedBy: i.reported_by,
+    confirmed: i.confirmed,
+    confirmedAt: i.confirmed_at,
+    confirmedBy: i.confirmed_by,
+    createdAt: i.created_at,
+    updatedAt: i.updated_at,
+  }));
+}
+
+export async function getIncidentsByDriver(driverId: string): Promise<Incident[]> {
+  const incidents = await sql`
+    SELECT * FROM incidents WHERE driver_id = ${driverId}
+    ORDER BY created_at DESC
+  ` as any[];
+  
+  return incidents.map((i: any) => ({
+    id: i.id,
+    seasonId: i.season_id,
+    roundId: i.round_id,
+    driverId: i.driver_id,
+    incidentType: i.incident_type,
+    severity: i.severity,
+    incidentPoints: i.incident_points || 0,
+    pointsToDeduct: i.points_to_deduct,
+    pointsDeducted: i.points_deducted,
+    description: i.description,
+    reportedBy: i.reported_by,
+    confirmed: i.confirmed,
+    confirmedAt: i.confirmed_at,
+    confirmedBy: i.confirmed_by,
+    createdAt: i.created_at,
+    updatedAt: i.updated_at,
+  }));
+}
+
+export async function getIncidentsByRound(roundId: string): Promise<Incident[]> {
+  const incidents = await sql`
+    SELECT * FROM incidents WHERE round_id = ${roundId}
+    ORDER BY created_at DESC
+  ` as any[];
+  
+  return incidents.map((i: any) => ({
+    id: i.id,
+    seasonId: i.season_id,
+    roundId: i.round_id,
+    driverId: i.driver_id,
+    incidentType: i.incident_type,
+    severity: i.severity,
+    incidentPoints: i.incident_points || 0,
+    pointsToDeduct: i.points_to_deduct,
+    pointsDeducted: i.points_deducted,
+    description: i.description,
+    reportedBy: i.reported_by,
+    confirmed: i.confirmed,
+    confirmedAt: i.confirmed_at,
+    confirmedBy: i.confirmed_by,
+    createdAt: i.created_at,
+    updatedAt: i.updated_at,
+  }));
+}
+
+export async function updateIncident(incident: Incident): Promise<void> {
+  // Recalculate severity based on points
+  const severity = incident.pointsToDeduct === 7 ? 'Minor' : 'Major';
+  
+  await sql`
+    UPDATE incidents SET
+      incident_type = ${incident.incidentType},
+      severity = ${severity},
+      incident_points = ${incident.incidentPoints || 0},
+      points_to_deduct = ${incident.pointsToDeduct},
+      description = ${incident.description},
+      updated_at = ${new Date().toISOString()}
+    WHERE id = ${incident.id}
+  `;
+}
+
+export async function confirmIncidentAndDeductPoints(
+  incidentId: string,
+  confirmedBy: string,
+  seasonId: string
+): Promise<void> {
+  // Get the incident
+  const incidents = await sql`SELECT * FROM incidents WHERE id = ${incidentId}` as any[];
+  if (incidents.length === 0) throw new Error('Incident not found');
+  
+  const incident = incidents[0];
+  
+  // Update incident as confirmed
+  await sql`
+    UPDATE incidents SET
+      confirmed = true,
+      confirmed_at = ${new Date().toISOString()},
+      confirmed_by = ${confirmedBy},
+      points_deducted = ${incident.points_to_deduct},
+      updated_at = ${new Date().toISOString()}
+    WHERE id = ${incidentId}
+  `;
+  
+  // Create negative points entry
+  const descriptionTrunc = incident.description.substring(0, 50);
+  const note = `Incident #${incidentId}: ${incident.incident_type} - ${descriptionTrunc}`;
+  
+  const pointsId = `points-incident-${incidentId}`;
+  await sql`
+    INSERT INTO points (
+      id, season_id, round_id, driver_id, division, race_type,
+      overall_position, points, note, created_at, updated_at
+    ) VALUES (
+      ${pointsId}, ${seasonId}, ${incident.round_id}, ${incident.driver_id},
+      'New', 'incident', 0, ${-incident.points_to_deduct}, ${note},
+      ${new Date().toISOString()}, ${new Date().toISOString()}
+    )
+  `;
+}
+
+export async function deleteIncident(id: string): Promise<void> {
+  await sql`DELETE FROM incidents WHERE id = ${id}`;
+}
+

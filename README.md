@@ -1,164 +1,170 @@
 # VHKC Staff Portal
 
-A modern, responsive web application for managing go kart drivers, race results, and performance data. Built with Next.js 14 (App Router), TypeScript, and Tailwind CSS.
+Internal staff portal for managing VHKC seasons, drivers, check-in, incidents, licenses, race data, points, standings, teams, and reports.
 
-## Features
+The app is built with Next.js App Router, TypeScript, Tailwind CSS, and Neon Postgres.
 
-- 📊 **Dashboard** with key metrics and performance tables
-- 👥 **Driver Management** with sorting and filtering
-- 🏁 **Race Tracking** and results management
-- 🏆 **Division Management** for organizing drivers
-- 📈 **Reports & Analytics** for performance insights
-- ⚙️ **Settings** for portal configuration
-- 🌓 **Dark/Light Mode** toggle
-- 📱 **Fully Responsive** design for desktop, tablet, and mobile
-- ✨ **Modern UI** with smooth animations and gradients
+## Overview
 
-## Tech Stack
+- **Framework**: Next.js 14
+- **Language**: TypeScript
+- **Database**: Neon Postgres via `@neondatabase/serverless`
+- **UI**: Tailwind CSS + Lucide icons
+- **Auth**: Environment variable login
 
-- **Next.js 14** - React framework with App Router
-- **TypeScript** - Type-safe development
-- **Tailwind CSS** - Utility-first CSS framework
-- **Lucide React** - Beautiful icon library
+## Current Modules
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ and npm/yarn/pnpm
-
-### Installation
-
-1. Install dependencies:
-```bash
-npm install
-# or
-yarn install
-# or
-pnpm install
-```
-
-2. Run the development server:
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-```
-
-3. Open [http://localhost:3000](http://localhost:3000) in your browser.
+- **Available**: Dashboard, Season, Drivers, Check In, Payments, License, Incidents, Races, Results, Points, Divisions, Standings, Teams, Reports, Locations
+- **Coming soon / disabled**: Compare
 
 ## Project Structure
 
-```
+```text
 vhkc-staff-portal/
-├── app/                    # Next.js App Router pages
-│   ├── layout.tsx         # Root layout with sidebar
-│   ├── page.tsx           # Dashboard page
-│   ├── drivers/           # Drivers page
-│   ├── races/             # Races page
-│   ├── divisions/         # Divisions page
-│   ├── reports/           # Reports page
-│   └── settings/          # Settings page
-├── components/            # Reusable React components
-│   ├── Sidebar.tsx        # Collapsible navigation sidebar
-│   ├── Header.tsx         # Top header with search and profile
-│   ├── StatsCards.tsx     # Dashboard statistics cards
-│   ├── PerformanceTable.tsx # Driver performance table
-│   └── AddDriverModal.tsx # Modal for adding new drivers
-├── data/                  # Mock data
-│   └── mockData.ts        # Sample drivers and stats
-├── types/                 # TypeScript type definitions
-│   └── index.ts           # Driver, Race, and Stats interfaces
-└── public/                # Static assets
+├── app/                  # App Router pages and API routes
+├── components/           # Shared UI and modal components
+├── lib/                  # Database helpers, services, auth, utilities
+├── scripts/              # DB init and migration scripts
+├── public/               # Static assets
+├── types/                # Shared TypeScript types
+├── QUICKSTART.md         # Neon setup quick guide
+└── AUTH_SETUP.md         # Authentication setup guide
 ```
 
-## Features in Detail
+## Environment Variables
 
-### Dashboard
-- Real-time statistics cards showing key metrics
-- Interactive performance table with sorting and filtering
-- Search functionality for drivers
-- Division-based filtering
-- Add new driver modal form
+Create `.env.local` in the project root.
 
-### Responsive Design
-- Mobile-first approach
-- Collapsible sidebar that transforms into a mobile menu
-- Adaptive layouts for all screen sizes
-- Touch-friendly interface elements
+### Required
 
-### Dark Mode
-- System preference detection
-- Manual toggle in header
-- Persistent theme selection
-- Smooth transitions
+```env
+DATABASE_URL=postgresql://user:password@host/database?sslmode=require
+AUTH_USERNAME=your_username
+AUTH_PASSWORD=your_password
+```
 
-## Development
+### Optional / migration-related
 
-### Build for Production
+If you still migrate data from Google Sheets, keep the existing Sheets credentials used by your local setup.
+
+See `AUTH_SETUP.md` for authentication details.
+
+## Local Development
+
+### 1. Install dependencies
 
 ```bash
+npm install
+```
+
+### 2. Initialize the database
+
+```bash
+npm run init-db
+```
+
+### 3. Apply focused schema migrations as needed
+
+```bash
+npm run migrate-incidents-licenses
+npm run migrate-fks
+```
+
+### 4. Start the app
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+## Database Setup Notes
+
+The schema is created in `lib/db.ts`, and additional maintenance migrations live in `scripts/`.
+
+Useful commands:
+
+```bash
+npm run init-db
+npm run migrate
+npm run migrate-incidents-licenses
+npm run migrate-fks
+npm run migrate-sql -- scripts/your-file.sql
+```
+
+### What these do
+
+- **`npm run init-db`**: Creates the base Neon schema
+- **`npm run migrate`**: Migrates data from Google Sheets into Neon
+- **`npm run migrate-incidents-licenses`**: Backfills incident/license tables for older databases
+- **`npm run migrate-fks`**: Adds foreign keys safely using `NOT VALID`
+- **`npm run migrate-sql -- <file>`**: Runs any SQL migration file via the local TypeScript runner
+
+## NPM Scripts
+
+```bash
+npm run dev
 npm run build
-npm start
+npm run start
+npm run init-db
+npm run migrate
+npm run migrate-add-points
+npm run migrate-add-mobile
+npm run migrate-incidents-licenses
+npm run migrate-sql -- scripts/file.sql
+npm run migrate-fks
+npm run migrate-rounds-location-id
+npm run migrate-remove-rounds-name
+npm run migrate-remove-fields
+npm run import-drivers-csv
 ```
 
-### Linting
+## Authentication
 
-```bash
-npm run lint
-```
+Authentication is handled by environment variables and the login route.
 
-## Deployment to GitHub Pages
+- Login page: `/login`
+- API route: `/api/auth/login`
+- Setup guide: `AUTH_SETUP.md`
 
-This project is configured for deployment to GitHub Pages using static export.
+## Feature Notes
 
-### Automatic Deployment (Recommended)
+### Incidents and Licenses
 
-1. **Enable GitHub Pages**:
-   - Go to your repository Settings → Pages
-   - Under "Source", select "GitHub Actions"
+- Incident management is backed by `incidents`, `licenses`, and `license_points_history`
+- License history now enforces foreign keys against real incidents
+- Empty licenses for new drivers are created without fake history rows
 
-2. **Push to main branch**:
-   - The GitHub Actions workflow (`.github/workflows/deploy.yml`) will automatically build and deploy your site
-   - The workflow runs on every push to `main` or `master` branch
+### Payments
 
-3. **Access your site**:
-   - If your repository is `username.github.io`, your site will be at `https://username.github.io`
-   - If your repository has a different name (e.g., `vhkc-staff-portal`), your site will be at `https://username.github.io/vhkc-staff-portal`
+- Payment management is available from the `Payments` page
+- Payment-related tables may not exist in all older databases and may require `npm run init-db`
 
-### Manual Deployment
+## Validation / Tooling Notes
 
-If you need to deploy manually:
+- `npm run lint` may prompt for ESLint setup if linting has not been configured locally yet
+- A full `npx tsc --noEmit` can still fail on unrelated existing issues outside the file you are working on
 
-1. **Build the static site**:
-   ```bash
-   npm run build
-   ```
-   This creates an `out` directory with all static files.
+## Deployment
 
-2. **Configure basePath** (if not using `username.github.io`):
-   - Edit `next.config.js`
-   - Uncomment and set the `basePath` to your repository name:
-   ```javascript
-   basePath: '/your-repo-name',
-   trailingSlash: true,
-   ```
+This app is intended to run as a server-backed Next.js application.
 
-3. **Push the `out` directory**:
-   - You can use tools like `gh-pages` package or manually copy files to the `gh-pages` branch
+Recommended deployment targets:
 
-### Important Notes
+- Vercel
+- Any Node.js host that supports Next.js App Router and environment variables
 
-- **API Routes**: API routes (`/api/*`) are not available in static export. The app is configured to work without them.
-- **Images**: Images are set to `unoptimized: true` for static export compatibility.
-- **Client-side Routing**: All routing is handled client-side, which works perfectly with static hosting.
+When deploying, make sure these are configured in the target environment:
 
-## Mock Data
+- `DATABASE_URL`
+- `AUTH_USERNAME`
+- `AUTH_PASSWORD`
 
-The application currently uses mock data located in `data/mockData.ts`. In a production environment, you would replace this with API calls to your backend service.
+## Related Docs
 
-## License
+- `QUICKSTART.md` — quick Neon setup flow
+- `AUTH_SETUP.md` — auth configuration and troubleshooting
 
-This project is private and proprietary.
+## Ownership
+
+This repository is private and proprietary.

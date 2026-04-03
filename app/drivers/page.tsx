@@ -8,7 +8,7 @@ import AddDriverModal from '@/components/AddDriverModal';
 import EditDriverModal from '@/components/EditDriverModal';
 import { useSeason } from '@/components/SeasonContext';
 import { Driver, Division, DriverStatus } from '@/types';
-import { Edit, Trash2, Plus, Loader2, Users, Search, Filter, ChevronUp, ChevronDown } from 'lucide-react';
+import { Edit, Trash2, Plus, Loader2, Users, Search, Filter, ChevronUp, ChevronDown, AlertTriangle, ChevronRight } from 'lucide-react';
 
 // Helper function to get division color
 const getDivisionColor = (division: Division) => {
@@ -108,6 +108,8 @@ const formatMobileNumber = (mobileNumber: string | undefined): string => {
 export default function DriversPage() {
   const { selectedSeason } = useSeason();
   const [drivers, setDrivers] = useState<any[]>([]);
+  const [incidents, setIncidents] = useState<any[]>([]);
+  const [expandedIncidents, setExpandedIncidents] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [divisionFilter, setDivisionFilter] = useState<Division | 'all'>('all');
@@ -124,30 +126,40 @@ export default function DriversPage() {
     }
   };
 
-  // Fetch drivers from API
+  // Fetch drivers and incidents from API
   useEffect(() => {
-    const fetchDrivers = async () => {
+    const fetchData = async () => {
       if (!selectedSeason) {
         setDrivers([]);
+        setIncidents([]);
         setLoading(false);
         return;
       }
 
       try {
         setLoading(true);
-        const response = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
-        if (response.ok) {
-          const data = await response.json();
+        const [driversRes, incidentsRes] = await Promise.all([
+          fetch(`/api/drivers?seasonId=${selectedSeason.id}`),
+          fetch(`/api/incidents?seasonId=${selectedSeason.id}`)
+        ]);
+        
+        if (driversRes.ok) {
+          const data = await driversRes.json();
           setDrivers(data);
         }
+        
+        if (incidentsRes.ok) {
+          const incidentsData = await incidentsRes.json();
+          setIncidents(incidentsData);
+        }
       } catch (error) {
-        console.error('Failed to fetch drivers:', error);
+        console.error('Failed to fetch data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchDrivers();
+    fetchData();
   }, [selectedSeason]);
 
   const teams = useMemo(() => {
@@ -352,6 +364,21 @@ export default function DriversPage() {
       });
 
       if (response.ok) {
+        const driverData = await response.json();
+        
+        // Create license for the new driver
+        try {
+          await fetch('/api/licenses', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              driverId: newDriver.id,
+            }),
+          });
+        } catch (licenseError) {
+          console.error('Failed to create license for new driver:', licenseError);
+        }
+        
         // Refresh drivers list
         const refreshResponse = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
         if (refreshResponse.ok) {
@@ -565,13 +592,23 @@ export default function DriversPage() {
                     )}
                   </div>
                 </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                  Incidents
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase sticky right-0 bg-slate-50 dark:bg-slate-800 z-50 border-l border-slate-200 dark:border-slate-700">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-              {filteredAndSortedDrivers.map((driver) => (
+              {filteredAndSortedDrivers.map((driver) => {
+                const driverIncidents = incidents.filter(i => i.driverId === driver.id);
+                const confirmedCount = driverIncidents.filter(i => i.confirmed).length;
+                const pendingCount = driverIncidents.filter(i => !i.confirmed).length;
+                const isExpanded = expandedIncidents.has(driver.id);
+                
+                return (
+                <>
                 <tr
                   key={driver.id}
                   className="group hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
@@ -608,6 +645,40 @@ export default function DriversPage() {
                       ? new Date(driver.lastUpdated).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
                       : 'N/A'}
                   </td>
+                  <td className="px-4 py-3 text-sm">
+                    {driverIncidents.length > 0 ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            const newExpanded = new Set(expandedIncidents);
+                            if (isExpanded) {
+                              newExpanded.delete(driver.id);
+                            } else {
+                              newExpanded.add(driver.id);
+                            }
+                            setExpandedIncidents(newExpanded);
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors"
+                        >
+                          <AlertTriangle className="w-3 h-3" />
+                          {driverIncidents.length}
+                          <ChevronRight className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                        </button>
+                        {confirmedCount > 0 && (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200">
+                            {confirmedCount} Confirmed
+                          </span>
+                        )}
+                        {pendingCount > 0 && (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">
+                            {pendingCount} Pending
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 dark:text-slate-600">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-sm sticky right-0 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 z-20 border-l border-slate-200 dark:border-slate-700">
                     <div className="flex items-center gap-2">
                       <button
@@ -633,7 +704,68 @@ export default function DriversPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                {isExpanded && driverIncidents.length > 0 && (
+                  <tr className="bg-slate-50 dark:bg-slate-900">
+                    <td colSpan={9} className="px-4 py-4">
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">
+                          Incident History for {driver.name}
+                        </h4>
+                        {driverIncidents.map((incident) => (
+                          <div
+                            key={incident.id}
+                            className={`p-3 rounded-lg border-2 ${
+                              incident.confirmed
+                                ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
+                                : 'bg-yellow-50 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-800'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span
+                                    className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                      incident.severity === 'Major'
+                                        ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
+                                        : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
+                                    }`}
+                                  >
+                                    {incident.severity}
+                                  </span>
+                                  <span
+                                    className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                      incident.confirmed
+                                        ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+                                        : 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200'
+                                    }`}
+                                  >
+                                    {incident.confirmed ? 'Confirmed' : 'Pending'}
+                                  </span>
+                                  <span className="text-xs text-slate-600 dark:text-slate-400">
+                                    {incident.incidentType}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-slate-700 dark:text-slate-300 mb-2">
+                                  {incident.description}
+                                </p>
+                                <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+                                  <span>Points: {incident.pointsToDeduct}</span>
+                                  <span>Reported by: {incident.reportedBy}</span>
+                                  {incident.createdAt && (
+                                    <span>{new Date(incident.createdAt).toLocaleDateString()}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </>
+              );
+              })}
             </tbody>
           </table>
         </div>

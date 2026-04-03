@@ -22,6 +22,9 @@ import {
   X,
   ClipboardCheck,
   MapPin,
+  DollarSign,
+  AlertTriangle,
+  CreditCard,
 } from 'lucide-react';
 
 interface NavItem {
@@ -29,6 +32,7 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   category?: string;
+  disabled?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -36,12 +40,15 @@ const navItems: NavItem[] = [
   { name: 'Season', href: '/season', icon: Calendar, category: 'management' },
   { name: 'Drivers', href: '/drivers', icon: Users, category: 'management' },
   { name: 'Check In', href: '/checkin', icon: ClipboardCheck, category: 'operations' },
+  { name: 'Payments', href: '/payments', icon: DollarSign, category: 'operations' },
   { name: 'Races', href: '/races', icon: Flag, category: 'operations' },
   { name: 'Results', href: '/results', icon: FileText, category: 'data' },
   { name: 'Points', href: '/points', icon: Trophy, category: 'data' },
   { name: 'Divisions', href: '/divisions', icon: ShieldCheck, category: 'management' },
   { name: 'Standings', href: '/standings', icon: BarChart3, category: 'data' },
   { name: 'Teams', href: '/teams', icon: UsersRound, category: 'management' },
+  { name: 'License', href: '/license', icon: CreditCard, category: 'management' },
+  { name: 'Incidents', href: '/incidents', icon: AlertTriangle, category: 'management' },
   { name: 'Reports', href: '/reports', icon: FileText, category: 'data' },
 ];
 
@@ -275,6 +282,23 @@ export default function Sidebar() {
               {comingSoonItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = pathname === item.href;
+                if (item.disabled) {
+                  return (
+                    <div
+                      key={item.href}
+                      aria-disabled="true"
+                      className="group relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ease-out text-slate-500 opacity-50 cursor-not-allowed"
+                    >
+                      <Icon className="w-5 h-5 flex-shrink-0" />
+                      {(!isCollapsed || (mounted && isMobile)) && (
+                        <span className="font-medium transition-opacity duration-200">
+                          {item.name}
+                        </span>
+                      )}
+                    </div>
+                  );
+                }
+
                 return (
                   <Link
                     key={item.href}

@@ -259,6 +259,124 @@ export async function initializeDatabase() {
     await sql`CREATE INDEX IF NOT EXISTS idx_division_changes_driver_id ON division_changes(driver_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_division_changes_season_id ON division_changes(season_id)`;
 
+    // Create payments table
+    await sql`
+      CREATE TABLE IF NOT EXISTS payments (
+        id TEXT PRIMARY KEY,
+        season_id TEXT NOT NULL,
+        round_id TEXT NOT NULL,
+        driver_id TEXT NOT NULL,
+        amount DECIMAL(10,2) NOT NULL,
+        status TEXT DEFAULT 'pending',
+        payment_method TEXT,
+        stripe_payment_intent_id TEXT,
+        payment_date TEXT,
+        reference_number TEXT,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    await sql`CREATE INDEX IF NOT EXISTS idx_payments_season_id ON payments(season_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_payments_round_id ON payments(round_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_payments_driver_id ON payments(driver_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_payments_stripe_id ON payments(stripe_payment_intent_id)`;
+
+    // Create incidents table
+    await sql`
+      CREATE TABLE IF NOT EXISTS incidents (
+        id TEXT PRIMARY KEY,
+        season_id TEXT NOT NULL,
+        round_id TEXT NOT NULL,
+        driver_id TEXT NOT NULL,
+        incident_type TEXT NOT NULL,
+        severity TEXT,
+        incident_points INTEGER NOT NULL DEFAULT 0,
+        points_to_deduct INTEGER NOT NULL,
+        points_deducted INTEGER DEFAULT 0,
+        description TEXT NOT NULL,
+        reported_by TEXT,
+        confirmed BOOLEAN DEFAULT FALSE,
+        confirmed_at TIMESTAMP,
+        confirmed_by TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    await sql`CREATE INDEX IF NOT EXISTS idx_incidents_season_id ON incidents(season_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_incidents_round_id ON incidents(round_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_incidents_driver_id ON incidents(driver_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_incidents_confirmed ON incidents(confirmed)`;
+
+    // Add incident_points column if it doesn't exist
+    try {
+      await sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS incident_points INTEGER NOT NULL DEFAULT 0`;
+      console.log('✓ Added incident_points column to incidents table');
+    } catch (error: any) {
+      if (!error.message?.includes('already exists')) {
+        console.warn('Could not add incident_points column:', error.message);
+      }
+    }
+
+    // Create licenses table
+    await sql`
+      CREATE TABLE IF NOT EXISTS licenses (
+        id TEXT PRIMARY KEY,
+        driver_id TEXT NOT NULL UNIQUE,
+        total_incident_points INTEGER DEFAULT 0,
+        is_suspended BOOLEAN DEFAULT FALSE,
+        suspended_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    await sql`CREATE INDEX IF NOT EXISTS idx_licenses_driver_id ON licenses(driver_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_licenses_suspended ON licenses(is_suspended)`;
+
+    // Create license_points_history table for tracking points over time
+    await sql`
+      CREATE TABLE IF NOT EXISTS license_points_history (
+        id TEXT PRIMARY KEY,
+        license_id TEXT NOT NULL,
+        driver_id TEXT NOT NULL,
+        incident_id TEXT NOT NULL,
+        points_added INTEGER NOT NULL,
+        points_at_time INTEGER NOT NULL,
+        incident_date TIMESTAMP NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        is_expired BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    await sql`CREATE INDEX IF NOT EXISTS idx_license_history_license_id ON license_points_history(license_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_license_history_driver_id ON license_points_history(driver_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_license_history_incident_id ON license_points_history(incident_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_license_history_expires_at ON license_points_history(expires_at)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_license_history_expired ON license_points_history(is_expired)`;
+
+    // Create division_change_audit table for tracking
+    await sql`
+      CREATE TABLE IF NOT EXISTS division_change_audit (
+        id TEXT PRIMARY KEY,
+        change_id TEXT NOT NULL,
+        driver_id TEXT NOT NULL,
+        old_division TEXT,
+        new_division TEXT,
+        was_locked BOOLEAN DEFAULT FALSE,
+        race_count_at_change INTEGER DEFAULT 0,
+        reason TEXT,
+        changed_by TEXT,
+        changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    await sql`CREATE INDEX IF NOT EXISTS idx_audit_change_id ON division_change_audit(change_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_audit_driver_id ON division_change_audit(driver_id)`;
+
     console.log('✓ Database tables initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
