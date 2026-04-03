@@ -96,16 +96,19 @@ function normalizePaymentStatus(rawValue: string): ImportPaymentStatus {
 
 function parseCsv(rawContent: string): string[][] {
   const rows: string[][] = [];
-  const firstLine = rawContent.split(/\r?\n/).find((line) => line.trim().length > 0) || '';
-  const delimiter = (firstLine.match(/\t/g)?.length || 0) > (firstLine.match(/,/g)?.length || 0) ? '\t' : ',';
+  // Strip UTF-8 BOM (\uFEFF) which is commonly prepended by Excel/Wix exports
+  const content = rawContent.replace(/^\uFEFF/, '');
+  const firstLine = content.split(/\r?\n/).find((line) => line.trim().length > 0) || '';
+  // Prefer tab if any tab character is present in the header line
+  const delimiter = firstLine.includes('\t') ? '\t' : ',';
 
   let currentField = '';
   let currentRow: string[] = [];
   let inQuotes = false;
 
-  for (let i = 0; i < rawContent.length; i++) {
-    const char = rawContent[i];
-    const nextChar = rawContent[i + 1];
+  for (let i = 0; i < content.length; i++) {
+    const char = content[i];
+    const nextChar = content[i + 1];
 
     if (char === '"') {
       if (inQuotes && nextChar === '"') {
@@ -187,7 +190,11 @@ export async function POST(request: NextRequest) {
     const missingColumns = REQUIRED_COLUMNS.filter((column) => !headerIndex.has(column));
     if (missingColumns.length > 0) {
       return NextResponse.json(
-        { error: `CSV missing required columns: ${missingColumns.join(', ')}` },
+        {
+          error: `CSV missing required columns: ${missingColumns.join(', ')}`,
+          foundColumns: headers,
+          hint: 'Ensure the file is saved as a tab-delimited or comma-delimited CSV. Common causes: wrong file type, or column names differ from expected.',
+        },
         { status: 400 }
       );
     }
