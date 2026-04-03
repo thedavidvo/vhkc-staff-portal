@@ -1,20 +1,19 @@
-export type Division = 'Division 1' | 'Division 2' | 'Division 3' | 'Division 4' | 'New';
+export type Division = 'Division 1' | 'Division 2' | 'Division 3' | 'Division 4' | 'New' | 'Open';
 export type DriverStatus = 'ACTIVE' | 'INACTIVE' | 'BANNED';
 
 export interface Driver {
   id: string;
   name: string;
+  aliases?: string[];
   firstName?: string;
   lastName?: string;
   dateOfBirth?: string;
   homeTrack?: string;
   division: Division;
   email: string;
+  mobileNumber?: string;
   teamName?: string;
   status: DriverStatus;
-  lastRacePosition: number;
-  fastestLap: string;
-  pointsTotal: number;
   lastUpdated: string;
   avatar?: string;
   raceHistory?: RaceResult[];
@@ -38,6 +37,7 @@ export interface Race {
   name: string;
   season: string;
   round: number;
+  roundNumber?: number; // Optional for backwards compatibility
   date: string;
   location: string;
   address: string;
@@ -46,7 +46,7 @@ export interface Race {
 }
 
 export interface RaceDivisionResult {
-  division: Division;
+  division: Division | 'Open'; // division is now race_division, which can be "Open"
   results: DriverRaceResult[];
 }
 
@@ -54,12 +54,15 @@ export interface DriverRaceResult {
   driverId: string;
   driverAlias?: string;
   driverName: string;
+  division?: Division; // Add division to race results
   kartNumber?: string;
   position: number;
   gridPosition?: number;
   overallPosition?: number;
   fastestLap: string;
   points: number;
+  resultsSheetId?: string; // Unique identifier for the results sheet
+  raceDivision?: Division | 'Open'; // UI division clicked (Open/Division 1/Division 2)
 }
 
 export interface Team {
@@ -76,12 +79,11 @@ export interface Promotion {
   fromDivision: Division;
   toDivision: Division;
   date: string;
+  roundName?: string;
 }
 
 export interface Stats {
   totalDrivers: number;
-  driversPromoted: number;
-  driversDemoted: number;
   activeDivisions: number;
 }
 
@@ -90,8 +92,9 @@ export interface Round {
   roundNumber: number;
   name: string;
   date: string;
-  location: string;
-  address: string;
+  locationId?: string;
+  location?: string; // For backward compatibility and display - populated from locations table
+  address?: string; // For backward compatibility and display - populated from locations table
   status: 'upcoming' | 'completed' | 'cancelled';
 }
 
@@ -102,5 +105,13 @@ export interface Season {
   endDate: string;
   numberOfRounds: number;
   rounds: Round[];
+}
+
+export interface CheckIn {
+  id: string;
+  roundId: string;
+  driverId: string;
+  checkedIn: boolean;
+  createdAt?: string;
 }
 

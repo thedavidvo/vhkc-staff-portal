@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Driver } from '@/types';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 
-type SortField = 'name' | 'division' | 'lastRacePosition' | 'fastestLap' | 'pointsTotal' | 'lastUpdated';
+type SortField = 'name' | 'division' | 'lastUpdated';
 type SortDirection = 'asc' | 'desc';
 
 interface PerformanceTableProps {
@@ -12,7 +12,7 @@ interface PerformanceTableProps {
 }
 
 export default function PerformanceTable({ drivers }: PerformanceTableProps) {
-  const [sortField, setSortField] = useState<SortField>('pointsTotal');
+  const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [divisionFilter, setDivisionFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,18 +57,6 @@ export default function PerformanceTable({ drivers }: PerformanceTableProps) {
         case 'division':
           aValue = a.division.toLowerCase();
           bValue = b.division.toLowerCase();
-          break;
-        case 'lastRacePosition':
-          aValue = a.lastRacePosition;
-          bValue = b.lastRacePosition;
-          break;
-        case 'fastestLap':
-          aValue = a.fastestLap;
-          bValue = b.fastestLap;
-          break;
-        case 'pointsTotal':
-          aValue = a.pointsTotal;
-          bValue = b.pointsTotal;
           break;
         case 'lastUpdated':
           aValue = new Date(a.lastUpdated).getTime();
@@ -116,13 +104,13 @@ export default function PerformanceTable({ drivers }: PerformanceTableProps) {
             placeholder="Search drivers..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
         <select
           value={divisionFilter}
           onChange={(e) => setDivisionFilter(e.target.value)}
-          className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+          className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
         >
           <option value="all">All Divisions</option>
           {divisions.map((div) => (
@@ -135,22 +123,13 @@ export default function PerformanceTable({ drivers }: PerformanceTableProps) {
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[800px]">
-          <thead className="bg-slate-50 dark:bg-slate-900">
+          <thead className="bg-slate-50 dark:bg-slate-800">
             <tr>
               <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                 <SortButton field="name">Driver Name</SortButton>
               </th>
               <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                 <SortButton field="division">Division</SortButton>
-              </th>
-              <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-                <SortButton field="lastRacePosition">Last Race Position</SortButton>
-              </th>
-              <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-                <SortButton field="fastestLap">Fastest Lap</SortButton>
-              </th>
-              <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-                <SortButton field="pointsTotal">Points Total</SortButton>
               </th>
               <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                 <SortButton field="lastUpdated">Last Updated</SortButton>
@@ -161,7 +140,7 @@ export default function PerformanceTable({ drivers }: PerformanceTableProps) {
             {filteredAndSortedDrivers.map((driver) => (
               <tr
                 key={driver.id}
-                className="hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >
                 <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-slate-900 dark:text-white">
@@ -169,26 +148,9 @@ export default function PerformanceTable({ drivers }: PerformanceTableProps) {
                   </div>
                 </td>
                 <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 py-1 text-xs font-semibold rounded-full bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200">
+                  <span className="px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200">
                     {driver.division}
                   </span>
-                </td>
-                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-slate-900 dark:text-white">
-                    #{driver.lastRacePosition}
-                  </div>
-                </td>
-                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-mono text-slate-900 dark:text-white">
-                    {driver.fastestLap}
-                  </div>
-                </td>
-                <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                    {mounted 
-                      ? driver.pointsTotal.toLocaleString() 
-                      : driver.pointsTotal.toString()}
-                  </div>
                 </td>
                 <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-slate-600 dark:text-slate-400">

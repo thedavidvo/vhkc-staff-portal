@@ -1,35 +1,73 @@
 'use client';
 
 import Header from '@/components/Header';
+import PageLayout from '@/components/PageLayout';
+import SectionCard from '@/components/SectionCard';
 import EditSeasonModal from '@/components/EditSeasonModal';
 import AddSeasonModal from '@/components/AddSeasonModal';
-import { useState, useMemo } from 'react';
+import EditRoundModal from '@/components/EditRoundModal';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSeason } from '@/components/SeasonContext';
-import { mockLocations } from '@/data/mockData';
 import { Round } from '@/types';
 import { Edit2, Trash2, Calendar, Plus, X } from 'lucide-react';
 
+interface Location {
+  id: string;
+  name: string;
+  address: string;
+}
+
 export default function SeasonPage() {
   const router = useRouter();
-  const { seasons, selectedSeason, setSelectedSeason, updateSeason, deleteSeason, addSeason } = useSeason();
+  const { seasons, selectedSeason, setSelectedSeason, updateSeason, deleteSeason, addSeason, loading } = useSeason();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingSeason, setEditingSeason] = useState<typeof seasons[0] | null>(null);
   const [selectedRound, setSelectedRound] = useState<Round | null>(null);
   const [isRoundDetailsOpen, setIsRoundDetailsOpen] = useState(false);
-  const [isRoundEditOpen, setIsRoundEditOpen] = useState(false);
-  const [editingRound, setEditingRound] = useState<Round | null>(null);
+  const [roundToEdit, setRoundToEdit] = useState<Round | null>(null);
+  const [isRoundEditModalOpen, setIsRoundEditModalOpen] = useState(false);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(true);
+  const [roundDetailsAddress, setRoundDetailsAddress] = useState<string>('');
 
-  const handleUpdateSeason = (updatedSeason: typeof seasons[0]) => {
-    updateSeason(updatedSeason);
+  // Fetch locations from API
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        setLocationsLoading(true);
+        const response = await fetch('/api/locations');
+        if (response.ok) {
+          const data = await response.json();
+          setLocations(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch locations:', error);
+      } finally {
+        setLocationsLoading(false);
+      }
+    };
+    fetchLocations();
+  }, []);
+
+  const handleUpdateSeason = async (updatedSeason: typeof seasons[0]) => {
+    try {
+      await updateSeason(updatedSeason);
+    } catch (error) {
+      alert('Failed to update season. Please try again.');
+    }
   };
 
-  const handleDeleteSeason = (seasonId: string) => {
+  const handleDeleteSeason = async (seasonId: string) => {
     if (!confirm('Are you sure you want to delete this season? This action cannot be undone.')) {
       return;
     }
-    deleteSeason(seasonId);
+    try {
+      await deleteSeason(seasonId);
+    } catch (error) {
+      alert('Failed to delete season. Please try again.');
+    }
   };
 
   const handleEditSeason = (season: typeof seasons[0]) => {
@@ -41,63 +79,124 @@ export default function SeasonPage() {
     setSelectedSeason(season);
   };
 
-  const handleAddSeason = (seasonData: {
+  const handleAddSeason = async (seasonData: {
     name: string;
     startDate: string;
     endDate: string;
     numberOfRounds: number;
   }) => {
-    const newSeason = {
-      id: `season-${Date.now()}`,
-      name: seasonData.name,
-      startDate: seasonData.startDate,
-      endDate: seasonData.endDate,
-      numberOfRounds: seasonData.numberOfRounds,
-      rounds: [],
-    };
-    addSeason(newSeason);
-    setIsAddModalOpen(false);
-    // Reset dashboard when a new season is added
-    router.push('/dashboard');
+    try {
+      const newSeason = {
+        id: `season-${Date.now()}`,
+        name: seasonData.name,
+        startDate: seasonData.startDate,
+        endDate: seasonData.endDate,
+        numberOfRounds: seasonData.numberOfRounds,
+        rounds: [],
+      };
+      await addSeason(newSeason);
+      setIsAddModalOpen(false);
+      // Reset dashboard when a new season is added
+      router.push('/dashboard');
+    } catch (error) {
+      alert('Failed to add season. Please try again.');
+    }
   };
 
-  const handleRoundClick = (round: Round) => {
+  const handleRoundClick = async (round: Round) => {
     setSelectedRound(round);
     setIsRoundDetailsOpen(true);
+    
+    // Fetch address from locations table if locationId is set
+    if (round.locationId) {
+      try {
+        const location = locations.find(loc => loc.id === round.locationId);
+        if (location && location.address) {
+          setRoundDetailsAddress(location.address);
+        } else {
+          // If not in local state, fetch from API
+          const response = await fetch('/api/locations');
+          if (response.ok) {
+            const locationsData = await response.json();
+            const foundLocation = locationsData.find((loc: Location) => loc.id === round.locationId);
+            setRoundDetailsAddress(foundLocation?.address || 'N/A');
+          } else {
+            setRoundDetailsAddress('N/A');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch location address:', error);
+        setRoundDetailsAddress('N/A');
+      }
+    } else {
+      setRoundDetailsAddress('N/A');
+    }
   };
 
-  const handleDeleteRound = (roundId: string) => {
+  const handleDeleteRound = async (roundId: string) => {
     if (!selectedSeason) return;
     if (!confirm('Are you sure you want to delete this round? This action cannot be undone.')) {
       return;
     }
-    const updatedSeason = {
-      ...selectedSeason,
-      rounds: selectedSeason.rounds.filter((r) => r.id !== roundId),
-    };
-    updateSeason(updatedSeason);
-    setSelectedSeason(updatedSeason);
+    try {
+      const updatedSeason = {
+        ...selectedSeason,
+        rounds: selectedSeason.rounds.filter((r) => r.id !== roundId),
+        numberOfRounds: selectedSeason.rounds.filter((r) => r.id !== roundId).length,
+      };
+      await updateSeason(updatedSeason);
+      // The updateSeason function in SeasonContext will refresh and update selectedSeason
+      // But we also need to ensure local state is updated immediately
+      setSelectedSeason(updatedSeason);
+    } catch (error) {
+      alert('Failed to delete round. Please try again.');
+    }
   };
 
   const handleEditRound = (round: Round) => {
     if (!selectedSeason) return;
-    setEditingRound(round);
-    setIsRoundEditOpen(true);
+    setRoundToEdit(round);
+    setIsRoundEditModalOpen(true);
   };
 
-  const handleSaveRound = (updatedRound: Round) => {
+  const handleSaveRound = async (round: Round) => {
     if (!selectedSeason) return;
-    const updatedRounds = selectedSeason.rounds.map((r) => 
-      r.id === updatedRound.id ? updatedRound : r
-    );
-    const updatedSeason = {
-      ...selectedSeason,
-      rounds: updatedRounds,
-    };
-    updateSeason(updatedSeason);
-    setSelectedSeason(updatedSeason);
-    setIsRoundEditOpen(false);
-    setEditingRound(null);
+    try {
+      const updatedRounds = [...selectedSeason.rounds];
+      const existingIndex = updatedRounds.findIndex((r) => r.id === round.id);
+      
+      // Ensure we have all required fields from the round, preserving locationId
+      const roundToSave: Round = {
+        id: round.id,
+        roundNumber: round.roundNumber,
+        name: '', // name column removed
+        date: round.date || '',
+        locationId: round.locationId, // Explicitly preserve locationId
+        status: round.status || 'upcoming',
+      };
+      
+      if (existingIndex >= 0) {
+        updatedRounds[existingIndex] = roundToSave;
+      } else {
+        updatedRounds.push(roundToSave);
+      }
+
+      // Sort rounds by roundNumber
+      updatedRounds.sort((a, b) => a.roundNumber - b.roundNumber);
+
+      const updatedSeason = {
+        ...selectedSeason,
+        rounds: updatedRounds,
+        numberOfRounds: updatedRounds.length,
+      };
+
+      await updateSeason(updatedSeason);
+      setIsRoundEditModalOpen(false);
+      setRoundToEdit(null);
+    } catch (error) {
+      console.error('Failed to save round:', error);
+      alert('Failed to save round. Please try again.');
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -149,24 +248,29 @@ export default function SeasonPage() {
 
   return (
     <>
-      <Header hideSearch />
-      <div className="p-6">
-        <div className="max-w-[95%] mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-              Season Management
-            </h1>
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all shadow-md font-medium"
-            >
-              <Plus className="w-5 h-5" />
-              Add New Season
-            </button>
-          </div>
-
-          {seasons.length === 0 ? (
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-12 text-center">
+      <PageLayout
+        title="Season Management"
+        subtitle="Manage seasons and rounds"
+        icon={Calendar}
+        headerActions={
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all shadow-lg hover:shadow-xl hover-lift font-medium"
+          >
+            <Plus className="w-5 h-5" />
+            Add New Season
+          </button>
+        }
+      >
+        {loading ? (
+          <SectionCard>
+            <div className="text-center py-12">
+              <p className="text-slate-500 dark:text-slate-400">Loading seasons...</p>
+            </div>
+          </SectionCard>
+        ) : seasons.length === 0 ? (
+          <SectionCard>
+            <div className="text-center py-12">
               <Calendar className="w-16 h-16 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
                 No seasons yet
@@ -175,34 +279,36 @@ export default function SeasonPage() {
                 Get started by creating your first season using the dropdown in the sidebar
               </p>
             </div>
-          ) : (
-            <>
-              {/* Selected Season Rounds Display */}
-              {selectedSeason && (
-                <div className="mb-8 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-                      {selectedSeason.name} - Rounds
-                    </h2>
-                    <button
-                      onClick={() => handleEditSeason(selectedSeason)}
-                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all shadow-md font-medium"
-                    >
-                      <Plus className="w-5 h-5" />
-                      Add Round
-                    </button>
-                  </div>
+          </SectionCard>
+        ) : (
+          <>
+            {/* Selected Season Rounds Display */}
+            {selectedSeason && (
+              <SectionCard
+                title={`${selectedSeason.name} - Rounds`}
+                icon={Calendar}
+                actions={
+                  <button
+                    onClick={() => handleEditSeason(selectedSeason)}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all shadow-lg hover:shadow-xl hover-lift font-medium"
+                  >
+                    <Edit2 className="w-5 h-5" />
+                    Edit Season
+                  </button>
+                }
+                className="mb-8"
+              >
                   {displayedRounds.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {displayedRounds.map((round) => (
                         <div
                           key={round.id}
-                          className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 relative group cursor-pointer hover:shadow-lg transition-all"
+                          className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 relative group cursor-pointer hover:shadow-lg transition-all"
                           onClick={() => handleRoundClick(round)}
                         >
                           <div className="flex items-start justify-between mb-2">
                             <div className="font-semibold text-slate-900 dark:text-white flex-1">
-                              {round.name}
+                              Round {round.roundNumber}
                             </div>
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button
@@ -210,7 +316,7 @@ export default function SeasonPage() {
                                   e.stopPropagation();
                                   handleEditRound(round);
                                 }}
-                                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
                                 aria-label="Edit round"
                               >
                                 <Edit2 className="w-4 h-4 text-slate-600 dark:text-slate-400" />
@@ -228,7 +334,14 @@ export default function SeasonPage() {
                             </div>
                           </div>
                           <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">
-                            {round.location}
+                            {(() => {
+                              const displayName = round.location && round.location.trim() 
+                                ? round.location.trim() 
+                                : 'TBD';
+                              // Remove "Season - " prefix if present
+                              const cleanName = displayName.replace(/^Season\s*-\s*/i, '');
+                              return cleanName || 'No details';
+                            })()}
                           </div>
                           {round.date && (
                             <div className="text-xs text-slate-500 dark:text-slate-500">
@@ -240,14 +353,14 @@ export default function SeasonPage() {
                             </div>
                           )}
                           <div className="mt-2">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
                               round.status === 'completed' 
                                 ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
                                 : round.status === 'upcoming'
                                 ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
                                 : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
                             }`}>
-                              {round.status}
+                              {round.status.charAt(0).toUpperCase() + round.status.slice(1).toLowerCase()}
                             </span>
                           </div>
                         </div>
@@ -258,18 +371,18 @@ export default function SeasonPage() {
                       No rounds for this season yet. Click "Add Round" to create one.
                     </p>
                   )}
-                </div>
-              )}
+              </SectionCard>
+            )}
 
-              {/* All Seasons Display */}
-              <div className="space-y-8">
+            {/* All Seasons Display */}
+            <div className="space-y-8">
                 {seasonsByYear.map(({ year, seasons: yearSeasons }) => (
                   <div key={year} className="space-y-4">
                     <div className="flex items-center gap-4">
                       <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
                         {year}
                       </h2>
-                      <div className="flex-1 h-px bg-slate-300 dark:bg-slate-600"></div>
+                      <div className="flex-1 h-px bg-slate-300 dark:bg-slate-800"></div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                       {yearSeasons.map((season) => (
@@ -289,7 +402,7 @@ export default function SeasonPage() {
                           <div className="flex gap-1">
                             <button
                               onClick={() => handleEditSeason(season)}
-                              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                               aria-label="Edit season"
                             >
                               <Edit2 className="w-4 h-4 text-slate-600 dark:text-slate-400" />
@@ -329,18 +442,48 @@ export default function SeasonPage() {
               </div>
             </>
           )}
-        </div>
-      </div>
+      </PageLayout>
 
       <EditSeasonModal
         isOpen={isEditModalOpen}
         onClose={() => {
           setIsEditModalOpen(false);
           setEditingSeason(null);
+          setRoundToEdit(null);
         }}
         season={editingSeason}
         onUpdate={handleUpdateSeason}
-        locations={mockLocations}
+        locations={locations}
+        initialRoundToEdit={roundToEdit}
+        onLocationAdded={async (locationName: string, address: string) => {
+          try {
+            const newLocation = {
+              id: `location-${Date.now()}`,
+              name: locationName,
+              address: address,
+            };
+            
+            const response = await fetch('/api/locations', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newLocation),
+            });
+            
+            if (response.ok) {
+              // Refresh locations
+              const refreshResponse = await fetch('/api/locations');
+              if (refreshResponse.ok) {
+                const data = await refreshResponse.json();
+                setLocations(data);
+              }
+            } else {
+              throw new Error('Failed to add location');
+            }
+          } catch (error) {
+            console.error('Failed to add location:', error);
+            throw error;
+          }
+        }}
       />
 
       <AddSeasonModal
@@ -348,19 +491,6 @@ export default function SeasonPage() {
         onClose={() => setIsAddModalOpen(false)}
         onAdd={handleAddSeason}
       />
-
-      {/* Round Edit Modal */}
-      {isRoundEditOpen && editingRound && (
-        <RoundEditForm
-          round={editingRound}
-          locations={mockLocations}
-          onSave={handleSaveRound}
-          onCancel={() => {
-            setIsRoundEditOpen(false);
-            setEditingRound(null);
-          }}
-        />
-      )}
 
       {/* Round Details Modal */}
       {isRoundDetailsOpen && selectedRound && (
@@ -375,7 +505,7 @@ export default function SeasonPage() {
                   setIsRoundDetailsOpen(false);
                   setSelectedRound(null);
                 }}
-                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 aria-label="Close modal"
               >
                 <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
@@ -403,19 +533,17 @@ export default function SeasonPage() {
                   Location
                 </label>
                 <p className="text-base text-slate-900 dark:text-white">
-                  {selectedRound.location}
+                  {selectedRound.location || 'N/A'}
                 </p>
               </div>
-              {selectedRound.address && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Address
-                  </label>
-                  <p className="text-base text-slate-900 dark:text-white">
-                    {selectedRound.address}
-                  </p>
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Address
+                </label>
+                <p className="text-base text-slate-900 dark:text-white">
+                  {roundDetailsAddress || 'N/A'}
+                </p>
+              </div>
               {selectedRound.date && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -434,7 +562,7 @@ export default function SeasonPage() {
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Status
                 </label>
-                <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full ${
+                <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full whitespace-nowrap ${
                   selectedRound.status === 'completed' 
                     ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
                     : selectedRound.status === 'upcoming'
@@ -451,7 +579,7 @@ export default function SeasonPage() {
                   setIsRoundDetailsOpen(false);
                   setSelectedRound(null);
                 }}
-                className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors font-medium"
+                className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium"
               >
                 Close
               </button>
@@ -459,148 +587,50 @@ export default function SeasonPage() {
           </div>
         </div>
       )}
+
+      {/* Edit Round Modal */}
+      {selectedSeason && roundToEdit && (
+        <EditRoundModal
+          isOpen={isRoundEditModalOpen}
+          onClose={() => {
+            setIsRoundEditModalOpen(false);
+            setRoundToEdit(null);
+          }}
+          round={roundToEdit}
+          seasonId={selectedSeason.id}
+          locations={locations}
+          onSave={handleSaveRound}
+          onLocationAdded={async (locationName: string, address: string) => {
+            try {
+              const newLocation = {
+                id: `location-${Date.now()}`,
+                name: locationName,
+                address: address,
+              };
+              
+              const response = await fetch('/api/locations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newLocation),
+              });
+              
+              if (response.ok) {
+                // Refresh locations
+                const refreshResponse = await fetch('/api/locations');
+                if (refreshResponse.ok) {
+                  const data = await refreshResponse.json();
+                  setLocations(data);
+                }
+              } else {
+                throw new Error('Failed to add location');
+              }
+            } catch (error) {
+              console.error('Failed to add location:', error);
+              throw error;
+            }
+          }}
+        />
+      )}
     </>
-  );
-}
-
-// Round Edit Form Component
-function RoundEditForm({
-  round,
-  locations,
-  onSave,
-  onCancel,
-}: {
-  round: Round;
-  locations: string[];
-  onSave: (round: Round) => void;
-  onCancel: () => void;
-}) {
-  const [formData, setFormData] = useState<Round>(round);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave(formData);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full">
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-            Edit Round
-          </h3>
-          <button
-            onClick={onCancel}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-          >
-            <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Round Number
-            </label>
-            <input
-              type="number"
-              required
-              min="1"
-              value={formData.roundNumber}
-              onChange={(e) => setFormData({ ...formData, roundNumber: parseInt(e.target.value) || 1 })}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Round Name
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Date <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">(optional)</span>
-            </label>
-            <input
-              type="date"
-              value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Location
-            </label>
-            <select
-              required
-              value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              {locations.map((loc) => (
-                <option key={loc} value={loc}>
-                  {loc}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Address
-            </label>
-            <input
-              type="text"
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="123 Racing Blvd, City, State 12345"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Status
-            </label>
-            <select
-              required
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as Round['status'] })}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="upcoming">Upcoming</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors font-medium"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-md"
-            >
-              Save Round
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
   );
 }
