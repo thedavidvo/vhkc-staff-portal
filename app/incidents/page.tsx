@@ -405,33 +405,33 @@ export default function IncidentsPage() {
                   placeholder="Search drivers..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 transition-colors"
+                  className="w-full h-9 pl-9 pr-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600 transition-colors"
                 />
               </div>
             </div>
 
             {/* Drivers List */}
-            <ul className="space-y-3">
+            <ul className="space-y-2">
               {filteredDrivers.map(driver => (
                 <li
                   key={driver.id}
                   onClick={() => handleOpenHistoryModal(driver)}
-                  className={`p-3 rounded-md border cursor-pointer transition-colors ${
+                  className={`p-2.5 rounded-md border cursor-pointer transition-colors ${
                     driver.license?.isSuspended
-                      ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/20'
+                      ? 'bg-white dark:bg-slate-900 border-red-200 dark:border-red-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'
                       : driver.license?.activePoints >= 5
-                      ? 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/20'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      ? 'bg-white dark:bg-slate-900 border-orange-200 dark:border-orange-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2">
-                      <h4 className="font-semibold text-slate-900 dark:text-white">{driver.name}</h4>
+                      <h4 className="text-sm font-semibold text-slate-900 dark:text-white">{driver.name}</h4>
                       {driver.license?.isSuspended && (
                         <ShieldAlert className="w-4 h-4 text-red-600 dark:text-red-400" />
                       )}
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${getDivisionColor(driver.division)}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${getDivisionColor(driver.division)}`}>
                       {driver.division}
                     </span>
                   </div>
@@ -440,29 +440,29 @@ export default function IncidentsPage() {
                     <div className="flex items-center gap-4">
                       <div>
                         <p className="text-xs text-slate-500 dark:text-slate-400">License Points</p>
-                        <p className={`text-2xl font-bold ${
+                        <p className={`text-lg font-semibold ${
                           driver.license?.isSuspended
                             ? 'text-red-600 dark:text-red-400'
                             : driver.license?.activePoints >= 5
                             ? 'text-orange-600 dark:text-orange-400'
                             : 'text-green-600 dark:text-green-400'
                         }`}>
-                          {driver.license?.activePoints || 0}<span className="text-sm text-slate-500 dark:text-slate-400">/8</span>
+                          {driver.license?.activePoints || 0}<span className="text-xs text-slate-500 dark:text-slate-400">/8</span>
                         </p>
                       </div>
                       <div>
                         <p className="text-xs text-slate-500 dark:text-slate-400">Incidents</p>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+                          <span className="text-xs px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
                             {driver.confirmedCount} ✓
                           </span>
                           {driver.pendingCount > 0 && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200">
+                            <span className="text-xs px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
                               {driver.pendingCount} ⏳
                             </span>
                           )}
                           {driver.incidentCount === 0 && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                            <span className="text-xs px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
                               0 incidents
                             </span>
                           )}
@@ -482,39 +482,39 @@ export default function IncidentsPage() {
             {/* Selected Driver's Incidents */}
             {selectedDriverId && (
               <div className="mt-6">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">
                   Incidents for {drivers.find(d => d.id === selectedDriverId)?.name}
                 </h3>
                 {filteredIncidents.length === 0 ? (
-                  <div className="p-6 text-center bg-slate-50 dark:bg-slate-800/50 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700">
-                    <Shield className="w-12 h-12 mx-auto text-green-500 mb-2" />
-                    <p className="text-slate-600 dark:text-slate-400">No incidents recorded</p>
+                  <div className="p-5 text-center bg-slate-50 dark:bg-slate-800/40 rounded-md border border-slate-200 dark:border-slate-800">
+                    <Shield className="w-8 h-8 mx-auto text-slate-400 mb-2" />
+                    <p className="text-sm text-slate-600 dark:text-slate-400">No incidents recorded</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {filteredIncidents.map(incident => {
                       const round = rounds.find(r => r.id === incident.roundId);
                       
                       return (
                         <div
                           key={incident.id}
-                          className={`p-3 rounded-md border ${
+                          className={`p-2.5 rounded-md border ${
                             incident.confirmed
-                              ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800'
-                              : 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800'
+                              ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                              : 'bg-white dark:bg-slate-900 border-orange-200 dark:border-orange-800'
                           }`}
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                                <span className={`px-2 py-0.5 text-xs font-medium rounded-md ${
                                   incident.severity === 'Major'
                                     ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
                                     : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
                                 }`}>
                                   {incident.severity}
                                 </span>
-                                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                                <span className={`px-2 py-0.5 text-xs font-medium rounded-md ${
                                   incident.confirmed
                                     ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
                                     : 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200'
@@ -525,7 +525,7 @@ export default function IncidentsPage() {
                                   Round {round?.roundNumber} • {incident.incidentType}
                                 </span>
                               </div>
-                              <p className="text-sm text-slate-700 dark:text-slate-300 mb-2">
+                              <p className="text-sm text-slate-700 dark:text-slate-300 mb-1.5">
                                 {incident.description}
                               </p>
                               <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
@@ -544,7 +544,7 @@ export default function IncidentsPage() {
                                       e.stopPropagation();
                                       handleConfirmIncident(incident);
                                     }}
-                                    className="p-1.5 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/20 rounded-md transition-colors"
+                                    className="p-1 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
                                     title="Confirm"
                                   >
                                     <CheckCircle className="w-4 h-4" />
@@ -554,7 +554,7 @@ export default function IncidentsPage() {
                                       e.stopPropagation();
                                       handleEditIncident(incident);
                                     }}
-                                    className="p-1.5 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+                                    className="p-1 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
                                     title="Edit"
                                   >
                                     <Edit className="w-4 h-4" />
@@ -566,7 +566,7 @@ export default function IncidentsPage() {
                                   e.stopPropagation();
                                   handleDeleteIncident(incident.id);
                                 }}
-                                className="p-1.5 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                                className="p-1 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
                                 title="Delete"
                               >
                                 <Trash className="w-4 h-4" />
@@ -602,7 +602,7 @@ export default function IncidentsPage() {
                   <select
                     value={formData.driverId}
                     onChange={(e) => setFormData({ ...formData, driverId: e.target.value })}
-                    className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800"
+                    className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm"
                   >
                     <option value="">Select Driver</option>
                     {driversWithLicenses.map(driver => (
@@ -620,7 +620,7 @@ export default function IncidentsPage() {
                   <select
                     value={formData.roundId}
                     onChange={(e) => setFormData({ ...formData, roundId: e.target.value })}
-                    className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800"
+                    className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm"
                   >
                     <option value="">Select Round</option>
                     {rounds.map(round => (
@@ -638,7 +638,7 @@ export default function IncidentsPage() {
                   <select
                     value={formData.incidentType}
                     onChange={(e) => setFormData({ ...formData, incidentType: e.target.value })}
-                    className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800"
+                    className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm"
                   >
                     <option value="On-Track Incident">On-Track Incident</option>
                     <option value="Behavioral">Behavioral</option>
@@ -656,7 +656,7 @@ export default function IncidentsPage() {
                     type="number"
                     value={formData.incidentPoints}
                     onChange={(e) => setFormData({ ...formData, incidentPoints: parseInt(e.target.value) || 0 })}
-                    className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800"
+                    className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm"
                     min="0"
                   />
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -672,7 +672,7 @@ export default function IncidentsPage() {
                     type="number"
                     value={formData.pointsToDeduct}
                     onChange={(e) => setFormData({ ...formData, pointsToDeduct: parseInt(e.target.value) || 0 })}
-                    className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800"
+                    className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm"
                     min="1"
                   />
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -687,7 +687,7 @@ export default function IncidentsPage() {
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800"
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm"
                     rows={4}
                     placeholder="Describe the incident..."
                   />
@@ -701,7 +701,7 @@ export default function IncidentsPage() {
                     type="text"
                     value={formData.reportedBy}
                     onChange={(e) => setFormData({ ...formData, reportedBy: e.target.value })}
-                    className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800"
+                    className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm"
                     placeholder="Your name"
                   />
                 </div>
@@ -709,7 +709,7 @@ export default function IncidentsPage() {
                 <div className="flex gap-3 pt-4">
                   <button
                     onClick={handleSaveIncident}
-                    className="flex-1 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-all font-medium"
+                    className="flex-1 px-4 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors text-sm font-medium"
                   >
                     {editingIncident ? 'Update' : 'Add'} Incident
                   </button>
@@ -718,7 +718,7 @@ export default function IncidentsPage() {
                       setShowForm(false);
                       setEditingIncident(null);
                     }}
-                    className="px-4 py-2.5 bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-all font-medium"
+                    className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm"
                   >
                     Cancel
                   </button>

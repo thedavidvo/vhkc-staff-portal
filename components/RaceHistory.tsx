@@ -2,25 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Race, Division } from '@/types';
-import { Calendar, MapPin, Trophy, Clock, Medal, Award } from 'lucide-react';
-
-// Helper function to get division color
-const getDivisionColor = (division: Division) => {
-  switch (division) {
-    case 'Division 1':
-      return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
-    case 'Division 2':
-      return 'bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200';
-    case 'Division 3':
-      return 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200';
-    case 'Division 4':
-      return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
-    case 'New':
-      return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
-    default:
-      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
-  }
-};
+import { MapPin, Trophy, Medal, Award } from 'lucide-react';
 
 interface RaceHistoryProps {
   races: Race[];
@@ -225,196 +207,137 @@ export default function RaceHistory({ races, drivers = [], points = [], rounds =
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* Panel 1: Race List */}
-      <div className="lg:col-span-1">
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden h-full flex flex-col">
-          <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-              Races
-            </h3>
-          </div>
-          <div className="overflow-y-auto flex-1">
-            {sortedRaces.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 dark:text-slate-400">
-                No races available.
-              </div>
-            ) : (
-              <div>
-                {sortedRaces.map((race, index) => (
-                  <div
-                    key={race.id}
-                    onClick={() => {
-                      setSelectedRaceId(race.id);
-                      // Set default division to Division 1 if available, otherwise first available
-                      const divisions = race.results?.map((r) => r.division) || [];
-                      if (divisions.includes('Division 1')) {
-                        setSelectedDivision('Division 1');
-                      } else if (divisions.length > 0) {
-                        setSelectedDivision(divisions[0]);
-                      }
-                    }}
-                    className={`p-4 cursor-pointer transition-all ${
-                      index > 0 ? 'border-t border-slate-200 dark:border-slate-700' : ''
-                    } ${
-                      selectedRaceId === race.id
-                        ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500 !border-l-blue-500'
-                        : 'hover:bg-slate-50 dark:hover:bg-slate-800'
-                    }`}
-                    style={
-                      selectedRaceId === race.id
-                        ? { borderLeftWidth: '4px', borderLeftColor: '#3b82f6' }
-                        : undefined
+      <div className="flex flex-col border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden">
+        <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+          <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Rounds</h3>
+        </div>
+        <div className="overflow-y-auto flex-1" style={{ maxHeight: '420px' }}>
+          {sortedRaces.length === 0 ? (
+            <div className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+              No races available.
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {sortedRaces.map((race) => (
+                <div
+                  key={race.id}
+                  onClick={() => {
+                    setSelectedRaceId(race.id);
+                    const divisions = race.results?.map((r) => r.division) || [];
+                    if (divisions.includes('Division 1')) {
+                      setSelectedDivision('Division 1');
+                    } else if (divisions.length > 0) {
+                      setSelectedDivision(divisions[0]);
                     }
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <h4 className="font-semibold text-slate-900 dark:text-white">
-                        Round {race.round || race.roundNumber || 'N/A'}
-                      </h4>
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
-                        race.status === 'completed' 
-                          ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
-                          : race.status === 'upcoming'
-                          ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
-                          : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
-                      }`}>
-                        {race.status.charAt(0).toUpperCase() + race.status.slice(1).toLowerCase()}
-                      </span>
-                    </div>
-                    <div className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        <span>{race.season} • Round {race.round}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4" />
-                        <span>{race.location}</span>
-                      </div>
-                      <div className="text-xs">
-                        {new Date(race.date).toLocaleDateString()}
-                      </div>
-                    </div>
+                  }}
+                  className={`px-3 py-3 cursor-pointer transition-colors ${
+                    selectedRaceId === race.id
+                      ? 'bg-slate-900 dark:bg-slate-100'
+                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-sm font-semibold ${
+                      selectedRaceId === race.id ? 'text-white dark:text-slate-900' : 'text-slate-900 dark:text-white'
+                    }`}>
+                      Round {race.round || race.roundNumber || 'N/A'}
+                    </span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                      race.status === 'completed'
+                        ? selectedRaceId === race.id ? 'bg-white/20 text-white dark:bg-slate-900/20 dark:text-slate-900' : 'text-green-700 dark:text-green-400'
+                        : selectedRaceId === race.id ? 'bg-white/20 text-white dark:bg-slate-900/20 dark:text-slate-900' : 'text-slate-500 dark:text-slate-400'
+                    }`}>
+                      {race.status.charAt(0).toUpperCase() + race.status.slice(1)}
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  <div className={`flex items-center gap-1.5 text-xs ${
+                    selectedRaceId === race.id ? 'text-white/70 dark:text-slate-900/60' : 'text-slate-500 dark:text-slate-400'
+                  }`}>
+                    <MapPin className="w-3 h-3" />
+                    <span>{race.location || 'TBD'}</span>
+                    {race.date && (
+                      <>
+                        <span>·</span>
+                        <span>{new Date(race.date).toLocaleDateString()}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Panel 2: Standings with Division Filter */}
-      <div className="lg:col-span-1">
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden h-full flex flex-col">
-          <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-            <div className="mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                  Round Results
-                </h3>
-                {selectedRace && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    {selectedRace.name} • Round {selectedRace.round}
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {(['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'] as Division[]).map((division) => (
-                <button
-                  key={division}
-                  onClick={() => setSelectedDivision(division)}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    selectedDivision === division
-                      ? `${getDivisionColor(division)} ring-2 ring-offset-2 ring-slate-400 dark:ring-slate-600 shadow-md`
-                      : `${getDivisionColor(division)} opacity-60 hover:opacity-100`
-                  }`}
-                >
-                  {division}
-                </button>
-              ))}
-            </div>
+      <div className="flex flex-col border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden">
+        <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+              {selectedRace ? `Round ${selectedRace.round} Results` : 'Results'}
+            </h3>
           </div>
-          
-          <div className="overflow-y-auto flex-1" style={{ maxHeight: 'calc(100vh - 500px)', minHeight: '400px' }}>
-            {standings.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 dark:text-slate-400">
-                No drivers found in {selectedDivision}
-              </div>
-            ) : (
-              <div className="p-4">
-                {/* Podium - Top 3 */}
-                {standings.slice(0, 3).length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase mb-3">
-                      Podium
-                    </h4>
-                    <div className="space-y-2">
-                      {standings.slice(0, 3).map((driver) => (
-                        <div
-                          key={driver.id}
-                          className="flex items-center gap-3 p-3 bg-gradient-to-r from-slate-50 to-white dark:from-slate-800 dark:to-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
-                        >
-                          <div className="flex items-center gap-2">
-                            {getRankIcon(driver.position)}
-                            <span className="text-lg font-bold text-slate-900 dark:text-white">
-                              {driver.position}
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                              {driver.name}
-                            </div>
-                            {driver.teamName && (
-                              <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                                {driver.teamName}
-                              </div>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                              {Math.round(driver.totalPoints)}
-                            </div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400">
-                              pts
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {(['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'] as Division[]).map((division) => (
+              <button
+                key={division}
+                onClick={() => setSelectedDivision(division)}
+                className={`px-2 py-1 rounded text-xs font-medium transition-colors border ${
+                  selectedDivision === division
+                    ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100'
+                    : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                {division}
+              </button>
+            ))}
+          </div>
+        </div>
 
-                {/* Remaining Drivers */}
-                {standings.slice(3).length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase mb-3">
-                      Other Finishers
-                    </h4>
-                    <div className="space-y-1">
-                      {standings.slice(3).map((driver) => (
-                        <div
-                          key={driver.id}
-                          className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded transition-colors"
-                        >
-                          <span className="text-sm font-semibold text-slate-600 dark:text-slate-400 w-8">
-                            {driver.position}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm text-slate-900 dark:text-white truncate">
-                              {driver.name}
-                            </div>
-                          </div>
-                          <div className="text-sm font-medium text-slate-600 dark:text-slate-400">
-                            {Math.round(driver.totalPoints)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+        <div className="overflow-y-auto flex-1" style={{ maxHeight: '370px' }}>
+          {standings.length === 0 ? (
+            <div className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+              No results for {selectedDivision}
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-slate-50 dark:bg-slate-800/50 sticky top-0">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase w-10">Pos</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Driver</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Pts</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {standings.map((driver) => (
+                  <tr key={driver.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-1">
+                        {getRankIcon(driver.position)}
+                        {driver.position > 3 && (
+                          <span className="text-xs text-slate-500 dark:text-slate-400 w-4">{driver.position}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className={`text-sm font-medium ${
+                        driver.position <= 3 ? 'text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300'
+                      }`}>
+                        {driver.name}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {Math.round(driver.totalPoints)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
