@@ -38,6 +38,14 @@ interface AggregatedRow {
   orderDate: string;
 }
 
+interface PreviewChange {
+  driverName: string;
+  isNew: boolean;
+  action: 'create' | 'update';
+  paymentStatus: ImportPaymentStatus;
+  currentPaymentStatus: string | null;
+}
+
 const REQUIRED_COLUMNS = ['guest first name', 'guest last name', 'payment status'];
 
 function normalizeHeader(header: string): string {
@@ -239,6 +247,32 @@ export async function POST(request: NextRequest) {
 
     const existingPayments = await getPaymentsByRound(roundId);
     const paymentByDriver = new Map(existingPayments.map((payment) => [payment.driverId, payment]));
+
+    // Preview mode: return what would change without writing to the database
+    const isPreview = String(formData.get('preview') || '').toLowerCase() === 'true';
+    if (isPreview) {
+      const changes: PreviewChange[] = [];
+      for (const row of Array.from(aggregated.values())) {
+        const fullName = `${row.firstName} ${row.lastName}`.trim();
+        const normalizedEmail = row.email.toLowerCase();
+        let driver = normalizedEmail ? driverByEmail.get(normalizedEmail) : undefined;
+        if (!driver && fullName) driver = driverByName.get(fullName.toLowerCase());
+        const existingPayment = driver ? paymentByDriver.get(driver.id) : undefined;
+        changes.push({
+          driverName: fullName || row.email || 'Unknown',
+          isNew: !driver,
+          action: existingPayment ? 'update' : 'create',
+          paymentStatus: row.paymentStatus,
+          currentPaymentStatus: existingPayment?.status ?? null,
+        });
+      }
+      return NextResponse.json({
+        preview: true,
+        changes,
+        totalRows: parsedRows.length - 1,
+        skippedRows,
+      });
+    }
 
     let createdDrivers = 0;
     let createdPayments = 0;
