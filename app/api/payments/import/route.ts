@@ -148,8 +148,8 @@ function parseCsvWithDelimiter(content: string, delimiter: string): string[][] {
 }
 
 function parseCsv(rawContent: string): string[][] {
-  // Strip UTF-8 BOM and any leading null bytes / zero-width characters
-  const content = rawContent.replace(/^[\uFEFF\u0000\u200B]+/, '');
+  // Strip any residual BOM or zero-width characters after decode
+  const content = rawContent.replace(/^[\uFEFF\u0000\u200B\uFFFD]+/, '');
 
   // Try delimiters in priority order; pick the one where the header row contains
   // the most required column matches, falling back to tab if tied.
@@ -179,6 +179,23 @@ function buildDriverKey(firstName: string, lastName: string, email: string): str
   return `name:${`${firstName} ${lastName}`.trim().toLowerCase()}`;
 }
 
+function decodeFileBuffer(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  // UTF-16 LE BOM: FF FE
+  if (bytes[0] === 0xFF && bytes[1] === 0xFE) {
+    return new TextDecoder('utf-16le').decode(buffer);
+  }
+  // UTF-16 BE BOM: FE FF
+  if (bytes[0] === 0xFE && bytes[1] === 0xFF) {
+    return new TextDecoder('utf-16be').decode(buffer);
+  }
+  // UTF-8 BOM: EF BB BF
+  if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
+    return new TextDecoder('utf-8').decode(buffer.slice(3));
+  }
+  return new TextDecoder('utf-8').decode(buffer);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -194,8 +211,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'A CSV file is required' }, { status: 400 });
     }
 
-    const csvText = await csvFile.text();
+    const csvBuffer = await csvFile.arrayBuffer();
+    const csvText = decodeFileBuffer(csvBuffer);
+    console.log('[import] raw start:', JSON.stringify(csvText.slice(0, 100)));
     const parsedRows = parseCsv(csvText);
+    console.log('[import] parsed rows:', parsedRows.length, '| first row:', parsedRows[0]);
 
     if (parsedRows.length < 2) {
       return NextResponse.json({ error: 'CSV file has no data rows' }, { status: 400 });

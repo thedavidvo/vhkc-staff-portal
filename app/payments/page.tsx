@@ -230,12 +230,12 @@ export default function PaymentsPage() {
   const stats = useMemo(() => {
     const paidCount = Object.values(paymentsByDriver).filter((payment) => payment.status === 'paid').length;
     const pendingCount = Math.max(0, drivers.length - paidCount);
-    const totalAmount = Object.values(paymentsByDriver).reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+    const totalAmountAud = Object.values(paymentsByDriver).reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
 
     return {
       paidCount,
       pendingCount,
-      totalAmount,
+      totalAmountAud,
     };
   }, [paymentsByDriver, drivers.length]);
 
@@ -353,7 +353,10 @@ export default function PaymentsPage() {
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.error || 'Failed to preview CSV.');
+        const cols = Array.isArray(data?.foundColumns) && data.foundColumns.length
+          ? `\nParsed columns: ${data.foundColumns.join(' | ')}`
+          : '';
+        throw new Error((data?.error || 'Failed to preview CSV.') + cols);
       }
 
       setImportPreview(data);
@@ -447,9 +450,9 @@ export default function PaymentsPage() {
     );
   }
 
-  const currency = new Intl.NumberFormat('en-HK', {
+  const currency = new Intl.NumberFormat('en-AU', {
     style: 'currency',
-    currency: 'HKD',
+    currency: 'AUD',
     minimumFractionDigits: 2,
   });
 
@@ -469,8 +472,8 @@ export default function PaymentsPage() {
           <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.pendingCount}</p>
         </SectionCard>
         <SectionCard className="py-4">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Total Recorded</p>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white">{currency.format(stats.totalAmount)}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Total Recorded (AUD)</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white">{currency.format(stats.totalAmountAud)}</p>
         </SectionCard>
       </div>
 
