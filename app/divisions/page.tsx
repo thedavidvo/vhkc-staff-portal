@@ -818,19 +818,19 @@ export default function DivisionsPage() {
                 <button
                   key={division}
                   onClick={() => setDivisionFilter(isSelected ? 'all' : division)}
-                  className={`p-6 rounded-2xl transition-all duration-300 hover:scale-105 ${
+                  className={`p-4 rounded-md border transition-colors ${
                     isSelected
-                      ? `bg-gradient-to-br ${getDivisionGradient(division)} text-white shadow-lg ring-4 ring-white dark:ring-slate-800`
-                      : 'glass shadow-modern hover:shadow-modern-lg'
+                      ? 'border-slate-900 dark:border-slate-100 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className={`text-sm font-bold uppercase tracking-wider ${isSelected ? 'text-white/90' : 'text-slate-600 dark:text-slate-400'}`}>
+                    <h3 className={`text-sm font-bold uppercase tracking-wider ${isSelected ? 'text-white/90 dark:text-slate-900/80' : 'text-slate-600 dark:text-slate-400'}`}>
                       {division}
                     </h3>
-                    <Users className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-slate-400'}`} />
+                    <Users className={`w-4 h-4 ${isSelected ? 'text-white dark:text-slate-900' : 'text-slate-400'}`} />
                   </div>
-                  <p className={`text-3xl font-black ${isSelected ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
+                  <p className={`text-3xl font-black ${isSelected ? 'text-white dark:text-slate-900' : 'text-slate-900 dark:text-white'}`}>
                     {driversByDivision[division]?.length || 0}
                   </p>
                 </button>
@@ -847,19 +847,19 @@ export default function DivisionsPage() {
         >
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search driver by name"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 transition-colors"
               />
             </div>
             <select
               value={divisionFilter}
               onChange={(e) => setDivisionFilter(e.target.value as Division | 'all')}
-              className="px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all min-w-[180px]"
+              className="px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30 transition-colors min-w-[180px]"
             >
               <option value="all">All Divisions</option>
               <option value="Division 1">Division 1</option>
@@ -888,7 +888,7 @@ export default function DivisionsPage() {
                   {selectedDriverIds.size > 0 && (
                     <button
                       onClick={handleBulkEdit}
-                      className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors"
                     >
                       <Edit2 className="w-4 h-4" />
                       Bulk Edit
@@ -929,7 +929,7 @@ export default function DivisionsPage() {
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-slate-800">
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-slate-900">
                       {filteredDrivers.length === 0 ? (
                         <tr>
                           <td colSpan={5} className="px-6 py-12 text-center">

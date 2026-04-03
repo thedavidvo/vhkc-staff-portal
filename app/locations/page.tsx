@@ -170,9 +170,9 @@ export default function LocationsPage() {
         headerActions={
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift"
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4" />
             Add Location
           </button>
         }
@@ -190,7 +190,7 @@ export default function LocationsPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search locations by name or address..."
-              className="w-full px-4 py-2.5 pl-10 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+              className="w-full px-4 py-2 pl-9 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500/50 transition-colors"
             />
           </div>
         </SectionCard>
@@ -206,7 +206,7 @@ export default function LocationsPage() {
               {!searchQuery && (
                 <button
                   onClick={() => setIsAddModalOpen(true)}
-                  className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                  className="mt-4 px-3 py-1.5 text-sm bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors"
                 >
                   Add Your First Location
                 </button>
@@ -237,13 +237,13 @@ export default function LocationsPage() {
                                 type="text"
                                 value={editingLocation.name}
                                 onChange={(e) => setEditingLocation({ ...editingLocation, name: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary font-semibold"
+                                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30 font-semibold"
                                 autoFocus
                               />
                               <textarea
                                 value={editingLocation.address}
                                 onChange={(e) => setEditingLocation({ ...editingLocation, address: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary text-sm min-h-[80px]"
+                                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30 text-sm min-h-[80px]"
                                 placeholder="Address (optional)"
                               />
                             </div>
@@ -265,7 +265,7 @@ export default function LocationsPage() {
                             <button
                               onClick={handleUpdateLocation}
                               disabled={saving}
-                              className="p-2 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                              className="p-2 rounded-md hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
                               aria-label="Save"
                             >
                               <Save className="w-4 h-4 text-green-600 dark:text-green-400" />
@@ -273,7 +273,7 @@ export default function LocationsPage() {
                             <button
                               onClick={() => setEditingLocation(null)}
                               disabled={saving}
-                              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                               aria-label="Cancel"
                             >
                               <X className="w-4 h-4 text-slate-600 dark:text-slate-400" />
@@ -283,14 +283,14 @@ export default function LocationsPage() {
                           <>
                             <button
                               onClick={() => setEditingLocation({ ...location })}
-                              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                               aria-label="Edit location"
                             >
                               <Edit className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                             </button>
                             <button
                               onClick={() => handleDeleteLocation(location.id)}
-                              className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                              className="p-2 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
                               aria-label="Delete location"
                             >
                               <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
@@ -325,7 +325,7 @@ export default function LocationsPage() {
                 setIsAddModalOpen(false);
                 setNewLocation({ name: '', address: '' });
               }}
-              className="flex-1 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium"
+              className="flex-1 px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
               Cancel
             </button>
@@ -333,7 +333,7 @@ export default function LocationsPage() {
               type="submit"
               form="add-location-form"
               disabled={saving}
-              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-1.5 text-sm bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? (
                 <>
@@ -367,7 +367,7 @@ export default function LocationsPage() {
                   required
                   value={newLocation.name}
                   onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })}
-                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                  className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500/50 transition-colors"
                   placeholder="e.g., VHKC Main Track"
                 />
               </div>
@@ -379,7 +379,7 @@ export default function LocationsPage() {
                 <textarea
                   value={newLocation.address}
                   onChange={(e) => setNewLocation({ ...newLocation, address: e.target.value })}
-                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all min-h-[100px]"
+                  className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500/50 transition-colors min-h-[100px]"
                   placeholder="123 Racing Blvd, City, State 12345"
                 />
               </div>
@@ -388,4 +388,5 @@ export default function LocationsPage() {
     </>
   );
 }
+
 

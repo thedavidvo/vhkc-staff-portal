@@ -377,20 +377,20 @@ export default function Dashboard() {
 
       {/* Next Upcoming Race */}
       {nextUpcomingRace ? (
-        <div className="mb-8 bg-gradient-to-br from-primary-500 via-primary-600 to-blue-600 rounded-3xl shadow-modern-2xl border border-primary-400/20 overflow-hidden relative hover-lift animate-fadeIn">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl animate-float"></div>
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full -ml-24 -mb-24 blur-2xl animate-float" style={{ animationDelay: '1s' }}></div>
-          <div className="p-8 text-white relative z-10">
-            <div className="flex items-center gap-3 mb-4">
-              <Flag className="w-6 h-6" />
-              <h2 className="text-2xl font-bold">Next Upcoming Race</h2>
+        <div className="mb-8 bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 rounded-full -mr-32 -mt-32"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 rounded-full -ml-24 -mb-24"></div>
+          <div className="p-6 relative z-10">
+              <div className="flex items-center gap-3 mb-4">
+              <Flag className="w-6 h-6 text-slate-700 dark:text-slate-300" />
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Next Upcoming Race</h2>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="flex items-start gap-3">
-                <Calendar className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                <Calendar className="w-4 h-4 mt-0.5 flex-shrink-0 text-slate-500 dark:text-slate-400" />
                 <div>
-                  <p className="text-sm opacity-90 mb-1">Date</p>
-                  <p className="font-semibold">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5">Date</p>
+                  <p className="font-semibold text-slate-900 dark:text-white">
                     {new Date(nextUpcomingRace.date).toLocaleDateString('en-US', {
                       weekday: 'long',
                       year: 'numeric',
@@ -401,19 +401,19 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <Flag className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                <Flag className="w-4 h-4 mt-0.5 flex-shrink-0 text-slate-500 dark:text-slate-400" />
                 <div>
-                  <p className="text-sm opacity-90 mb-1">Race</p>
-                  <p className="font-semibold">{nextUpcomingRace.name}</p>
-                  <p className="text-sm opacity-90">{nextUpcomingRace.season} • Round {nextUpcomingRace.round}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5">Race</p>
+                  <p className="font-semibold text-slate-900 dark:text-white">{nextUpcomingRace.name}</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">{nextUpcomingRace.season} • Round {nextUpcomingRace.round}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <MapPin className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-slate-500 dark:text-slate-400" />
                 <div>
-                  <p className="text-sm opacity-90 mb-1">Location</p>
-                  <p className="font-semibold">{nextUpcomingRace.location}</p>
-                  <p className="text-sm opacity-90">{nextUpcomingRace.address}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5">Location</p>
+                  <p className="font-semibold text-slate-900 dark:text-white">{nextUpcomingRace.location}</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">{nextUpcomingRace.address}</p>
                 </div>
               </div>
             </div>
@@ -450,7 +450,7 @@ export default function Dashboard() {
                   return (
                     <div
                       key={division}
-                      className="p-4 bg-slate-50/50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-all duration-200"
+                      className="p-3 bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                     >
                       <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
                         <span className={`px-2 py-1 rounded-lg text-xs ${getDivisionColor(division)}`}>
@@ -502,10 +502,10 @@ export default function Dashboard() {
                   <button
                     key={division}
                     onClick={() => setSelectedStandingsDivision(division)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors border ${
                       selectedStandingsDivision === division
-                        ? `${getDivisionColor(division)} ring-2 ring-offset-2 ring-slate-400 dark:ring-slate-600 shadow-md`
-                        : `${getDivisionColor(division)} opacity-60 hover:opacity-100`
+                        ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100'
+                        : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                     }`}
                   >
                     {division}

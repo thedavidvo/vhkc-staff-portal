@@ -377,7 +377,7 @@ export default function PaymentsPage() {
               <select
                 value={selectedRound}
                 onChange={(event) => setSelectedRound(event.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
               >
                 {rounds.length === 0 && <option value="">No rounds available</option>}
                 {rounds.map((round) => (
@@ -393,7 +393,7 @@ export default function PaymentsPage() {
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as 'all' | PaymentStatus)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
               >
                 <option value="all">All</option>
                 <option value="paid">Paid</option>
@@ -410,7 +410,7 @@ export default function PaymentsPage() {
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Name or alias"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
               />
             </div>
           </div>
@@ -477,14 +477,14 @@ export default function PaymentsPage() {
                             step="0.01"
                             value={draft.amount}
                             onChange={(event) => updateDraft(driver.id, 'amount', event.target.value)}
-                            className="w-28 px-2 py-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
+                            className="w-28 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                           />
                         </td>
                         <td className="py-3 pr-3">
                           <select
                             value={draft.status}
                             onChange={(event) => updateDraft(driver.id, 'status', event.target.value)}
-                            className={`px-2 py-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 ${getStatusStyle(draft.status)}`}
+                            className={`px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 ${getStatusStyle(draft.status)}`}
                           >
                             <option value="paid">Paid</option>
                             <option value="pending">Pending</option>
@@ -498,7 +498,7 @@ export default function PaymentsPage() {
                             value={draft.paymentMethod}
                             onChange={(event) => updateDraft(driver.id, 'paymentMethod', event.target.value)}
                             placeholder="cash / transfer"
-                            className="w-36 px-2 py-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
+                            className="w-36 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                           />
                         </td>
                         <td className="py-3 pr-3">
@@ -507,7 +507,7 @@ export default function PaymentsPage() {
                             value={draft.notes}
                             onChange={(event) => updateDraft(driver.id, 'notes', event.target.value)}
                             placeholder="Optional"
-                            className="w-48 px-2 py-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
+                            className="w-48 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                           />
                         </td>
                         <td className="py-3 pr-3">
@@ -515,7 +515,7 @@ export default function PaymentsPage() {
                             <button
                               onClick={() => handleSavePayment(driver.id)}
                               disabled={isSaving}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-60"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-700 dark:hover:bg-slate-200 disabled:opacity-60 transition-colors"
                             >
                               {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                               {existingPayment ? 'Update' : 'Save'}
@@ -525,7 +525,7 @@ export default function PaymentsPage() {
                               <button
                                 onClick={() => handleDeletePayment(existingPayment.id)}
                                 disabled={isDeleting}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-red-600 hover:bg-red-700 text-white disabled:opacity-60"
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-red-200 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-60 transition-colors"
                               >
                                 {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                                 Delete
@@ -558,3 +558,4 @@ export default function PaymentsPage() {
     </PageLayout>
   );
 }
+

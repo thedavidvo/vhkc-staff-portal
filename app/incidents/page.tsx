@@ -387,9 +387,9 @@ export default function IncidentsPage() {
               reportedBy: '',
             });
           }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all font-medium shadow-lg hover:shadow-xl"
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-4 h-4" />
           Add Incident
         </button>
       }
@@ -399,13 +399,13 @@ export default function IncidentsPage() {
             {/* Search */}
             <div className="mb-6">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Search drivers..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800"
+                  className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 transition-colors"
                 />
               </div>
             </div>
@@ -416,12 +416,12 @@ export default function IncidentsPage() {
                 <li
                   key={driver.id}
                   onClick={() => handleOpenHistoryModal(driver)}
-                  className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                  className={`p-3 rounded-md border cursor-pointer transition-colors ${
                     driver.license?.isSuspended
                       ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/20'
                       : driver.license?.activePoints >= 5
                       ? 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/20'
-                      : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
@@ -498,7 +498,7 @@ export default function IncidentsPage() {
                       return (
                         <div
                           key={incident.id}
-                          className={`p-3 rounded-lg border-2 ${
+                          className={`p-3 rounded-md border ${
                             incident.confirmed
                               ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800'
                               : 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800'
@@ -544,7 +544,7 @@ export default function IncidentsPage() {
                                       e.stopPropagation();
                                       handleConfirmIncident(incident);
                                     }}
-                                    className="p-1.5 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                    className="p-1.5 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/20 rounded-md transition-colors"
                                     title="Confirm"
                                   >
                                     <CheckCircle className="w-4 h-4" />
@@ -554,7 +554,7 @@ export default function IncidentsPage() {
                                       e.stopPropagation();
                                       handleEditIncident(incident);
                                     }}
-                                    className="p-1.5 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                    className="p-1.5 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-md transition-colors"
                                     title="Edit"
                                   >
                                     <Edit className="w-4 h-4" />
@@ -566,7 +566,7 @@ export default function IncidentsPage() {
                                   e.stopPropagation();
                                   handleDeleteIncident(incident.id);
                                 }}
-                                className="p-1.5 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                className="p-1.5 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-md transition-colors"
                                 title="Delete"
                               >
                                 <Trash className="w-4 h-4" />
