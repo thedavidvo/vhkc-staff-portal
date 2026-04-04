@@ -1,6 +1,6 @@
 'use client';
 
-import { X, Plus, Trash2, Edit2, Calendar, Save } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Season, Round } from '@/types';
 import Modal from '@/components/Modal';
@@ -225,24 +225,21 @@ export default function EditSeasonModal({
       isOpen={isOpen}
       onClose={onClose}
       title="Edit Season"
-      subtitle={`Manage ${season.name} details and rounds`}
-      icon={Calendar}
-      size="full"
+      size="lg"
       footer={
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium"
+            className="flex-1 px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleSave}
-            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift flex items-center justify-center gap-2"
+            className="flex-1 px-3 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md text-sm hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors"
           >
-            <Save className="w-4 h-4" />
             Save Season
           </button>
         </div>
@@ -250,120 +247,108 @@ export default function EditSeasonModal({
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Side - Season Details */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
             Season Details
           </h3>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Season Name
-                </label>
-                <input
-                  type="text"
-                  value={currentSeason.name}
-                  onChange={(e) => handleSeasonUpdate('name', e.target.value)}
-                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-                />
-              </div>
 
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Start Date <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">(optional)</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={currentSeason.startDate}
-                    onChange={(e) => handleSeasonUpdate('startDate', e.target.value)}
-                    className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-                  />
-                </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+              Season Name
+            </label>
+            <input
+              type="text"
+              value={currentSeason.name}
+              onChange={(e) => handleSeasonUpdate('name', e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 transition-all"
+            />
+          </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    End Date <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">(optional)</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={currentSeason.endDate}
-                    onChange={(e) => handleSeasonUpdate('endDate', e.target.value)}
-                    className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-                  />
-                </div>
-              </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                Start Date <span className="text-slate-400 font-normal">(optional)</span>
+              </label>
+              <input
+                type="date"
+                value={currentSeason.startDate}
+                onChange={(e) => handleSeasonUpdate('startDate', e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                End Date <span className="text-slate-400 font-normal">(optional)</span>
+              </label>
+              <input
+                type="date"
+                value={currentSeason.endDate}
+                onChange={(e) => handleSeasonUpdate('endDate', e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 transition-all"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Right Side - Rounds Section */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
               Rounds ({sortedRounds.length})
             </h3>
             <button
               onClick={handleAddRound}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" />
               Add Round
             </button>
           </div>
 
-            {sortedRounds.length === 0 ? (
-              <div className="text-center py-8 text-slate-500 dark:text-slate-400 flex-1 flex items-center justify-center">
-                No rounds added yet. Click "Add Round" to create one.
-              </div>
-            ) : (
-              <div className="space-y-2 flex-1">
-                {sortedRounds.map((round) => (
-                  <div
-                    key={round.id}
-                    className="flex items-center justify-between p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/50"
-                  >
-                    <div className="flex-1">
-                      <div className="font-medium text-slate-900 dark:text-white">
-                        Round {round.roundNumber}
-                      </div>
-                      <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                        {(() => {
-                          const parts = [];
-                          // Location
-                          const locationName = round.location && round.location.trim() 
-                            ? round.location.trim() 
-                            : 'No Location';
-                          parts.push(locationName);
-                          // Date
-                          if (round.date) {
-                            parts.push(new Date(round.date).toLocaleDateString());
-                          } else {
-                            parts.push('No Date');
-                          }
-                          // Status
-                          parts.push(round.status.charAt(0).toUpperCase() + round.status.slice(1).toLowerCase());
-                          return parts.join(' • ');
-                        })()}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEditRound(round)}
-                        className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
-                        aria-label="Edit round"
-                      >
-                        <Edit2 className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteRound(round.id)}
-                        className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-                        aria-label="Delete round"
-                      >
-                        <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
-                      </button>
-                    </div>
+          {sortedRounds.length === 0 ? (
+            <div className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+              No rounds yet. Click "Add Round" to create one.
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {sortedRounds.map((round) => (
+                <div
+                  key={round.id}
+                  className="flex items-center justify-between px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-slate-50 dark:bg-slate-800/50"
+                >
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium text-slate-900 dark:text-white">Round {round.roundNumber}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">
+                      {(() => {
+                        const parts = [];
+                        const locationName = round.location && round.location.trim() ? round.location.trim() : null;
+                        if (locationName) parts.push(locationName);
+                        if (round.date) parts.push(new Date(round.date).toLocaleDateString());
+                        parts.push(round.status.charAt(0).toUpperCase() + round.status.slice(1).toLowerCase());
+                        return parts.join(' · ');
+                      })()}
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => handleEditRound(round)}
+                      className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                      aria-label="Edit round"
+                    >
+                      <Edit2 className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteRound(round.id)}
+                      className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                      aria-label="Delete round"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -457,182 +442,168 @@ function RoundForm({ round, locations, onSave, onCancel, onLocationAdded, isEdit
       isOpen={true}
       onClose={onCancel}
       title={isEditing ? 'Edit Round' : 'Add Round'}
-      subtitle={isEditing ? 'Update round details' : 'Create a new round for this season'}
-      icon={Calendar}
-      size="md"
+      size="sm"
       footer={
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium"
+            className="flex-1 px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
             Cancel
           </button>
           <button
             type="submit"
             form="round-form"
-            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift flex items-center justify-center gap-2"
+            className="flex-1 px-3 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md text-sm hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors"
           >
-            <Save className="w-4 h-4" />
             Save Round
           </button>
         </div>
       }
     >
-      <form id="round-form" onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Round Number
-            </label>
-            <input
-              type="number"
-              required
-              min="1"
-              value={formData.roundNumber}
-              onChange={(e) => setFormData({ ...formData, roundNumber: parseInt(e.target.value) || 1 })}
-              className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-            />
-          </div>
+      <form id="round-form" onSubmit={handleSubmit} className="space-y-3">
+        <div>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+            Round Number
+          </label>
+          <input
+            type="number"
+            required
+            min="1"
+            value={formData.roundNumber}
+            onChange={(e) => setFormData({ ...formData, roundNumber: parseInt(e.target.value) || 1 })}
+            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 transition-all"
+          />
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Date <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">(optional)</span>
-            </label>
-            <input
-              type="date"
-              value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-            />
-          </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+            Date <span className="text-slate-400 font-normal">(optional)</span>
+          </label>
+          <input
+            type="date"
+            value={formData.date}
+            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 transition-all"
+          />
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Location <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">(optional)</span>
-            </label>
-            {!showManualLocation ? (
-              <div className="space-y-2">
-                <select
-                  value={formData.locationId || ''}
-                  onChange={(e) => {
-                    if (e.target.value === '__manual__') {
-                      setShowManualLocation(true);
-                    } else {
-                      // Preserve locationId - use empty string as undefined, or the selected value
-                      const value = e.target.value;
-                      const newLocationId = value && value.trim() !== '' ? value : undefined;
-                      console.log('Location dropdown changed:', { value, newLocationId, currentFormData: formData.locationId });
-                      setFormData({ ...formData, locationId: newLocationId });
-                    }
-                  }}
-                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+        <div>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+            Location <span className="text-slate-400 font-normal">(optional)</span>
+          </label>
+          {!showManualLocation ? (
+            <div className="space-y-2">
+              <select
+                value={formData.locationId || ''}
+                onChange={(e) => {
+                  if (e.target.value === '__manual__') {
+                    setShowManualLocation(true);
+                  } else {
+                    const value = e.target.value;
+                    const newLocationId = value && value.trim() !== '' ? value : undefined;
+                    console.log('Location dropdown changed:', { value, newLocationId, currentFormData: formData.locationId });
+                    setFormData({ ...formData, locationId: newLocationId });
+                  }
+                }}
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 transition-all"
+              >
+                <option value="">Select a location (optional)</option>
+                {locations.length > 0 && locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}
+                  </option>
+                ))}
+                <option value="__manual__">+ Add New Location</option>
+              </select>
+              {locations.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowManualLocation(true)}
+                  className="w-full px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
-                  <option value="">Select a location (optional)</option>
-                  {locations.length > 0 && locations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.name}
-                    </option>
-                  ))}
-                  <option value="__manual__">+ Add New Location</option>
-                </select>
-                {locations.length === 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowManualLocation(true)}
-                    className="w-full px-4 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    + Add Location Manually
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  value={manualLocation}
-                  onChange={(e) => setManualLocation(e.target.value)}
-                  placeholder="Location name (optional)"
-                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-                />
-                <input
-                  type="text"
-                  value={manualAddress}
-                  onChange={(e) => setManualAddress(e.target.value)}
-                  placeholder="Address (optional)"
-                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-                />
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      let newLocationId: string | undefined;
-                      
-                      // If location is provided, add it to the locations list
-                      if (manualLocation.trim() && onLocationAdded) {
-                        try {
-                          await onLocationAdded(manualLocation.trim(), manualAddress.trim());
-                          // Fetch the newly added location to get its ID
-                          const response = await fetch('/api/locations');
-                          if (response.ok) {
-                            const locationsData = await response.json();
-                            const newLocation = locationsData.find((l: Location) => l.name === manualLocation.trim());
-                            if (newLocation) {
-                              newLocationId = newLocation.id;
-                            }
-                          }
-                        } catch (error) {
-                          console.error('Failed to add location:', error);
-                          alert('Failed to add location. Please try again.');
-                          return;
+                  + Add Location Manually
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={manualLocation}
+                onChange={(e) => setManualLocation(e.target.value)}
+                placeholder="Location name"
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 transition-all"
+              />
+              <input
+                type="text"
+                value={manualAddress}
+                onChange={(e) => setManualAddress(e.target.value)}
+                placeholder="Address (optional)"
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 transition-all"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    let newLocationId: string | undefined;
+                    if (manualLocation.trim() && onLocationAdded) {
+                      try {
+                        await onLocationAdded(manualLocation.trim(), manualAddress.trim());
+                        const response = await fetch('/api/locations');
+                        if (response.ok) {
+                          const locationsData = await response.json();
+                          const newLocation = locationsData.find((l: Location) => l.name === manualLocation.trim());
+                          if (newLocation) newLocationId = newLocation.id;
                         }
+                      } catch (error) {
+                        console.error('Failed to add location:', error);
+                        alert('Failed to add location. Please try again.');
+                        return;
                       }
-                      
-                      // Update form data with locationId
-                      setFormData({ 
-                        ...formData, 
-                        locationId: newLocationId || undefined
-                      });
-                      setShowManualLocation(false);
-                      setManualLocation('');
-                      setManualAddress('');
-                    }}
-                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-                  >
-                    Save Location
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowManualLocation(false);
-                      setManualLocation('');
-                      setManualAddress('');
-                    }}
-                    className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm font-medium"
-                  >
-                    Cancel
-                  </button>
-                </div>
+                    }
+                    setFormData({ ...formData, locationId: newLocationId || undefined });
+                    setShowManualLocation(false);
+                    setManualLocation('');
+                    setManualAddress('');
+                  }}
+                  className="flex-1 px-3 py-1.5 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md text-xs hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors"
+                >
+                  Save Location
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowManualLocation(false);
+                    setManualLocation('');
+                    setManualAddress('');
+                  }}
+                  className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-xs"
+                >
+                  Cancel
+                </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Status
-            </label>
-            <select
-              required
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as Round['status'] })}
-              className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-            >
-              <option value="upcoming">Upcoming</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
-        </form>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+            Status
+          </label>
+          <select
+            required
+            value={formData.status}
+            onChange={(e) => setFormData({ ...formData, status: e.target.value as Round['status'] })}
+            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 transition-all"
+          >
+            <option value="upcoming">Upcoming</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+      </form>
     </Modal>
   );
 }

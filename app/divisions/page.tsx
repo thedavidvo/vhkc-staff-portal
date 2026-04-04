@@ -875,7 +875,7 @@ export default function DivisionsPage() {
                               <span className={`px-2 py-0.5 text-xs font-medium rounded-md ${getDivisionColor(change.currentDivision)}`}>
                                 {change.currentDivision}
                               </span>
-                              <span className="text-slate-300 dark:text-slate-600 text-sm">-></span>
+                              <span className="text-slate-300 dark:text-slate-600 text-sm">{'->'}</span>
                               <span className={`px-2 py-0.5 text-xs font-medium rounded-md ${getDivisionColor(change.newDivision)}`}>
                                 {change.newDivision}
                               </span>
@@ -927,7 +927,7 @@ export default function DivisionsPage() {
                               <span className={`px-2 py-0.5 text-xs font-medium rounded-md ${getDivisionColor(change.currentDivision)}`}>
                                 {change.currentDivision}
                               </span>
-                              <span className="text-slate-300 dark:text-slate-600 text-sm">-></span>
+                              <span className="text-slate-300 dark:text-slate-600 text-sm">{'->'}</span>
                               <span className={`px-2 py-0.5 text-xs font-medium rounded-md ${getDivisionColor(change.newDivision)}`}>
                                 {change.newDivision}
                               </span>

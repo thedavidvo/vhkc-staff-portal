@@ -216,12 +216,12 @@ export default function SeasonPage() {
     return selectedSeason.rounds.sort((a, b) => a.roundNumber - b.roundNumber);
   }, [selectedSeason]);
 
-  // Keep the newest season first in the horizontal selector
+  // Sort seasons chronologically (oldest first)
   const sortedSeasons = useMemo(() => {
     return [...seasons].sort((a, b) => {
-      const aTime = a.startDate ? new Date(a.startDate).getTime() : 0;
-      const bTime = b.startDate ? new Date(b.startDate).getTime() : 0;
-      return bTime - aTime;
+      const aTime = a.startDate ? new Date(a.startDate).getTime() : Infinity;
+      const bTime = b.startDate ? new Date(b.startDate).getTime() : Infinity;
+      return aTime - bTime;
     });
   }, [seasons]);
 
@@ -325,15 +325,6 @@ export default function SeasonPage() {
               <SectionCard
                 title={`${selectedSeason.name} - Rounds`}
                 icon={Calendar}
-                actions={
-                  <button
-                    onClick={() => handleEditSeason(selectedSeason)}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                    Edit Season
-                  </button>
-                }
               >
                 {displayedRounds.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
