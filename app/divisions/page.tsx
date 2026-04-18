@@ -114,14 +114,7 @@ export default function DivisionsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [divisionFilter, setDivisionFilter] = useState<Division | 'all'>('all');
-  const [pendingChanges, setPendingChanges] = useState<PendingDivisionChange[]>([]);
-  const [pointsModalOpen, setPointsModalOpen] = useState(false);
-  const [selectedChange, setSelectedChange] = useState<PendingDivisionChange | null>(null);
   const [divisionChanges, setDivisionChanges] = useState<any[]>([]);
-  const [updatingDriverId, setUpdatingDriverId] = useState<string | null>(null);
-  const [showRoundSelectModal, setShowRoundSelectModal] = useState(false);
-  const [pendingDivisionUpdate, setPendingDivisionUpdate] = useState<{driverId: string, driverName: string, oldDivision: Division, newDivision: Division} | null>(null);
-  const [selectedRoundId, setSelectedRoundId] = useState<string>('');
   const [showDivisionChangeModal, setShowDivisionChangeModal] = useState(false);
   const [selectedDriverForChange, setSelectedDriverForChange] = useState<{id: string, name: string, currentDivision: Division} | null>(null);
   const [editingDivisionChange, setEditingDivisionChange] = useState<any | null>(null);
@@ -136,8 +129,7 @@ export default function DivisionsPage() {
   const [bulkEditDivisionStart, setBulkEditDivisionStart] = useState<Division | ''>('');
   const [bulkSaving, setBulkSaving] = useState(false);
   const [raceCountsByDriver, setRaceCountsByDriver] = useState<Record<string, number>>({});
-  const [overrideReason, setOverrideReason] = useState<string>('');
-  const [showOverrideWarning, setShowOverrideWarning] = useState(false);
+  const [updatingDriverId, setUpdatingDriverId] = useState<string | null>(null);
 
   // Fetch drivers from API
   useEffect(() => {
@@ -283,282 +275,26 @@ export default function DivisionsPage() {
     return filtered;
   }, [drivers, searchQuery, divisionFilter]);
 
-  const handleDivisionChange = (driverId: string, newDiv: Division, isCurrentDivision: boolean = false) => {
+  const handleDivisionChange = (driverId: string, newDiv: Division) => {
     const driver = drivers.find((d) => d.id === driverId);
     if (!driver) return;
 
-    // Don't add if the division is the same
-    if (driver.division === newDiv) {
-      // Remove from pending changes if it exists
-      setPendingChanges(pendingChanges.filter((p) => p.driverId !== driverId));
-      return;
-    }
+    // Don't proceed if division is the same
+    if (driver.division === newDiv) return;
 
-    // If changing current division directly, show round selection modal
-    if (isCurrentDivision) {
-      setPendingDivisionUpdate({
-        driverId,
-        driverName: driver.name,
-        oldDivision: driver.division,
-        newDivision: newDiv
-      });
-      // Set default based on division - if "New", default to pre-season; otherwise latest round
-      if (selectedSeason) {
-        const preSeasonRoundId = `pre-season-${selectedSeason.id}`;
-        const sortedRounds = [...rounds].sort((a, b) => (b.roundNumber || 0) - (a.roundNumber || 0));
-        const defaultRoundId = driver.division === 'New' && preSeasonRoundId 
-          ? preSeasonRoundId 
-          : (sortedRounds.length > 0 ? sortedRounds[0].id : preSeasonRoundId);
-        setSelectedRoundId(defaultRoundId);
-      } else {
-        const sortedRounds = [...rounds].sort((a, b) => (b.roundNumber || 0) - (a.roundNumber || 0));
-        setSelectedRoundId(sortedRounds.length > 0 ? sortedRounds[0].id : '');
-      }
-      setShowRoundSelectModal(true);
-      return;
-    }
-
-    // Determine if it's a promotion or demotion
-    // Use numeric order for consistency: New=5 (lowest), Division 1=1 (highest)
-    const divisionOrder: Partial<Record<Division, number>> = {
-      'Division 1': 1,  // Highest division
-      'Division 2': 2,
-      'Division 3': 3,
-      'Division 4': 4,
-      'New': 5,         // Lowest division (newest drivers)
-    };
-    const currentDivision = driver.division as Division;
-    const newDivision = newDiv as Division;
-    const currentOrder = divisionOrder[currentDivision] ?? 5;
-    const newOrder = divisionOrder[newDivision] ?? 5;
-    
-    // Determine type with special handling for "New" division
-    let type: 'promotion' | 'demotion';
-    if (currentDivision === 'New') {
-      // From New division
-      if (newDivision === 'Division 1' || newDivision === 'Division 2') {
-        type = 'promotion';
-      } else if (newDivision === 'Division 3') {
-        type = 'promotion'; // Treat as promotion for display purposes even though no points change
-      } else {
-        type = 'demotion'; // Division 4 from New
-      }
-    } else {
-      // Standard logic: Promotion = moving to a lower number (better division)
-      type = newOrder < currentOrder ? 'promotion' : 'demotion';
-    }
-
-    // Check if this driver already has a pending change
-    const existingIndex = pendingChanges.findIndex((p) => p.driverId === driverId);
-    
-    const change: PendingDivisionChange = {
-      driverId,
-      driverName: driver.name,
-      currentDivision: driver.division,
-      newDivision: newDiv,
-      type,
-    };
-    
-    if (existingIndex >= 0) {
-      // Update existing pending change
-      const updated = [...pendingChanges];
-      updated[existingIndex] = change;
-      setPendingChanges(updated);
-    } else {
-      // Add new pending change
-      setPendingChanges([...pendingChanges, change]);
-    }
+    // Open DivisionChangeModal directly
+    setSelectedDriverForChange({
+      id: driverId,
+      name: driver.name,
+      currentDivision: driver.division
+    });
+    setEditingDivisionChange(null);
+    setShowDivisionChangeModal(true);
   };
 
-  const handleCurrentDivisionChange = async () => {
-    if (!pendingDivisionUpdate || !selectedSeason || !selectedRoundId) {
-      if (!selectedRoundId) {
-        alert('Please select a round');
-      }
-      return;
-    }
-    
-    const roundId = selectedRoundId;
 
-    const { driverId, driverName, oldDivision, newDivision } = pendingDivisionUpdate;
 
-    try {
-      setUpdatingDriverId(driverId);
-
-      // Determine change type
-      // New is the lowest division (5), Division 1 is the highest (1)
-      // Moving from higher number to lower number = promotion
-      const divisionOrder: Partial<Record<Division, number>> = {
-        'Division 1': 1,  // Highest division
-        'Division 2': 2,
-        'Division 3': 3,
-        'Division 4': 4,
-        'New': 5,         // Lowest division (newest drivers)
-      };
-      const fromOrder = divisionOrder[oldDivision] ?? 5;
-      const toOrder = divisionOrder[newDivision] ?? 5;
-      
-      // Determine change type with special handling for "New" division
-      let changeType: 'promotion' | 'demotion';
-      if (oldDivision === 'New') {
-        // From New division
-        if (newDivision === 'Division 1' || newDivision === 'Division 2') {
-          changeType = 'promotion';
-        } else if (newDivision === 'Division 3') {
-          changeType = 'promotion'; // Treat as promotion for display purposes even though no points change
-        } else {
-          changeType = 'demotion'; // Division 4 from New
-        }
-      } else {
-        // Standard logic: Promotion = moving to a lower number (better division)
-        // Demotion = moving to a higher number (worse division)
-        changeType = toOrder < fromOrder ? 'promotion' : 'demotion';
-      }
-
-      // Fetch the driver
-      const driverResponse = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
-      if (!driverResponse.ok) throw new Error('Failed to fetch driver');
-      const driversData = await driverResponse.json();
-      const driver = driversData.find((d: any) => d.id === driverId);
-      if (!driver) throw new Error('Driver not found');
-
-      // Update driver division
-      const updatedDriver = {
-        ...driver,
-        division: newDivision,
-        lastUpdated: new Date().toISOString().split('T')[0],
-      };
-
-      const updateResponse = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedDriver),
-      });
-
-      if (!updateResponse.ok) {
-        throw new Error('Failed to update driver division');
-      }
-
-      // Create division change record
-      const changeId = `division-change-${driverId}-${Date.now()}`;
-      const divisionChange = {
-        id: changeId,
-        seasonId: selectedSeason.id,
-        roundId: roundId,
-        driverId: driverId,
-        driverName: driverName,
-        fromDivision: oldDivision,
-        toDivision: newDivision,
-        changeType: changeType,
-        createdAt: new Date().toISOString(),
-      };
-
-      const changeResponse = await fetch('/api/division-changes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(divisionChange),
-      });
-
-      if (!changeResponse.ok) {
-        console.warn('Failed to save division change record');
-      }
-
-      // Log to audit table if driver was locked
-      const raceCount = raceCountsByDriver[driverId] || 0;
-      const wasLocked = raceCount >= 2;
-      
-      if (wasLocked) {
-        const auditEntry = {
-          changeId: changeId,
-          driverId: driverId,
-          oldDivision: oldDivision,
-          newDivision: newDivision,
-          wasLocked: true,
-          raceCountAtChange: raceCount,
-          reason: overrideReason,
-          changedBy: 'Admin', // TODO: Get from auth context
-          changedAt: new Date().toISOString(),
-        };
-
-        try {
-          await fetch('/api/division-change-audit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(auditEntry),
-          });
-        } catch (auditError) {
-          console.error('Failed to log audit entry:', auditError);
-        }
-      }
-
-      // Clear override reason
-      setOverrideReason('');
-
-      // Refresh drivers and division changes
-      const refreshedDriversResponse = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
-      if (refreshedDriversResponse.ok) {
-        const refreshedDrivers = await refreshedDriversResponse.json();
-        setDrivers(refreshedDrivers);
-      }
-
-      // Refresh division changes
-      const refreshedChangesResponse = await fetch(`/api/division-changes?seasonId=${selectedSeason.id}`);
-      if (refreshedChangesResponse.ok) {
-        const refreshedChanges = await refreshedChangesResponse.json();
-        setDivisionChanges(refreshedChanges);
-      }
-
-      // Dispatch event to notify other components
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('vhkc:drivers-updated'));
-      }
-
-      // Remove from pending changes if exists
-      setPendingChanges(pendingChanges.filter((p) => p.driverId !== driverId));
-
-      setShowRoundSelectModal(false);
-      setPendingDivisionUpdate(null);
-      setSelectedRoundId('');
-    } catch (error) {
-      console.error('Failed to update current division:', error);
-      alert('Failed to update current division. Please try again.');
-    } finally {
-      setUpdatingDriverId(null);
-    }
-  };
-
-  const handleConfirmChange = (pendingChange: PendingDivisionChange) => {
-    if (!selectedSeason) return;
-    
-    // Open the modal to edit round points
-    setSelectedChange(pendingChange);
-    setPointsModalOpen(true);
-  };
-
-  const handleModalSave = async () => {
-    if (!selectedChange || !selectedSeason) return;
-
-    // Refresh drivers list
-    try {
-      const response = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setDrivers(data);
-      }
-    } catch (error) {
-      console.error('Failed to refresh drivers:', error);
-    }
-
-    // Remove from pending changes
-    setPendingChanges(pendingChanges.filter((p) => p.driverId !== selectedChange.driverId));
-    setSelectedChange(null);
-  };
-
-  const handleDeclineChange = (driverId: string) => {
-    // Remove from pending changes without updating
-    setPendingChanges(pendingChanges.filter((p) => p.driverId !== driverId));
-  };
-
+  // Bulk selection handlers
   const driversByDivision = useMemo(() => {
     const grouped: Partial<Record<Division, any[]>> = {
       'Division 1': [],
@@ -575,16 +311,6 @@ export default function DivisionsPage() {
     });
     return grouped;
   }, [drivers]);
-
-  const promotions = useMemo(() => {
-    return pendingChanges.filter((p) => p.type === 'promotion');
-  }, [pendingChanges]);
-
-  const demotions = useMemo(() => {
-    return pendingChanges.filter((p) => p.type === 'demotion');
-  }, [pendingChanges]);
-
-  // Bulk selection handlers
   const handleSelectDriver = (driverId: string) => {
     setSelectedDriverIds(prev => {
       const newSet = new Set(prev);
@@ -839,141 +565,6 @@ export default function DivisionsPage() {
           )}
         </div>
 
-        {/* Confirm Division Changes */}
-        <SectionCard
-          title="Confirm Division Changes"
-          icon={Sparkles}
-          actions={
-            pendingChanges.length > 0 && (
-              <span className="px-2 py-0.5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold rounded-md">
-                {pendingChanges.length}
-              </span>
-            )
-          }
-          className="mb-6"
-          noPadding
-        >
-          <div className="max-h-[380px] overflow-y-auto p-3">
-              {/* Promotions */}
-              {promotions.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2.5">
-                    Promotions ({promotions.length})
-                  </h3>
-                  <div className="space-y-2.5">
-                    {promotions.map((change) => (
-                      <div
-                        key={change.driverId}
-                        className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md transition-colors"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
-                                {change.driverName}
-                              </p>
-                              <span className={`px-2 py-0.5 text-xs font-medium rounded-md ${getDivisionColor(change.currentDivision)}`}>
-                                {change.currentDivision}
-                              </span>
-                              <span className="text-slate-300 dark:text-slate-600 text-sm">{'->'}</span>
-                              <span className={`px-2 py-0.5 text-xs font-medium rounded-md ${getDivisionColor(change.newDivision)}`}>
-                                {change.newDivision}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex gap-1.5 flex-shrink-0">
-                            <button
-                              onClick={() => handleConfirmChange(change)}
-                              className="p-1.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-md transition-colors"
-                              aria-label="Confirm"
-                              title="Confirm"
-                            >
-                              <Check className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeclineChange(change.driverId)}
-                              className="p-1.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md transition-colors"
-                              aria-label="Decline"
-                              title="Decline"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Demotions */}
-              {demotions.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2.5">
-                    Demotions ({demotions.length})
-                  </h3>
-                  <div className="space-y-2.5">
-                    {demotions.map((change) => (
-                      <div
-                        key={change.driverId}
-                        className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md transition-colors"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
-                                {change.driverName}
-                              </p>
-                              <span className={`px-2 py-0.5 text-xs font-medium rounded-md ${getDivisionColor(change.currentDivision)}`}>
-                                {change.currentDivision}
-                              </span>
-                              <span className="text-slate-300 dark:text-slate-600 text-sm">{'->'}</span>
-                              <span className={`px-2 py-0.5 text-xs font-medium rounded-md ${getDivisionColor(change.newDivision)}`}>
-                                {change.newDivision}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex gap-1.5 flex-shrink-0">
-                            <button
-                              onClick={() => handleConfirmChange(change)}
-                              className="p-1.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-md transition-colors"
-                              aria-label="Confirm"
-                              title="Confirm"
-                            >
-                              <Check className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeclineChange(change.driverId)}
-                              className="p-1.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md transition-colors"
-                              aria-label="Decline"
-                              title="Decline"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {pendingChanges.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800/50 flex items-center justify-center mb-3">
-                    <Check className="w-6 h-6 text-slate-400 dark:text-slate-500" />
-                  </div>
-                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-                    No pending changes
-                  </p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                    Select a division change to see it here
-                  </p>
-                </div>
-              )}
-          </div>
-        </SectionCard>
-
         {/* Search and Filter */}
         <SectionCard
           icon={Search}
@@ -1054,9 +645,6 @@ export default function DivisionsPage() {
                         <th className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 sticky left-[248px] bg-slate-50 dark:bg-slate-800 z-50 w-48">
                           Current Division
                         </th>
-                        <th className="px-3 py-1.5 text-center text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                          Change To
-                        </th>
                         <th className="px-3 py-1.5 text-center text-[11px] font-medium text-slate-500 dark:text-slate-400 w-40">
                           History / Actions
                         </th>
@@ -1065,7 +653,7 @@ export default function DivisionsPage() {
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
                       {filteredDrivers.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-4 py-10 text-center">
+                          <td colSpan={4} className="px-4 py-10 text-center">
                             <p className="text-slate-500 dark:text-slate-400">
                               No drivers found matching your search criteria.
                             </p>
@@ -1073,7 +661,6 @@ export default function DivisionsPage() {
                         </tr>
                       ) : (
                         filteredDrivers.map((driver) => {
-                          const pendingChange = pendingChanges.find((p) => p.driverId === driver.id);
                           const driverChanges = divisionChanges.filter((c) => c.driverId === driver.id).sort((a, b) => {
                             const dateA = new Date(a.createdAt || '').getTime();
                             const dateB = new Date(b.createdAt || '').getTime();
@@ -1099,16 +686,14 @@ export default function DivisionsPage() {
                                 </button>
                               </td>
                               <td className={`px-3 py-2 text-sm text-slate-900 dark:text-white sticky left-12 z-20 ${
-                                pendingChange
-                                  ? 'bg-white dark:bg-slate-900 border-l-2 border-l-amber-400 group-hover:bg-slate-50 dark:group-hover:bg-slate-800'
-                                  : isSelected
+                                isSelected
                                   ? 'bg-white dark:bg-slate-900 border-l-2 border-l-slate-400 group-hover:bg-slate-50 dark:group-hover:bg-slate-800'
                                   : 'bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800'
                               }`}>
                                 {driver.name}
                               </td>
                               <td className={`px-3 py-2 text-sm sticky left-[248px] z-20 w-48 ${
-                                pendingChange || isSelected
+                                isSelected
                                   ? 'bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800'
                                   : 'bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800'
                               }`}>
@@ -1117,9 +702,8 @@ export default function DivisionsPage() {
                                     value={driver.division}
                                     onChange={(e) => {
                                       const newDiv = e.target.value as Division;
-                                      handleDivisionChange(driver.id, newDiv, true);
+                                      handleDivisionChange(driver.id, newDiv);
                                     }}
-                                    disabled={updatingDriverId === driver.id}
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
                                   >
                                     <option value="Division 1">Division 1</option>
@@ -1134,33 +718,6 @@ export default function DivisionsPage() {
                                     {updatingDriverId === driver.id && <Loader2 className="w-3 h-3 animate-spin" style={{ color: 'inherit' }} />}
                                   </div>
                                 </div>
-                              </td>
-                              <td className="px-3 py-2 text-sm text-center">
-                                {(() => {
-                                  const selectedDivision = pendingChange?.newDivision || driver.division;
-                                  return (
-                                    <div className="relative inline-block">
-                                      <select
-                                        value={selectedDivision}
-                                        onChange={(e) => {
-                                          const newDiv = e.target.value as Division;
-                                          handleDivisionChange(driver.id, newDiv);
-                                        }}
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                      >
-                                        <option value="Division 1">Division 1</option>
-                                        <option value="Division 2">Division 2</option>
-                                        <option value="Division 3">Division 3</option>
-                                        <option value="Division 4">Division 4</option>
-                                        <option value="New">New</option>
-                                      </select>
-                                      <div className={`px-2 py-0.5 text-xs font-medium rounded-md whitespace-nowrap inline-flex items-center gap-1 ${getDivisionColor(selectedDivision)} pointer-events-none`}>
-                                        <span>{selectedDivision}</span>
-                                        <ChevronDown className="w-3 h-3" style={{ color: 'inherit' }} />
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
                               </td>
                               <td className="px-3 py-2 text-sm text-center">
                                 <div className="flex flex-col items-center gap-2">
@@ -1213,171 +770,7 @@ export default function DivisionsPage() {
         </div>
       </PageLayout>
 
-      {/* Round Points Edit Modal */}
-      {selectedChange && selectedSeason && (
-        <RoundPointsEditModal
-          isOpen={pointsModalOpen}
-          onClose={() => {
-            setPointsModalOpen(false);
-            setSelectedChange(null);
-          }}
-          driverId={selectedChange.driverId}
-          driverName={selectedChange.driverName}
-          currentDivision={selectedChange.currentDivision}
-          newDivision={selectedChange.newDivision}
-          seasonId={selectedSeason.id}
-          onSave={handleModalSave}
-          type={selectedChange.type}
-          rounds={rounds}
-        />
-      )}
 
-      {/* Round Selection Modal for Current Division Change */}
-      {showRoundSelectModal && pendingDivisionUpdate && (
-        <div className="fixed inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-5 max-w-md w-full">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-base font-semibold text-slate-900 dark:text-white">
-                  Select Round for Division Change
-                </h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                  {pendingDivisionUpdate.driverName}: {pendingDivisionUpdate.oldDivision} → {pendingDivisionUpdate.newDivision}
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  setShowRoundSelectModal(false);
-                  setPendingDivisionUpdate(null);
-                }}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
-              >
-                <X className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-              </button>
-            </div>
-            
-            <div className="space-y-3 mb-6">
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400">
-                Select when this division change occurred:
-              </label>
-              <select
-                value={selectedRoundId}
-                onChange={(e) => setSelectedRoundId(e.target.value)}
-                className="h-9 w-full px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600"
-              >
-                <option value="">Select when change occurred</option>
-                {selectedSeason && (
-                  <option value={`pre-season-${selectedSeason.id}`}>Pre-Season (Before Season Start)</option>
-                )}
-                {[...rounds].sort((a, b) => (b.roundNumber || 0) - (a.roundNumber || 0)).map((round) => (
-                  <option key={round.id} value={round.id}>
-                    Round {round.roundNumber} - {round.location || 'TBD'} {round.date ? `(${round.date})` : ''}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Use <span className="font-semibold">"Pre-Season"</span> for drivers who joined as "New" before the season started
-              </p>
-              {selectedRoundId.startsWith('pre-season-') && (
-                <div className="mt-2 p-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md">
-                  <p className="text-xs text-slate-600 dark:text-slate-300">
-                    Pre-Season: Recording division change before season start
-                  </p>
-                </div>
-              )}
-              
-              {/* Division Lock Warning */}
-              {pendingDivisionUpdate && (() => {
-                const raceCount = raceCountsByDriver[pendingDivisionUpdate.driverId] || 0;
-                const isLocked = raceCount >= 2;
-                
-                if (isLocked) {
-                  return (
-                    <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-md">
-                      <div className="flex items-start gap-2 mb-3">
-                        <ShieldCheck className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
-                        <div className="flex-1">
-                          <p className="text-xs font-semibold text-orange-900 dark:text-orange-100 mb-1 uppercase tracking-wide">
-                            Division Locked
-                          </p>
-                          <p className="text-xs text-orange-700 dark:text-orange-300">
-                            This driver has raced in {raceCount} rounds. Division changes require admin override.
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <label className="block text-xs font-medium text-orange-800 dark:text-orange-200 mb-1.5">
-                          Override Reason (Required) *
-                        </label>
-                        <textarea
-                          value={overrideReason}
-                          onChange={(e) => setOverrideReason(e.target.value)}
-                          placeholder="Explain why this division change is needed..."
-                          className="w-full px-3 py-2 border border-orange-300 dark:border-orange-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-1 focus:ring-orange-400/40"
-                          rows={3}
-                        />
-                      </div>
-                    </div>
-                  );
-                } else {
-                  return (
-                    <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-                        <p className="text-xs text-green-700 dark:text-green-300">
-                          Driver has {raceCount} race{raceCount !== 1 ? 's' : ''}. Division change allowed.
-                        </p>
-                      </div>
-                    </div>
-                  );
-                }
-              })()}
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowRoundSelectModal(false);
-                  setPendingDivisionUpdate(null);
-                  setSelectedRoundId('');
-                }}
-                className="flex-1 h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (pendingDivisionUpdate) {
-                    const raceCount = raceCountsByDriver[pendingDivisionUpdate.driverId] || 0;
-                    const isLocked = raceCount >= 2;
-                    
-                    if (isLocked && !overrideReason.trim()) {
-                      alert('Please provide a reason for overriding the division lock');
-                      return;
-                    }
-                  }
-                  handleCurrentDivisionChange();
-                }}
-                disabled={updatingDriverId !== null || !selectedRoundId}
-                className="flex-1 h-9 px-3 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors text-sm inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {updatingDriverId ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4" />
-                    Save Change
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Division Change Modal - Create/Edit division change for specific round */}
       {showDivisionChangeModal && selectedDriverForChange && selectedSeason && (
@@ -1761,13 +1154,14 @@ function DivisionChangeModal({
         const response = await fetch(`/api/points?driverId=${driverId}&seasonId=${seasonId}`);
         if (response.ok) {
           const points = await response.json();
-          const roundPoints = points.filter((p: any) => p.roundId === selectedRoundId);
-          setRoundPoints(roundPoints);
-          
-          // Calculate current total for this round
-          const currentTotal = roundPoints.reduce((sum: number, p: any) => sum + (p.points || 0), 0);
-          
-          // Determine if this is a promotion or demotion based on from/to divisions
+          // Use all season points (not just the selected round)
+          const allSeasonPoints = points as any[];
+          setRoundPoints(allSeasonPoints);
+
+          // Calculate current season total
+          const currentTotal = allSeasonPoints.reduce((sum: number, p: any) => sum + (p.points || 0), 0);
+
+          // Determine multiplier: promotion = 0.75, demotion = 1.25
           const divisionOrder: Partial<Record<Division, number>> = {
             'Division 1': 1,
             'Division 2': 2,
@@ -1777,58 +1171,35 @@ function DivisionChangeModal({
           };
           const fromOrder = divisionOrder[fromDivision] ?? 5;
           const toOrder = divisionOrder[toDivision] ?? 5;
-          
-          // Apply formula to calculate new total
-          let newTotal: number;
-          
-          // Special handling for transitions from "New" division
-          if (fromDivision === 'New') {
-            if (toDivision === 'Division 1' || toDivision === 'Division 2') {
-              // New -> Division 1 or Division 2: Promotion (0.66 multiplier)
-              newTotal = Math.round(currentTotal * 0.66);
-              newTotal = Math.min(newTotal, 75);
-            } else if (toDivision === 'Division 3') {
-              // New -> Division 3: No change in points
-              newTotal = currentTotal;
-            } else if (toDivision === 'Division 4') {
-              // New -> Division 4: Demotion (1.66 multiplier)
-              newTotal = Math.round(currentTotal * 1.66);
-              if (newTotal < 20) {
-                newTotal += 10;
+          const isPromotion = toOrder < fromOrder;
+          const multiplierFactor = isPromotion ? 0.75 : 1.25;
+
+          const newTotal = Math.round(currentTotal * multiplierFactor);
+
+          // Distribute new total proportionally across all rounds
+          const adjustments: Record<string, number> = {};
+          if (currentTotal > 0 && allSeasonPoints.length > 0) {
+            let distributed = 0;
+            allSeasonPoints.forEach((p: any) => {
+              const adjusted = Math.round((p.points || 0) * multiplierFactor);
+              adjustments[p.id] = adjusted;
+              distributed += adjusted;
+            });
+
+            // Add remainder to the row with the largest points
+            const remainder = newTotal - distributed;
+            if (remainder !== 0) {
+              const largest = allSeasonPoints.reduce((max: any, p: any) =>
+                (p.points || 0) > (max.points || 0) ? p : max, allSeasonPoints[0]);
+              if (largest) {
+                adjustments[largest.id] = (adjustments[largest.id] || 0) + remainder;
               }
-              newTotal = Math.min(newTotal, 75);
-            } else {
-              // Fallback for any other case
-              newTotal = currentTotal;
-            }
-          } else {
-            // Standard logic for non-"New" divisions
-            const isPromotion = toOrder < fromOrder;
-            
-            if (isPromotion) {
-              // Promotion: round points * 0.66, capped at 75
-              newTotal = Math.round(currentTotal * 0.66);
-              newTotal = Math.min(newTotal, 75);
-            } else {
-              // Demotion: round points * 1.66, capped at 75. If result is lower than 20, add 10
-              newTotal = Math.round(currentTotal * 1.66);
-              if (newTotal < 20) {
-                newTotal += 10;
-              }
-              newTotal = Math.min(newTotal, 75);
             }
           }
-          
-          // Initialize points adjustments with calculated multiplier applied proportionally
-          const adjustments: Record<string, number> = {};
-          const multiplier = currentTotal > 0 ? newTotal / currentTotal : 1;
-          roundPoints.forEach((p: any) => {
-            adjustments[p.id] = Math.round((p.points || 0) * multiplier);
-          });
           setPointsAdjustments(adjustments);
-          
+
           // Auto-show points editor if there are points to adjust
-          if (roundPoints.length > 0 && !existingChange) {
+          if (allSeasonPoints.length > 0 && !existingChange) {
             setShowPointsEditor(true);
           }
         }
@@ -2231,24 +1602,18 @@ function DivisionChangeModal({
                       // Show calculation breakdown
                       let calculationSteps: string[] = [];
                       if (isPromotion) {
-                        const step1 = currentTotal * 0.66;
+                        const step1 = currentTotal * 0.75;
                         const step2 = Math.round(step1);
-                        const step3 = Math.min(step2, 75);
                         calculationSteps = [
-                          `${currentTotal} × 0.66 = ${step1.toFixed(2)}`,
-                          `Round to ${step2}`,
-                          step3 < step2 ? `Capped at 75` : ''
+                          `${currentTotal} × 0.75 = ${step1.toFixed(2)}`,
+                          `Round to ${step2}`
                         ].filter(s => s);
                       } else {
-                        const step1 = currentTotal * 1.66;
+                        const step1 = currentTotal * 1.25;
                         const step2 = Math.round(step1);
-                        const step3 = step2 < 20 ? step2 + 10 : step2;
-                        const step4 = Math.min(step3, 75);
                         calculationSteps = [
-                          `${currentTotal} × 1.66 = ${step1.toFixed(2)}`,
-                          `Round to ${step2}`,
-                          step3 !== step2 ? `Less than 20, add 10 = ${step3}` : '',
-                          step4 < step3 ? `Capped at 75` : ''
+                          `${currentTotal} × 1.25 = ${step1.toFixed(2)}`,
+                          `Round to ${step2}`
                         ].filter(s => s);
                       }
                       
@@ -2257,7 +1622,7 @@ function DivisionChangeModal({
                           {/* Calculation Breakdown */}
                           <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
                             <div className="text-xs font-semibold text-blue-800 dark:text-blue-300 mb-1">
-                              {isPromotion ? '📈 Promotion' : '📉 Demotion'} Calculation:
+                              {isPromotion ? '📈 Promotion (×0.75)' : '📉 Demotion (×1.25)'} Calculation:
                             </div>
                             <div className="text-xs text-blue-700 dark:text-blue-300 space-y-0.5">
                               {calculationSteps.map((step, idx) => (

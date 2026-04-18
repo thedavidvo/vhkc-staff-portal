@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSeasons, addSeason, updateSeason, deleteSeason, getDriversBySeason, addDriver } from '@/lib/dbService';
+import { getSeasons, addSeason, updateSeason, deleteSeason, getDriversBySeason, upsertSeasonDriverMembership } from '@/lib/dbService';
 import { cache } from '@/lib/cache';
 
 const CACHE_KEY = 'seasons';
@@ -50,30 +50,18 @@ export async function POST(request: NextRequest) {
     // Create the new season
     await addSeason(season);
     
-    // If there's a previous season, copy all drivers from it to the new season
+    // If there's a previous season, carry over roster memberships with reset season fields
     if (previousSeason) {
       try {
         const previousDrivers = await getDriversBySeason(previousSeason.id);
-        
-        // Copy each driver to the new season with a new ID but preserving their state
-        for (let i = 0; i < previousDrivers.length; i++) {
-          const driver = previousDrivers[i];
-          
-          // Generate a unique ID for the driver in the new season
-          const timestamp = Date.now();
-          const random = Math.random().toString(36).substr(2, 9);
-          const index = i.toString().padStart(4, '0');
-          const newDriverId = `driver-${timestamp}-${random}-${index}`;
-          
-          // Create a new driver object with the same properties but new ID and season
-          const newDriver = {
-            ...driver,
-            id: newDriverId,
-            lastUpdated: new Date().toISOString(),
-          };
-          
-          // Add the driver to the new season
-          await addDriver(newDriver, season.id);
+
+        // Reset per-season values while keeping canonical driver identity.
+        for (const driver of previousDrivers) {
+          await upsertSeasonDriverMembership(season.id, driver.id, {
+            division: (driver.division || 'New'),
+            teamName: '',
+            status: 'ACTIVE',
+          });
         }
         
         // Invalidate drivers cache for the new season

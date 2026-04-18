@@ -8,6 +8,31 @@ export interface Location {
   address: string;
 }
 
+let seasonDriversEnsured = false;
+
+async function ensureSeasonDriversTable(): Promise<void> {
+  if (seasonDriversEnsured) return;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS season_drivers (
+      id TEXT PRIMARY KEY,
+      season_id TEXT NOT NULL,
+      driver_id TEXT NOT NULL,
+      division TEXT NOT NULL DEFAULT 'New',
+      team_name TEXT,
+      status TEXT DEFAULT 'ACTIVE',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(season_id, driver_id)
+    )
+  `;
+
+  await sql`CREATE INDEX IF NOT EXISTS idx_season_drivers_season_id ON season_drivers(season_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_season_drivers_driver_id ON season_drivers(driver_id)`;
+
+  seasonDriversEnsured = true;
+}
+
 
 // ============================================================================
 // SEASON OPERATIONS
@@ -318,9 +343,35 @@ export async function deleteRound(roundId: string): Promise<void> {
 // ============================================================================
 
 export async function getDrivers(seasonId?: string): Promise<Driver[]> {
-  const drivers = (seasonId
-    ? await sql`SELECT * FROM drivers WHERE season_id = ${seasonId} ORDER BY name`
-    : await sql`SELECT * FROM drivers ORDER BY name`) as any[];
+  let drivers: any[] = [];
+
+  if (seasonId) {
+    await ensureSeasonDriversTable();
+
+    const seasonDrivers = await sql`
+      SELECT
+        d.id,
+        d.name,
+        d.email,
+        d.mobile_number,
+        d.last_updated,
+        d.first_name,
+        d.last_name,
+        d.date_of_birth,
+        d.home_track,
+        d.aliases,
+        sd.division,
+        sd.team_name,
+        sd.status
+      FROM season_drivers sd
+      INNER JOIN drivers d ON d.id = sd.driver_id
+      WHERE sd.season_id = ${seasonId}
+      ORDER BY d.name
+    ` as any[];
+    drivers = seasonDrivers;
+  } else {
+    drivers = await sql`SELECT * FROM drivers ORDER BY name` as any[];
+  }
   
   return drivers.map((d: any) => ({
     id: d.id,
@@ -377,7 +428,24 @@ export async function addDriver(driver: Driver, seasonId: string): Promise<void>
       ${driver.lastUpdated || ''}, ${driver.firstName || ''}, ${driver.lastName || ''},
       ${driver.dateOfBirth || ''}, ${driver.homeTrack || ''}, ${aliases}
     )
+    ON CONFLICT (id)
+    DO UPDATE SET
+      name = EXCLUDED.name,
+      email = EXCLUDED.email,
+      mobile_number = EXCLUDED.mobile_number,
+      last_updated = EXCLUDED.last_updated,
+      first_name = EXCLUDED.first_name,
+      last_name = EXCLUDED.last_name,
+      date_of_birth = EXCLUDED.date_of_birth,
+      home_track = EXCLUDED.home_track,
+      aliases = EXCLUDED.aliases
   `;
+
+  await upsertSeasonDriverMembership(seasonId, driver.id, {
+    division: driver.division,
+    teamName: driver.teamName || '',
+    status: driver.status || 'ACTIVE',
+  });
   
   // Automatically create a division_changes entry when onboarding a driver
   // This ensures proper historical division tracking based on when the driver joined
@@ -452,9 +520,6 @@ export async function updateDriver(driver: Driver, seasonId?: string): Promise<v
     SET name = ${driver.name},
         email = ${driver.email || ''},
         mobile_number = ${driver.mobileNumber || ''},
-        division = ${driver.division},
-        team_name = ${driver.teamName || ''},
-        status = ${driver.status || 'ACTIVE'},
         last_updated = ${driver.lastUpdated || ''},
         first_name = ${driver.firstName || ''},
         last_name = ${driver.lastName || ''},
@@ -463,9 +528,70 @@ export async function updateDriver(driver: Driver, seasonId?: string): Promise<v
         aliases = ${aliases}
     WHERE id = ${driver.id}
   `;
+
+  if (seasonId) {
+    await upsertSeasonDriverMembership(seasonId, driver.id, {
+      division: driver.division,
+      teamName: driver.teamName || '',
+      status: driver.status || 'ACTIVE',
+    });
+  } else {
+    await sql`
+      UPDATE drivers
+      SET division = ${driver.division},
+          team_name = ${driver.teamName || ''},
+          status = ${driver.status || 'ACTIVE'}
+      WHERE id = ${driver.id}
+    `;
+  }
 }
 
-export async function deleteDriver(driverId: string): Promise<void> {
+export async function deleteDriver(driverId: string, seasonId?: string): Promise<void> {
+  if (seasonId) {
+    await ensureSeasonDriversTable();
+
+    const membership = await sql`
+      SELECT id FROM season_drivers
+      WHERE season_id = ${seasonId} AND driver_id = ${driverId}
+      LIMIT 1
+    ` as any[];
+
+    if (membership.length > 0) {
+      // Delete season-scoped related data only.
+      await sql`
+        DELETE FROM race_results
+        WHERE driver_id = ${driverId}
+          AND round_id IN (SELECT id FROM rounds WHERE season_id = ${seasonId})
+      `;
+
+      await sql`
+        DELETE FROM points
+        WHERE driver_id = ${driverId}
+          AND season_id = ${seasonId}
+      `;
+
+      await sql`
+        DELETE FROM check_ins
+        WHERE driver_id = ${driverId}
+          AND round_id IN (SELECT id FROM rounds WHERE season_id = ${seasonId})
+      `;
+
+      await sql`
+        DELETE FROM division_changes
+        WHERE driver_id = ${driverId}
+          AND season_id = ${seasonId}
+      `;
+
+      await sql`
+        DELETE FROM season_drivers
+        WHERE season_id = ${seasonId}
+          AND driver_id = ${driverId}
+      `;
+
+      return;
+    }
+  }
+
   // Delete all related data for this driver in the correct order
   // 1. Delete race results
   await sql`DELETE FROM race_results WHERE driver_id = ${driverId}`;
@@ -478,9 +604,37 @@ export async function deleteDriver(driverId: string): Promise<void> {
   
   // 4. Delete division changes
   await sql`DELETE FROM division_changes WHERE driver_id = ${driverId}`;
+
+  // 5. Delete season memberships
+  await sql`DELETE FROM season_drivers WHERE driver_id = ${driverId}`;
   
-  // 5. Finally delete the driver
+  // 6. Finally delete the driver
   await sql`DELETE FROM drivers WHERE id = ${driverId}`;
+}
+
+export async function upsertSeasonDriverMembership(
+  seasonId: string,
+  driverId: string,
+  values: { division: Division; teamName?: string; status?: string }
+): Promise<void> {
+  await ensureSeasonDriversTable();
+
+  const membershipId = `${seasonId}-${driverId}`;
+  await sql`
+    INSERT INTO season_drivers (
+      id, season_id, driver_id, division, team_name, status, created_at, updated_at
+    ) VALUES (
+      ${membershipId}, ${seasonId}, ${driverId},
+      ${values.division}, ${values.teamName || ''}, ${values.status || 'ACTIVE'},
+      ${new Date().toISOString()}, ${new Date().toISOString()}
+    )
+    ON CONFLICT (season_id, driver_id)
+    DO UPDATE SET
+      division = EXCLUDED.division,
+      team_name = EXCLUDED.team_name,
+      status = EXCLUDED.status,
+      updated_at = CURRENT_TIMESTAMP
+  `;
 }
 
 // ============================================================================
@@ -518,11 +672,28 @@ export async function getRaceResultsByRound(roundId: string, resultsSheetId?: st
       SELECT 
         rr.*,
         COALESCE(
-          (SELECT COALESCE(dc.from_division, dc.division_start)
+          (SELECT CASE
+              WHEN dc.change_type IN ('promotion', 'demotion') THEN dc.to_division
+              WHEN dc.change_type IN ('division_start', 'mid_season_join') THEN dc.division_start
+              ELSE NULL
+            END
            FROM division_changes dc
+           LEFT JOIN rounds dc_round ON dc_round.id = dc.round_id
+           LEFT JOIN rounds rr_round ON rr_round.id = rr.round_id
            WHERE dc.driver_id = rr.driver_id 
-             AND (dc.round_id = rr.round_id OR dc.round_id IS NULL)
-           ORDER BY dc.round_id DESC NULLS LAST
+             AND (
+               dc.round_id IS NULL
+               OR dc.round_id LIKE 'pre-season-%'
+               OR (
+                 rr_round.round_number IS NOT NULL
+                 AND dc_round.round_number IS NOT NULL
+                 AND dc_round.round_number <= rr_round.round_number
+               )
+             )
+           ORDER BY
+             CASE WHEN dc.round_id IS NULL OR dc.round_id LIKE 'pre-season-%' THEN 0 ELSE 1 END DESC,
+             COALESCE(dc_round.round_number, 0) DESC,
+             dc.created_at DESC
            LIMIT 1),
           rr.division
         ) as driver_division_at_round
@@ -538,11 +709,28 @@ export async function getRaceResultsByRound(roundId: string, resultsSheetId?: st
       SELECT 
         rr.*,
         COALESCE(
-          (SELECT COALESCE(dc.from_division, dc.division_start)
+          (SELECT CASE
+              WHEN dc.change_type IN ('promotion', 'demotion') THEN dc.to_division
+              WHEN dc.change_type IN ('division_start', 'mid_season_join') THEN dc.division_start
+              ELSE NULL
+            END
            FROM division_changes dc
+           LEFT JOIN rounds dc_round ON dc_round.id = dc.round_id
+           LEFT JOIN rounds rr_round ON rr_round.id = rr.round_id
            WHERE dc.driver_id = rr.driver_id 
-             AND (dc.round_id = rr.round_id OR dc.round_id IS NULL)
-           ORDER BY dc.round_id DESC NULLS LAST
+             AND (
+               dc.round_id IS NULL
+               OR dc.round_id LIKE 'pre-season-%'
+               OR (
+                 rr_round.round_number IS NOT NULL
+                 AND dc_round.round_number IS NOT NULL
+                 AND dc_round.round_number <= rr_round.round_number
+               )
+             )
+           ORDER BY
+             CASE WHEN dc.round_id IS NULL OR dc.round_id LIKE 'pre-season-%' THEN 0 ELSE 1 END DESC,
+             COALESCE(dc_round.round_number, 0) DESC,
+             dc.created_at DESC
            LIMIT 1),
           rr.division
         ) as driver_division_at_round
@@ -557,11 +745,28 @@ export async function getRaceResultsByRound(roundId: string, resultsSheetId?: st
       SELECT 
         rr.*,
         COALESCE(
-          (SELECT COALESCE(dc.from_division, dc.division_start)
+          (SELECT CASE
+              WHEN dc.change_type IN ('promotion', 'demotion') THEN dc.to_division
+              WHEN dc.change_type IN ('division_start', 'mid_season_join') THEN dc.division_start
+              ELSE NULL
+            END
            FROM division_changes dc
+           LEFT JOIN rounds dc_round ON dc_round.id = dc.round_id
+           LEFT JOIN rounds rr_round ON rr_round.id = rr.round_id
            WHERE dc.driver_id = rr.driver_id 
-             AND (dc.round_id = rr.round_id OR dc.round_id IS NULL)
-           ORDER BY dc.round_id DESC NULLS LAST
+             AND (
+               dc.round_id IS NULL
+               OR dc.round_id LIKE 'pre-season-%'
+               OR (
+                 rr_round.round_number IS NOT NULL
+                 AND dc_round.round_number IS NOT NULL
+                 AND dc_round.round_number <= rr_round.round_number
+               )
+             )
+           ORDER BY
+             CASE WHEN dc.round_id IS NULL OR dc.round_id LIKE 'pre-season-%' THEN 0 ELSE 1 END DESC,
+             COALESCE(dc_round.round_number, 0) DESC,
+             dc.created_at DESC
            LIMIT 1),
           rr.division
         ) as driver_division_at_round
@@ -800,14 +1005,16 @@ export async function deleteLocation(locationId: string): Promise<void> {
 // ============================================================================
 
 export async function getTeams(seasonId?: string): Promise<Team[]> {
+  await ensureSeasonDriversTable();
+
   const teams = (seasonId
     ? await sql`SELECT * FROM teams WHERE season_id = ${seasonId} ORDER BY name`
     : await sql`SELECT * FROM teams ORDER BY name`) as any[];
   
   // Get all drivers to populate driverIds
   const allDrivers = (seasonId
-    ? await sql`SELECT id, team_name FROM drivers WHERE season_id = ${seasonId}`
-    : await sql`SELECT id, team_name FROM drivers`) as any[];
+    ? await sql`SELECT driver_id AS id, team_name FROM season_drivers WHERE season_id = ${seasonId}`
+    : await sql`SELECT driver_id AS id, team_name FROM season_drivers`) as any[];
   
   return teams.map((t: any) => {
     // Find all drivers that belong to this team (by team name)
@@ -966,17 +1173,40 @@ export async function getPointsBySeason(seasonId: string): Promise<Points[]> {
     SELECT 
       p.*,
       d.first_name || ' ' || d.last_name as driver_name,
+      (
+        SELECT COALESCE(rr.race_division, rr.division)
+        FROM race_results rr
+        WHERE rr.driver_id = p.driver_id
+          AND rr.round_id = p.round_id
+          AND rr.race_type = p.race_type
+          AND COALESCE(rr.final_type, '') = COALESCE(p.final_type, '')
+        LIMIT 1
+      ) as race_division,
       COALESCE(
-        (SELECT COALESCE(dc.from_division, dc.division_start)
+        (SELECT CASE
+            WHEN dc.change_type IN ('promotion', 'demotion') THEN dc.to_division
+            WHEN dc.change_type IN ('division_start', 'mid_season_join') THEN dc.division_start
+            ELSE NULL
+          END
          FROM division_changes dc
+         LEFT JOIN rounds dc_round ON dc_round.id = dc.round_id
+         LEFT JOIN rounds p_round ON p_round.id = p.round_id
          WHERE dc.driver_id = p.driver_id 
-           AND dc.round_id = p.round_id
+           AND (
+             dc.round_id IS NULL
+             OR dc.round_id LIKE 'pre-season-%'
+             OR (
+               p_round.round_number IS NOT NULL
+               AND dc_round.round_number IS NOT NULL
+               AND dc_round.round_number <= p_round.round_number
+             )
+           )
+         ORDER BY
+           CASE WHEN dc.round_id IS NULL OR dc.round_id LIKE 'pre-season-%' THEN 0 ELSE 1 END DESC,
+           COALESCE(dc_round.round_number, 0) DESC,
+           dc.created_at DESC
          LIMIT 1),
-        (SELECT DISTINCT rr.division 
-         FROM race_results rr 
-         WHERE rr.driver_id = p.driver_id 
-           AND rr.round_id = p.round_id 
-         LIMIT 1),
+        p.division,
         d.division
       ) as driver_division
     FROM points p
@@ -991,6 +1221,7 @@ export async function getPointsBySeason(seasonId: string): Promise<Points[]> {
     driverId: p.driver_id,
     driverName: p.driver_name || 'Unknown Driver',
     division: p.division as Division,
+    raceDivision: p.race_division as Division | 'Open' | undefined,
     driverDivision: p.driver_division as Division,
     raceType: p.race_type || 'qualification',
     finalType: p.final_type || undefined,
@@ -1007,61 +1238,46 @@ export async function addPoints(points: Points): Promise<void> {
     // Normalize finalType: convert empty string to null for consistent constraint handling
     const normalizedFinalType = points.finalType && points.finalType.trim() !== '' ? points.finalType : null;
     const raceType = points.raceType || 'qualification';
-    
-    // Check if record exists
-    const existingRecord = normalizedFinalType === null
-      ? await sql`
-          SELECT id FROM points 
-          WHERE round_id = ${points.roundId} 
-            AND driver_id = ${points.driverId} 
-            AND race_type = ${raceType}
-            AND (final_type IS NULL OR final_type = '')
-          LIMIT 1
-        ` as any[]
-      : await sql`
-          SELECT id FROM points 
-          WHERE round_id = ${points.roundId} 
-            AND driver_id = ${points.driverId} 
-            AND race_type = ${raceType}
-            AND final_type = ${normalizedFinalType}
-          LIMIT 1
-        ` as any[];
-    
-    if (existingRecord.length > 0) {
-      // Update existing record
-      if (!points.division) {
-        throw new Error('Division is required to update points');
-      }
-      
-      await sql`
+
+    if (!points.division) {
+      throw new Error('Division is required to save points');
+    }
+
+    // Update existing match first, then insert only if no row was updated.
+    await sql`
+      WITH updated AS (
         UPDATE points
         SET division = ${points.division},
             overall_position = ${points.overallPosition || null},
             points = ${points.points},
             note = ${points.note || null},
             updated_at = CURRENT_TIMESTAMP
-        WHERE round_id = ${points.roundId} 
-          AND driver_id = ${points.driverId} 
+        WHERE round_id = ${points.roundId}
+          AND driver_id = ${points.driverId}
           AND race_type = ${raceType}
           AND ${normalizedFinalType === null ? sql`(final_type IS NULL OR final_type = '')` : sql`final_type = ${normalizedFinalType}`}
-      `;
-    } else {
-      // Insert new record
-      await sql`
-        INSERT INTO points (
-          id, season_id, round_id, driver_id, division, race_type, final_type,
-          overall_position, points, note, created_at, updated_at
-        ) VALUES (
-          ${points.id}, ${points.seasonId}, ${points.roundId}, ${points.driverId},
-          ${points.division}, ${raceType}, ${normalizedFinalType},
-          ${points.overallPosition || null}, ${points.points}, ${points.note || null},
-          ${points.createdAt || new Date().toISOString()}, ${points.updatedAt || new Date().toISOString()}
-        )
-      `;
-    }
+        RETURNING id
+      )
+      INSERT INTO points (
+        id, season_id, round_id, driver_id, division, race_type, final_type,
+        overall_position, points, note, created_at, updated_at
+      )
+      SELECT
+        ${points.id}, ${points.seasonId}, ${points.roundId}, ${points.driverId},
+        ${points.division}, ${raceType}, ${normalizedFinalType},
+        ${points.overallPosition || null}, ${points.points}, ${points.note || null},
+        ${points.createdAt || new Date().toISOString()}, ${points.updatedAt || new Date().toISOString()}
+      WHERE NOT EXISTS (SELECT 1 FROM updated)
+    `;
   } catch (error) {
     console.error('Error in addPoints:', error);
     throw error;
+  }
+}
+
+export async function addPointsBulk(pointsList: Points[]): Promise<void> {
+  for (const points of pointsList) {
+    await addPoints(points);
   }
 }
 
@@ -1463,6 +1679,8 @@ export interface Incident {
 }
 
 export async function createIncident(incident: Incident): Promise<void> {
+  await ensureSeasonDriversTable();
+
   // Calculate severity based on points
   const severity = incident.pointsToDeduct === 7 ? 'Minor' : 'Major';
 
@@ -1487,14 +1705,14 @@ export async function createIncident(incident: Incident): Promise<void> {
   }
 
   const drivers = await sql`
-    SELECT id, season_id FROM drivers WHERE id = ${incident.driverId}
+    SELECT driver_id
+    FROM season_drivers
+    WHERE season_id = ${incident.seasonId}
+      AND driver_id = ${incident.driverId}
+    LIMIT 1
   ` as any[];
 
   if (drivers.length === 0) {
-    throw new Error('Selected driver does not exist');
-  }
-
-  if (drivers[0].season_id !== incident.seasonId) {
     throw new Error('Selected driver does not belong to the current season');
   }
   

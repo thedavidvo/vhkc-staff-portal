@@ -109,7 +109,6 @@ export default function PointsPage() {
   const [selectedHeatType, setSelectedHeatType] = useState<string>('');
   const [selectedFinalType, setSelectedFinalType] = useState<string>('');
   const [selectedDivision, setSelectedDivision] = useState<Division>('Division 1'); // Race Division
-  const [selectedDriverDivision, setSelectedDriverDivision] = useState<Division | 'All'>('All'); // Driver Division filter
   const [drivers, setDrivers] = useState<any[]>([]);
   
   // Editing state
@@ -183,7 +182,7 @@ export default function PointsPage() {
     }
     
     return Array.from(heatTypes).sort();
-  }, [driverPoints, selectedRaceType, selectedRound, selectedDivision, selectedDriverDivision]);
+  }, [driverPoints, selectedRaceType, selectedRound, selectedDivision]);
 
   // Get available final types based on selected race type, round, and division
   const availableFinalTypes = useMemo(() => {
@@ -205,7 +204,7 @@ export default function PointsPage() {
     }
     
     return Array.from(finalTypes).sort();
-  }, [driverPoints, selectedRaceType, selectedRound, selectedDivision, selectedDriverDivision]);
+  }, [driverPoints, selectedRaceType, selectedRound, selectedDivision]);
 
   // Fetch rounds, drivers, and race results
   useEffect(() => {
@@ -288,7 +287,7 @@ export default function PointsPage() {
                   
                   sortedResults.forEach((result, index) => {
                     const overallPosition = result.overallPosition || (index + 1);
-                    const points = result.points || getPointsForPosition(
+                    const points = getPointsForPosition(
                       overallPosition,
                       result.raceType || 'qualification',
                       hasHeatRace
@@ -296,11 +295,8 @@ export default function PointsPage() {
                     
                     const driver = drivers.find((d: any) => d.id === result.driverId);
                     
-                    // Determine driver's division at this round
-                    // Priority: 1) driverDivision from race results (with division_changes lookup)
-                    //          2) division field from race results (driver's division stored in race_results)
-                    //          3) current driver division as last fallback
-                    const driverDivision = result.driverDivision || result.division || driver?.division;
+                    // Determine driver's division at this round (never infer from race division)
+                    const driverDivision = result.driverDivision || driver?.division;
                     
                     allPoints.push({
                       driverId: result.driverId,
@@ -390,6 +386,7 @@ export default function PointsPage() {
             ...point,
               roundNumber: round?.roundNumber || 0,
             roundName: round?.location || 'TBD',
+            raceDivision: point.raceDivision || undefined,
             // The division field in points table stores the driver's division at that round
             driverDivision: point.division,
             };
@@ -433,9 +430,15 @@ export default function PointsPage() {
       );
     }
 
-    // Filter by driver division only (points table only stores driver division, not race division)
-    if (selectedDriverDivision && selectedDriverDivision !== 'All') {
-      filtered = filtered.filter(p => p.driverDivision === selectedDriverDivision);
+    // Filter saved results by race division (not driver division)
+    if (selectedDivision) {
+      filtered = filtered.filter((p) => {
+        const raceDivision = p.raceDivision || p.division;
+        if (selectedDivision === 'Open') {
+          return typeof raceDivision === 'string' && isOpenDivision(raceDivision);
+        }
+        return raceDivision === selectedDivision;
+      });
     }
 
     // Apply column sorting if active
@@ -467,7 +470,7 @@ export default function PointsPage() {
     }
 
     return filtered;
-  }, [savedPointsList, selectedRound, selectedRaceType, selectedHeatType, selectedFinalType, selectedDivision, selectedDriverDivision, savedSortColumn, savedSortDirection]);
+  }, [savedPointsList, selectedRound, selectedRaceType, selectedHeatType, selectedFinalType, selectedDivision, savedSortColumn, savedSortDirection]);
 
   // Filter points and calculate overall position based on filters
   const filteredPoints = useMemo(() => {
@@ -498,11 +501,6 @@ export default function PointsPage() {
     // Filter by race division
     if (selectedDivision) {
       filtered = filtered.filter(p => p.division === selectedDivision);
-    }
-
-    // Filter by driver division
-    if (selectedDriverDivision && selectedDriverDivision !== 'All') {
-      filtered = filtered.filter(p => p.driverDivision === selectedDriverDivision);
     }
 
     // Group by division and round only (not by race type) to calculate overall position across all race types
@@ -727,7 +725,7 @@ export default function PointsPage() {
     }
 
     return sorted;
-  }, [driverPoints, selectedRound, selectedDivision, selectedDriverDivision, selectedRaceType, selectedHeatType, selectedFinalType, editingPoints, savedPoints, sortColumn, sortDirection]);
+  }, [driverPoints, selectedRound, selectedDivision, selectedRaceType, selectedHeatType, selectedFinalType, editingPoints, savedPoints, sortColumn, sortDirection]);
 
   // Calculate total points per driver
   const driverTotals = useMemo(() => {
@@ -760,13 +758,14 @@ export default function PointsPage() {
       return;
     }
 
-    const pointsToSave = filteredPoints.length;
+    const changedKeys = Object.keys(editingPoints);
+    const pointsToSave = changedKeys.length;
     if (pointsToSave === 0) {
-      alert('No points to save');
+      alert('No point changes to save');
       return;
     }
 
-    const confirmMsg = `Save ${pointsToSave} point record(s) to the database?`;
+    const confirmMsg = `Save ${pointsToSave} changed point record(s) to the database?`;
     if (!confirm(confirmMsg)) {
       return;
     }
@@ -774,39 +773,52 @@ export default function PointsPage() {
     try {
       setIsSaving(true);
 
-      // Save all current points from the filtered view
-      for (const point of filteredPoints) {
-        const key = `${point.driverId}-${point.roundId}-${point.raceType}-${point.finalType || ''}`;
-        const currentPoints = editingPoints[key] !== undefined 
-          ? editingPoints[key] 
-          : (savedPoints[key] || point.points);
-        
-        const pointsId = `points-${point.roundId}-${point.driverId}-${point.raceType}-${point.finalType || ''}`;
-        
-        const divisionToSave = point.driverDivision || point.division;
-        
-        // Save to points table via API
-        const response = await fetch('/api/points', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+      // Save only changed points (single bulk request)
+      const pointByKey = new Map(
+        driverPoints.map((point) => [
+          `${point.driverId}-${point.roundId}-${point.raceType}-${point.finalType || ''}`,
+          point,
+        ])
+      );
+
+      const payload = changedKeys
+        .map((key) => {
+          const point = pointByKey.get(key);
+          if (!point) return null;
+
+          const currentPoints = editingPoints[key];
+          const pointsId = `points-${point.roundId}-${point.driverId}-${point.raceType}-${point.finalType || ''}`;
+          const divisionToSave = point.driverDivision || point.division;
+
+          return {
             id: pointsId,
             seasonId: selectedSeason.id,
             roundId: point.roundId,
             driverId: point.driverId,
-            division: divisionToSave, // Save driver division (for historical tracking)
+            division: divisionToSave,
             raceType: point.raceType || 'qualification',
             finalType: point.finalType && point.finalType.trim() !== '' ? point.finalType : null,
             overallPosition: point.overallPosition,
             points: currentPoints,
-          }),
-        });
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null);
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('Failed to save points:', errorData);
-          throw new Error(`Failed to save points for ${point.driverName}: ${errorData.error || 'Unknown error'}`);
-        }
+      if (payload.length === 0) {
+        alert('No valid point changes to save');
+        return;
+      }
+
+      const response = await fetch('/api/points/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ points: payload }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to save points:', errorData);
+        throw new Error(errorData.error || 'Failed to save points');
       }
 
       // Move edited points to saved points
@@ -862,7 +874,7 @@ export default function PointsPage() {
                   
                   sortedResults.forEach((result, index) => {
                     const overallPosition = result.overallPosition || (index + 1);
-                    const points = result.points || getPointsForPosition(
+                    const points = getPointsForPosition(
                       overallPosition,
                       result.raceType || 'qualification',
                       hasHeatRace
@@ -870,8 +882,8 @@ export default function PointsPage() {
                     
                     const driver = drivers.find((d: any) => d.id === result.driverId);
                     
-                    // Determine driver's division at this round (same logic as initial fetch)
-                    const driverDivision = result.driverDivision || result.division || driver?.division;
+                    // Determine driver's division at this round (never infer from race division)
+                    const driverDivision = result.driverDivision || driver?.division;
                     
                     allPoints.push({
                       driverId: result.driverId,
@@ -1437,23 +1449,6 @@ export default function PointsPage() {
                 </div>
 
               {/* Driver Division Filter - All divisions available */}
-              <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Driver Division
-                  </label>
-                  <select
-                    value={selectedDriverDivision}
-                    onChange={(e) => setSelectedDriverDivision(e.target.value as Division | 'All')}
-                    className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30"
-                  >
-                  <option value="All">All Divisions</option>
-                  <option value="Division 1">Division 1</option>
-                  <option value="Division 2">Division 2</option>
-                  <option value="Division 3">Division 3</option>
-                  <option value="Division 4">Division 4</option>
-                  <option value="New">New</option>
-                  </select>
-                </div>
               </div>
             </SectionCard>
             

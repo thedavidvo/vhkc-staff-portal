@@ -54,7 +54,7 @@ export async function initializeDatabase() {
     await sql`
       CREATE TABLE IF NOT EXISTS drivers (
         id TEXT PRIMARY KEY,
-        season_id TEXT NOT NULL,
+        season_id TEXT,
         name TEXT NOT NULL,
         email TEXT,
         mobile_number TEXT,
@@ -71,7 +71,22 @@ export async function initializeDatabase() {
       )
     `;
 
-    await sql`CREATE INDEX IF NOT EXISTS idx_drivers_season_id ON drivers(season_id)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS season_drivers (
+        id TEXT PRIMARY KEY,
+        season_id TEXT NOT NULL,
+        driver_id TEXT NOT NULL,
+        division TEXT NOT NULL DEFAULT 'New',
+        team_name TEXT,
+        status TEXT DEFAULT 'ACTIVE',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(season_id, driver_id)
+      )
+    `;
+
+    await sql`CREATE INDEX IF NOT EXISTS idx_season_drivers_season_id ON season_drivers(season_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_season_drivers_driver_id ON season_drivers(driver_id)`;
 
     await sql`
       CREATE TABLE IF NOT EXISTS race_results (
@@ -348,6 +363,10 @@ export async function initializeDatabase() {
         incident_date TIMESTAMP NOT NULL,
         expires_at TIMESTAMP NOT NULL,
         is_expired BOOLEAN DEFAULT FALSE,
+        incident_season_id TEXT,
+        incident_round_id TEXT,
+        incident_round_number INTEGER,
+        incident_division TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `;
@@ -357,6 +376,9 @@ export async function initializeDatabase() {
     await sql`CREATE INDEX IF NOT EXISTS idx_license_history_incident_id ON license_points_history(incident_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_license_history_expires_at ON license_points_history(expires_at)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_license_history_expired ON license_points_history(is_expired)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_license_history_incident_season_id ON license_points_history(incident_season_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_license_history_incident_round_id ON license_points_history(incident_round_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_license_history_incident_round_number ON license_points_history(incident_round_number)`;
 
     // Create division_change_audit table for tracking
     await sql`
