@@ -707,8 +707,8 @@ export default function CheckInPage() {
 
       {/* Edit Driver Modal */}
       {editingDriver && (
-        <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold text-slate-900 dark:text-white">Edit Driver</h2>

@@ -1234,11 +1234,11 @@ export default function DivisionsPage() {
 
       {/* Round Selection Modal for Current Division Change */}
       {showRoundSelectModal && pendingDivisionUpdate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-5 max-w-md w-full">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                <h3 className="text-base font-semibold text-slate-900 dark:text-white">
                   Select Round for Division Change
                 </h3>
                 <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
@@ -1250,20 +1250,20 @@ export default function DivisionsPage() {
                   setShowRoundSelectModal(false);
                   setPendingDivisionUpdate(null);
                 }}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
               >
-                <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                <X className="w-4 h-4 text-slate-600 dark:text-slate-400" />
               </button>
             </div>
             
             <div className="space-y-3 mb-6">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400">
                 Select when this division change occurred:
               </label>
               <select
                 value={selectedRoundId}
                 onChange={(e) => setSelectedRoundId(e.target.value)}
-                className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                className="h-9 w-full px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600"
               >
                 <option value="">Select when change occurred</option>
                 {selectedSeason && (
@@ -1279,9 +1279,9 @@ export default function DivisionsPage() {
                 Use <span className="font-semibold">"Pre-Season"</span> for drivers who joined as "New" before the season started
               </p>
               {selectedRoundId.startsWith('pre-season-') && (
-                <div className="mt-2 p-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-                  <p className="text-xs text-purple-700 dark:text-purple-300 font-medium">
-                    📅 Pre-Season: Recording division change before season start
+                <div className="mt-2 p-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md">
+                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                    Pre-Season: Recording division change before season start
                   </p>
                 </div>
               )}
@@ -1293,11 +1293,11 @@ export default function DivisionsPage() {
                 
                 if (isLocked) {
                   return (
-                    <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-200 dark:border-orange-800 rounded-xl">
+                    <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-md">
                       <div className="flex items-start gap-2 mb-3">
                         <ShieldCheck className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
                         <div className="flex-1">
-                          <p className="text-sm font-semibold text-orange-900 dark:text-orange-100 mb-1">
+                          <p className="text-xs font-semibold text-orange-900 dark:text-orange-100 mb-1 uppercase tracking-wide">
                             Division Locked
                           </p>
                           <p className="text-xs text-orange-700 dark:text-orange-300">
@@ -1307,14 +1307,14 @@ export default function DivisionsPage() {
                       </div>
                       
                       <div>
-                        <label className="block text-xs font-medium text-orange-800 dark:text-orange-200 mb-2">
+                        <label className="block text-xs font-medium text-orange-800 dark:text-orange-200 mb-1.5">
                           Override Reason (Required) *
                         </label>
                         <textarea
                           value={overrideReason}
                           onChange={(e) => setOverrideReason(e.target.value)}
                           placeholder="Explain why this division change is needed..."
-                          className="w-full px-3 py-2 border-2 border-orange-300 dark:border-orange-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          className="w-full px-3 py-2 border border-orange-300 dark:border-orange-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-1 focus:ring-orange-400/40"
                           rows={3}
                         />
                       </div>
@@ -1342,7 +1342,7 @@ export default function DivisionsPage() {
                   setPendingDivisionUpdate(null);
                   setSelectedRoundId('');
                 }}
-                className="flex-1 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium"
+                className="flex-1 h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >
                 Cancel
               </button>
@@ -1360,7 +1360,7 @@ export default function DivisionsPage() {
                   handleCurrentDivisionChange();
                 }}
                 disabled={updatingDriverId !== null || !selectedRoundId}
-                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 h-9 px-3 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors text-sm inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {updatingDriverId ? (
                   <>
@@ -1420,11 +1420,11 @@ export default function DivisionsPage() {
 
       {/* Bulk Edit Modal */}
       {showBulkEditModal && selectedSeason && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
+        <div className="fixed inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-5 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                <h3 className="text-base font-semibold text-slate-900 dark:text-white">
                   Bulk Edit Division Changes
                 </h3>
                 <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
@@ -1440,16 +1440,16 @@ export default function DivisionsPage() {
                   setBulkEditChangeType('promotion');
                   setBulkEditDivisionStart('');
                 }}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
               >
-                <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                <X className="w-4 h-4 text-slate-600 dark:text-slate-400" />
               </button>
             </div>
 
             <div className="space-y-4">
               {/* Change Type */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                   Change Type
                 </label>
                 <select
@@ -1464,7 +1464,7 @@ export default function DivisionsPage() {
                       setBulkEditDivisionStart('');
                     }
                   }}
-                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                  className="h-9 w-full px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600"
                 >
                   <option value="promotion">Promotion / Demotion (Within Season)</option>
                   <option value="division_start">Pre-Season Division Start</option>
@@ -1474,13 +1474,13 @@ export default function DivisionsPage() {
 
               {/* Round Selection */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                   {bulkEditChangeType === 'mid_season_join' ? 'Round Joined' : 'Round'}
                 </label>
                 <select
                   value={bulkEditRoundId}
                   onChange={(e) => setBulkEditRoundId(e.target.value)}
-                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                  className="h-9 w-full px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600"
                 >
                   <option value="">Select a round</option>
                   <option value={`pre-season-${selectedSeason.id}`}>Pre-Season (Before Season Start)</option>
@@ -1496,13 +1496,13 @@ export default function DivisionsPage() {
               {(bulkEditChangeType === 'promotion' || bulkEditChangeType === 'demotion') ? (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                       From Division (optional - will use driver's current division if not specified)
                     </label>
                     <select
                       value={bulkEditFromDivision}
                       onChange={(e) => setBulkEditFromDivision(e.target.value as Division)}
-                      className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                      className="h-9 w-full px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600"
                     >
                       <option value="">Use driver's current division</option>
                       <option value="Division 1">Division 1</option>
@@ -1513,13 +1513,13 @@ export default function DivisionsPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                       To Division
                     </label>
                     <select
                       value={bulkEditToDivision}
                       onChange={(e) => setBulkEditToDivision(e.target.value as Division)}
-                      className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                      className="h-9 w-full px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600"
                     >
                       <option value="">Select target division</option>
                       <option value="Division 1">Division 1</option>
@@ -1532,13 +1532,13 @@ export default function DivisionsPage() {
                 </>
               ) : (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                     Division Start
                   </label>
                   <select
                     value={bulkEditDivisionStart}
                     onChange={(e) => setBulkEditDivisionStart(e.target.value as Division)}
-                    className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                    className="h-9 w-full px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600"
                   >
                     <option value="">Select division start</option>
                     <option value="Division 1">Division 1</option>
@@ -1552,10 +1552,10 @@ export default function DivisionsPage() {
 
               {/* Selected Drivers List */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                   Selected Drivers
                 </label>
-                <div className="max-h-40 overflow-y-auto border-2 border-slate-200 dark:border-slate-700 rounded-xl p-3 bg-slate-50 dark:bg-slate-900">
+                <div className="max-h-40 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-md p-3 bg-slate-50 dark:bg-slate-900">
                   <div className="flex flex-wrap gap-2">
                     {getSelectedDrivers.map(driver => (
                       <span
@@ -1580,7 +1580,7 @@ export default function DivisionsPage() {
                   setBulkEditChangeType('promotion');
                   setBulkEditDivisionStart('');
                 }}
-                className="flex-1 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium"
+                className="flex-1 h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >
                 Cancel
               </button>
@@ -1589,7 +1589,7 @@ export default function DivisionsPage() {
                 disabled={bulkSaving || !bulkEditRoundId || 
                   ((bulkEditChangeType === 'promotion' || bulkEditChangeType === 'demotion') && !bulkEditToDivision) ||
                   ((bulkEditChangeType === 'division_start' || bulkEditChangeType === 'mid_season_join') && !bulkEditDivisionStart)}
-                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 h-9 px-3 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors text-sm inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {bulkSaving ? (
                   <>
@@ -1996,11 +1996,11 @@ function DivisionChangeModal({
   const divisionOptions: Division[] = ['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 max-w-2xl w-full mx-4">
+    <div className="fixed inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-5 max-w-2xl w-full">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+            <h3 className="text-base font-semibold text-slate-900 dark:text-white">
               {existingChange ? 'Edit' : 'Create'} Division Change
             </h3>
             <div className="flex items-center gap-2 mt-1">
@@ -2016,9 +2016,9 @@ function DivisionChangeModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
           >
-            <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+            <X className="w-4 h-4 text-slate-600 dark:text-slate-400" />
           </button>
         </div>
         
@@ -2026,7 +2026,7 @@ function DivisionChangeModal({
           {/* Change Type Selection - only show when creating new */}
           {!existingChange && (
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                 Change Type
               </label>
               <select
@@ -2051,7 +2051,7 @@ function DivisionChangeModal({
                     }
                   }
                 }}
-                className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                className="h-9 w-full px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600"
               >
                 <option value="promotion">Promotion / Demotion (Within Season)</option>
                 <option value="division_start">Pre-Season Division Start</option>
@@ -2069,7 +2069,7 @@ function DivisionChangeModal({
 
           {/* Round Selection */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
               {isMidSeasonJoin ? 'Round Joined' : 'Round'}
             </label>
             <select
@@ -2087,7 +2087,7 @@ function DivisionChangeModal({
                   setChangeType('promotion');
                 }
               }}
-              className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+              className="h-9 w-full px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600"
             >
               <option value="">Select a round</option>
               <option value={`pre-season-${seasonId}`}>Pre-Season (Before Season Start)</option>
@@ -2105,16 +2105,16 @@ function DivisionChangeModal({
                 : 'Select when this division change occurred'}
             </p>
             {isPreSeason && (
-              <div className="mt-2 p-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-                <p className="text-xs text-purple-700 dark:text-purple-300 font-medium">
-                  📅 Pre-Season: No promotions/demotions - this is their starting division
+              <div className="mt-2 p-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md">
+                <p className="text-xs text-slate-600 dark:text-slate-300">
+                  Pre-Season: No promotions/demotions - this is their starting division
                 </p>
               </div>
             )}
             {isMidSeasonJoin && selectedRoundId && !selectedRoundId.startsWith('pre-season-') && (
-              <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">
-                  📅 Mid-Season Join: Driver joined during the season
+              <div className="mt-2 p-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md">
+                <p className="text-xs text-slate-600 dark:text-slate-300">
+                  Mid-Season Join: Driver joined during the season
                 </p>
               </div>
             )}
@@ -2123,13 +2123,13 @@ function DivisionChangeModal({
           {/* Division Start - for pre-season and mid-season join */}
           {(isPreSeason || isMidSeasonJoin) && (
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                 Division Start
               </label>
               <select
                 value={divisionStart}
                 onChange={(e) => setDivisionStart(e.target.value as Division)}
-                className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                className="h-9 w-full px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600"
               >
                 {divisionOptions.map((div) => (
                   <option key={div} value={div}>{div}</option>
@@ -2147,13 +2147,13 @@ function DivisionChangeModal({
           {isRegularChange && (
             <>
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                   From Division <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">(division before change)</span>
                 </label>
                 <select
                   value={fromDivision}
                   onChange={(e) => setFromDivision(e.target.value as Division)}
-                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                  className="h-9 w-full px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600"
                 >
                   {divisionOptions.map((div) => (
                     <option key={div} value={div}>{div}</option>
@@ -2162,13 +2162,13 @@ function DivisionChangeModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                   To Division <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">(division after change)</span>
                 </label>
                 <select
                   value={toDivision}
                   onChange={(e) => setToDivision(e.target.value as Division)}
-                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                  className="h-9 w-full px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600"
                 >
                   {divisionOptions.map((div) => (
                     <option key={div} value={div}>{div}</option>
@@ -2299,7 +2299,7 @@ function DivisionChangeModal({
                                   });
                                   setPointsAdjustments(newAdjustments);
                                 }}
-                                className="w-24 px-2 py-1.5 text-sm border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-semibold"
+                                className="w-24 px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40"
                                 min="0"
                                 placeholder="Points"
                               />
@@ -2344,7 +2344,7 @@ function DivisionChangeModal({
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium"
+            className="flex-1 h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
             Cancel
           </button>
@@ -2352,7 +2352,7 @@ function DivisionChangeModal({
             onClick={handleSave}
             disabled={saving || !selectedRoundId || 
               (isPreSeason || isMidSeasonJoin ? !divisionStart : (!fromDivision || !toDivision || fromDivision === toDivision))}
-            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 h-9 px-3 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors text-sm inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? (
               <>
@@ -2491,11 +2491,11 @@ function DivisionHistoryModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-5 max-w-2xl w-full max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+            <h3 className="text-base font-semibold text-slate-900 dark:text-white">
               Division Change History
             </h3>
             <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
@@ -2504,9 +2504,9 @@ function DivisionHistoryModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
           >
-            <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+            <X className="w-4 h-4 text-slate-600 dark:text-slate-400" />
           </button>
         </div>
         
@@ -2563,7 +2563,7 @@ function DivisionHistoryModal({
                 return (
                   <div
                     key={change.id}
-                    className="p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg"
+                    className="p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1">
@@ -2624,7 +2624,7 @@ function DivisionHistoryModal({
                       <div className="flex gap-2 flex-shrink-0">
                         <button
                           onClick={() => onEdit(change)}
-                          className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                          className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors"
                           title="Edit"
                         >
                           <Edit2 className="w-4 h-4 text-slate-600 dark:text-slate-400" />
@@ -2632,7 +2632,7 @@ function DivisionHistoryModal({
                         <button
                           onClick={() => handleDelete(change.id)}
                           disabled={deletingId === change.id}
-                          className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
+                          className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-md transition-colors disabled:opacity-50"
                           title="Delete"
                         >
                           {deletingId === change.id ? (
@@ -2653,7 +2653,7 @@ function DivisionHistoryModal({
         <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
           <button
             onClick={onClose}
-            className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium"
+            className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
             Close
           </button>

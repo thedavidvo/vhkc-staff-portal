@@ -88,29 +88,29 @@ export default function Modal({
       onMouseUp={handleBackdropMouseUp}
     >
       {/* Backdrop */}
-      <div ref={backdropRef} className="absolute inset-0 bg-black/70 transition-opacity" />
+      <div ref={backdropRef} className="absolute inset-0 bg-black/45 backdrop-blur-[1px] transition-opacity" />
 
       {/* Modal */}
       <div
-        className={`relative w-full ${sizeClasses[size]} bg-white dark:bg-slate-800 rounded-3xl shadow-modern-2xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-scaleIn`}
+        className={`relative w-full ${sizeClasses[size]} bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-scaleIn`}
         onMouseDown={(e) => e.stopPropagation()}
         onMouseUp={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-6 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/80">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-4 flex-1">
+            <div className="flex items-center gap-3 flex-1">
               {Icon && (
-                <div className="p-3 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl shadow-lg">
-                  <Icon className="w-6 h-6 text-white" />
+                <div className="p-2 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <Icon className="w-4 h-4 text-slate-600 dark:text-slate-300" />
                 </div>
               )}
               <div className="flex-1">
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white">
                   {title}
                 </h2>
                 {subtitle && (
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                     {subtitle}
                   </p>
                 )}
@@ -118,22 +118,22 @@ export default function Modal({
             </div>
             <button
               onClick={onClose}
-              className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               aria-label="Close modal"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-6 max-h-[calc(100vh-200px)] overflow-y-auto">
+        <div className="p-4 max-h-[calc(100vh-180px)] overflow-y-auto">
           {children}
         </div>
 
         {/* Footer */}
         {footer && (
-          <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+          <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/70">
             {footer}
           </div>
         )}
