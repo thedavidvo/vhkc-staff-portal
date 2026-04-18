@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import PageLayout from '@/components/PageLayout';
 import SectionCard from '@/components/SectionCard';
 import { useSeason } from '@/components/SeasonContext';
-import { CreditCard, AlertTriangle, CheckCircle, XCircle, Loader2, Search, Shield } from 'lucide-react';
+import { CreditCard, AlertTriangle, CheckCircle, XCircle, Loader2, Search, Shield, RefreshCw } from 'lucide-react';
 
 const getDivisionColor = (division: string) => {
   switch (division) {
@@ -31,6 +31,8 @@ interface License {
   driver_division: string;
   total_incident_points: number;
   activePoints: number;
+  nextExpiry?: string;
+  nextExpiryDetail?: string;
   is_suspended: boolean;
   isSuspended: boolean;
   suspended_at?: string;
@@ -45,6 +47,7 @@ export default function LicensePage() {
   const [licenses, setLicenses] = useState<License[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingLicenseId, setUpdatingLicenseId] = useState<string | null>(null);
+  const [recomputingSeason, setRecomputingSeason] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<LicenseFilter>('all');
 
@@ -60,7 +63,7 @@ export default function LicensePage() {
 
     try {
       setLoading(true);
-      const response = await fetch('/api/licenses');
+      const response = await fetch(`/api/licenses?seasonId=${selectedSeason.id}`);
       if (response.ok) {
         const data = await response.json();
         setLicenses(data);
@@ -127,6 +130,36 @@ export default function LicensePage() {
     }
   };
 
+  const handleRecomputeSeason = async () => {
+    if (!selectedSeason) return;
+
+    try {
+      setRecomputingSeason(true);
+      const response = await fetch('/api/licenses', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'recompute-season',
+          seasonId: selectedSeason.id,
+        }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        alert(payload?.error || 'Failed to recompute licenses');
+        return;
+      }
+
+      await fetchLicenses();
+      alert(`Recomputed ${payload.updated || 0} of ${payload.processed || 0} licenses (round ${payload.currentRound || 0}).`);
+    } catch (error) {
+      console.error('Failed to recompute season licenses:', error);
+      alert('Failed to recompute licenses');
+    } finally {
+      setRecomputingSeason(false);
+    }
+  };
+
   if (loading) {
     return (
       <>
@@ -158,16 +191,32 @@ export default function LicensePage() {
           <div className="h-9 w-9 rounded-md border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300">
             <Shield className="w-4 h-4" />
           </div>
-          <div>
+          <div className="flex-1">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-2">
               License Point System
             </h3>
             <ul className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
               <li>• Incident points are assigned manually during incident review</li>
               <li>• Drivers with <strong>8 or more points</strong> will have their license suspended</li>
-              <li>• Points expire after <strong>1 year</strong> from the incident date</li>
-              <li>• Licenses carry over between seasons, but points expire based on time</li>
+              <li>• Division 1 points expire after <strong>12 rounds</strong></li>
+              <li>• Division 2 points expire after <strong>6 rounds</strong></li>
+              <li>• Division 3 points reset each season and do not carry over</li>
             </ul>
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={handleRecomputeSeason}
+                disabled={!selectedSeason || recomputingSeason}
+                className="h-9 inline-flex items-center gap-2 px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {recomputingSeason ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                Recompute Season Licenses
+              </button>
+            </div>
           </div>
         </div>
       </SectionCard>
@@ -297,6 +346,9 @@ export default function LicensePage() {
                   Active Points
                 </th>
                 <th className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase">
+                  Next Expiry
+                </th>
+                <th className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase">
                   Status
                 </th>
                 <th className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase">
@@ -340,6 +392,14 @@ export default function LicensePage() {
                         </span>
                       )}
                     </div>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
+                    <span
+                      title={license.nextExpiryDetail || license.nextExpiry || 'N/A'}
+                      className="cursor-help border-b border-dotted border-slate-300 dark:border-slate-600"
+                    >
+                      {license.nextExpiry || 'N/A'}
+                    </span>
                   </td>
                   <td className="px-3 py-2 text-sm">
                     <select

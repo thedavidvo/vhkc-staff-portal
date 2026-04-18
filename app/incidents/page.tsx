@@ -89,7 +89,7 @@ export default function IncidentsPage() {
           fetch(`/api/incidents?seasonId=${selectedSeason.id}`),
           fetch(`/api/rounds?seasonId=${selectedSeason.id}`),
           fetch(`/api/drivers?seasonId=${selectedSeason.id}`),
-          fetch('/api/licenses'),
+          fetch(`/api/licenses?seasonId=${selectedSeason.id}`),
         ]);
 
         if (incidentsRes.ok) {
@@ -208,7 +208,7 @@ export default function IncidentsPage() {
       if (response.ok) {
         // Refresh incidents and licenses
         const refreshPromises = [
-          fetch('/api/licenses'),
+          fetch(`/api/licenses?seasonId=${selectedSeason.id}`),
         ];
         
         if (selectedSeason) {
@@ -282,6 +282,8 @@ export default function IncidentsPage() {
         body: JSON.stringify({
           driverId: incident.driverId,
           incidentId: incident.id,
+          seasonId: selectedSeason?.id,
+          roundId: incident.roundId,
           incidentPoints: incident.incidentPoints,
           incidentDate: incident.createdAt || new Date().toISOString(),
         }),
@@ -295,7 +297,7 @@ export default function IncidentsPage() {
 
       // Refresh incidents and licenses
       const refreshPromises = [
-        fetch('/api/licenses'),
+        fetch(`/api/licenses?seasonId=${selectedSeason?.id}`),
       ];
       
       if (selectedSeason) {

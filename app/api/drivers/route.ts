@@ -65,7 +65,7 @@ export async function PUT(request: NextRequest) {
     }
     
     const driver = await request.json();
-    await updateDriver(driver);
+    await updateDriver(driver, seasonId);
     
     // Invalidate cache
     cache.invalidate(`drivers:${seasonId}`);
@@ -89,7 +89,7 @@ export async function DELETE(request: NextRequest) {
     }
     
     // Delete the driver and all related data
-    await deleteDriver(driverId);
+    await deleteDriver(driverId, seasonId || undefined);
     
     // Invalidate all relevant caches
     if (seasonId) {

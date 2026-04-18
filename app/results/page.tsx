@@ -131,7 +131,6 @@ export default function ResultsPage() {
   const [raceResults, setRaceResults] = useState<RaceResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDivision, setSelectedDivision] = useState<Division>('Division 1'); // Race Division
-  const [selectedDriverDivision, setSelectedDriverDivision] = useState<Division | 'All'>('All'); // Driver Division filter
   const [selectedRaceType, setSelectedRaceType] = useState<string>('');
   const [selectedHeatType, setSelectedHeatType] = useState<string>('');
   const [selectedFinalType, setSelectedFinalType] = useState<string>('');
@@ -675,26 +674,6 @@ export default function ResultsPage() {
                 >
                   <option value="Division 1">Division 1</option>
                   <option value="Division 2">Division 2</option>
-                  <option value="Open">Open</option>
-                </select>
-              </div>
-
-              {/* Driver Division Filter - All divisions available */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Driver Division
-                </label>
-                <select
-                  value={selectedDriverDivision}
-                  onChange={(e) => setSelectedDriverDivision(e.target.value as Division | 'All')}
-                  className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30"
-                >
-                  <option value="All">All Divisions</option>
-                  <option value="Division 1">Division 1</option>
-                  <option value="Division 2">Division 2</option>
-                  <option value="Division 3">Division 3</option>
-                  <option value="Division 4">Division 4</option>
-                  <option value="New">New</option>
                   <option value="Open">Open</option>
                 </select>
               </div>
