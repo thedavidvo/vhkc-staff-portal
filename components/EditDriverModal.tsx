@@ -1,6 +1,6 @@
 'use client';
 
-import { Edit, Save, Loader2, X } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Division, DriverStatus, Driver } from '@/types';
 import Modal from '@/components/Modal';
@@ -156,21 +156,22 @@ export default function EditDriverModal({
     }
   };
 
+  const inputCls = 'w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 transition-all';
+  const labelCls = 'block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1';
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title="Edit Driver"
-      subtitle={`Edit details for ${driver.name}`}
-      icon={Edit}
-      size="lg"
+      size="md"
       footer={
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            className="flex-1 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium disabled:opacity-50"
+            className="flex-1 px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
@@ -178,157 +179,143 @@ export default function EditDriverModal({
             type="submit"
             form="edit-driver-form"
             disabled={isSaving}
-            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift flex items-center justify-center gap-2 disabled:opacity-50"
+            className="flex-1 px-3 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md text-sm hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
           >
             {isSaving ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="w-5 h-5" />
-                Save Changes
-              </>
-            )}
+              <><Loader2 className="w-4 h-4 animate-spin" />Saving...</>
+            ) : 'Save Changes'}
           </button>
         </div>
       }
     >
-      <form id="edit-driver-form" onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-2 gap-4">
+      <form id="edit-driver-form" onSubmit={handleSubmit} className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              First Name
-            </label>
+            <label className={labelCls}>First Name</label>
             <input
               type="text"
               value={formData.firstName || driver.firstName || ''}
               onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-              className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+              className={inputCls}
               placeholder="First Name"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Last Name
-            </label>
+            <label className={labelCls}>Last Name</label>
             <input
               type="text"
               value={formData.lastName || driver.lastName || ''}
               onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-              className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+              className={inputCls}
               placeholder="Last Name"
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Email <span className="text-red-500">*</span>
-            </label>
+            <label className={labelCls}>Email</label>
             <input
               type="email"
               required
               value={formData.email || driver.email || ''}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+              className={inputCls}
               placeholder="Email"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Mobile Number
-            </label>
+            <label className={labelCls}>Mobile <span className="text-slate-400 font-normal">(optional)</span></label>
             <input
               type="tel"
               value={formData.mobileNumber || driver.mobileNumber || ''}
               onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })}
-              className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+              className={inputCls}
               placeholder="Mobile Number"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Date of Birth
-          </label>
+          <label className={labelCls}>Date of Birth <span className="text-slate-400 font-normal">(optional)</span></label>
           <div className="grid grid-cols-3 gap-2">
-            <div>
-              <input
-                type="number"
-                min="1"
-                max="31"
-                value={dateOfBirth.day || ''}
-                onChange={(e) => {
-                  const day = parseInt(e.target.value) || 0;
-                  setDateOfBirth({ ...dateOfBirth, day });
-                }}
-                className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-                placeholder="DD"
-              />
-            </div>
-            <div>
-              <input
-                type="number"
-                min="1"
-                max="12"
-                value={dateOfBirth.month || ''}
-                onChange={(e) => {
-                  const month = parseInt(e.target.value) || 0;
-                  setDateOfBirth({ ...dateOfBirth, month });
-                }}
-                className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-                placeholder="MM"
-              />
-            </div>
-            <div>
-              <input
-                type="number"
-                min="1900"
-                max={new Date().getFullYear()}
-                value={dateOfBirth.year || ''}
-                onChange={(e) => {
-                  const year = parseInt(e.target.value) || 0;
-                  setDateOfBirth({ ...dateOfBirth, year });
-                }}
-                className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-                placeholder="YYYY"
-              />
-            </div>
+            <input
+              type="number"
+              min="1"
+              max="31"
+              value={dateOfBirth.day || ''}
+              onChange={(e) => setDateOfBirth({ ...dateOfBirth, day: parseInt(e.target.value) || 0 })}
+              className={inputCls}
+              placeholder="DD"
+            />
+            <input
+              type="number"
+              min="1"
+              max="12"
+              value={dateOfBirth.month || ''}
+              onChange={(e) => setDateOfBirth({ ...dateOfBirth, month: parseInt(e.target.value) || 0 })}
+              className={inputCls}
+              placeholder="MM"
+            />
+            <input
+              type="number"
+              min="1900"
+              max={new Date().getFullYear()}
+              value={dateOfBirth.year || ''}
+              onChange={(e) => setDateOfBirth({ ...dateOfBirth, year: parseInt(e.target.value) || 0 })}
+              className={inputCls}
+              placeholder="YYYY"
+            />
           </div>
-          {(dateOfBirth.day && dateOfBirth.month && dateOfBirth.year) || driver.dateOfBirth ? (
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-              Age: {calculateAge(combineDate(dateOfBirth.day, dateOfBirth.month, dateOfBirth.year) || driver.dateOfBirth) ?? 'N/A'} years old
+          {((dateOfBirth.day && dateOfBirth.month && dateOfBirth.year) || driver.dateOfBirth) ? (
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Age: {calculateAge(combineDate(dateOfBirth.day, dateOfBirth.month, dateOfBirth.year) || driver.dateOfBirth) ?? 'N/A'}
             </p>
           ) : null}
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Division <span className="text-red-500">*</span>
-          </label>
-          <select
-            required
-            value={formData.division || driver.division}
-            onChange={(e) => setFormData({ ...formData, division: e.target.value as Division })}
-            className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-          >
-            <option value="Division 1">Division 1</option>
-            <option value="Division 2">Division 2</option>
-            <option value="Division 3">Division 3</option>
-            <option value="Division 4">Division 4</option>
-            <option value="New">New</option>
-          </select>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>Division</label>
+            <select
+              required
+              value={formData.division || driver.division}
+              onChange={(e) => setFormData({ ...formData, division: e.target.value as Division })}
+              className={inputCls}
+            >
+              <option value="Division 1">Division 1</option>
+              <option value="Division 2">Division 2</option>
+              <option value="Division 3">Division 3</option>
+              <option value="Division 4">Division 4</option>
+              <option value="New">New</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Home Track <span className="text-slate-400 font-normal">(optional)</span></label>
+            <input
+              type="text"
+              value={formData.homeTrack || driver.homeTrack || ''}
+              onChange={(e) => setFormData({ ...formData, homeTrack: e.target.value })}
+              className={inputCls}
+              placeholder="Home Track"
+            />
+          </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Aliases
-          </label>
-          <div className="space-y-2">
+          <label className={labelCls}>Team Name <span className="text-slate-400 font-normal">(optional)</span></label>
+          <input
+            type="text"
+            value={formData.teamName || driver.teamName || ''}
+            onChange={(e) => setFormData({ ...formData, teamName: e.target.value })}
+            className={inputCls}
+            placeholder="Team Name"
+          />
+        </div>
+
+        <div>
+          <label className={labelCls}>Aliases <span className="text-slate-400 font-normal">(optional)</span></label>
+          <div className="space-y-1.5">
             {(formData.aliases || ['']).map((alias, index) => (
               <div key={index} className="flex gap-2">
                 <input
@@ -339,16 +326,12 @@ export default function EditDriverModal({
                       e.preventDefault();
                       const currentAliases = formData.aliases || [''];
                       const trimmedValue = e.currentTarget.value.trim();
-                      
-                      // Always add new alias if current one has content and it's the last field
                       if (trimmedValue && index === currentAliases.length - 1) {
-                        // Update the current alias value and add a new empty one
                         const newAliases = [...currentAliases];
                         newAliases[index] = trimmedValue;
                         newAliases.push('');
                         setFormData({ ...formData, aliases: newAliases });
                       } else if (trimmedValue && index < currentAliases.length - 1) {
-                        // If it's not the last field, just update the current value
                         const newAliases = [...currentAliases];
                         newAliases[index] = trimmedValue;
                         setFormData({ ...formData, aliases: newAliases });
@@ -356,27 +339,21 @@ export default function EditDriverModal({
                     }
                   }}
                   onChange={(e) => {
-                    const currentAliases = formData.aliases || [''];
-                    const newAliases = [...currentAliases];
+                    const newAliases = [...(formData.aliases || [''])];
                     newAliases[index] = e.target.value;
                     setFormData({ ...formData, aliases: newAliases });
                   }}
-                  className="flex-1 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                  className={`flex-1 ${inputCls}`}
                   placeholder={`Alias ${index + 1}`}
                 />
                 {index < (formData.aliases || ['']).length - 1 && (
                   <button
                     type="button"
                     onClick={() => {
-                      const currentAliases = formData.aliases || [''];
-                      const newAliases = currentAliases.filter((_, i) => i !== index);
-                      // Ensure at least one empty field remains
-                      if (newAliases.length === 0) {
-                        newAliases.push('');
-                      }
-                      setFormData({ ...formData, aliases: newAliases });
+                      const newAliases = (formData.aliases || ['']).filter((_, i) => i !== index);
+                      setFormData({ ...formData, aliases: newAliases.length ? newAliases : [''] });
                     }}
-                    className="px-4 py-2.5 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors font-medium"
+                    className="p-1 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -385,18 +362,12 @@ export default function EditDriverModal({
             ))}
             <button
               type="button"
-              onClick={() => {
-                const currentAliases = formData.aliases || [''];
-                setFormData({ ...formData, aliases: [...currentAliases, ''] });
-              }}
-              className="px-4 py-2.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors text-sm font-medium"
+              onClick={() => setFormData({ ...formData, aliases: [...(formData.aliases || ['']), ''] })}
+              className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
             >
               + Add Alias
             </button>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-            Press Enter on the last alias field to add another
-          </p>
         </div>
 
         <div>
@@ -426,22 +397,24 @@ export default function EditDriverModal({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Status <span className="text-red-500">*</span>
-          </label>
+          <label className={labelCls}>Status</label>
           <div className="flex gap-2">
             {(['ACTIVE', 'INACTIVE', 'BANNED'] as DriverStatus[]).map((status) => (
               <button
                 key={status}
                 type="button"
                 onClick={() => setFormData({ ...formData, status })}
-                className={`flex-1 px-4 py-2.5 rounded-xl font-medium transition-colors ${
+                className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${
                   (formData.status || driver.status) === status
-                    ? getStatusColor(status) + ' ring-2 ring-offset-2 ring-slate-400'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    ? status === 'ACTIVE'
+                      ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700'
+                      : status === 'INACTIVE'
+                      ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700'
+                      : 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700'
+                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
                 }`}
               >
-                {formatStatus(status)}
+                {status.charAt(0) + status.slice(1).toLowerCase()}
               </button>
             ))}
           </div>

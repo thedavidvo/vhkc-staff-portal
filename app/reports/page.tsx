@@ -1795,7 +1795,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
               <select
                 value={selectedRoundId}
                 onChange={(e) => setSelectedRoundId(e.target.value)}
-                className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500/50 transition-colors"
               >
                 {rounds.length === 0 ? (
                   <option value="">No rounds available</option>
@@ -1816,7 +1816,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
               <select
                 value={selectedDivision}
                 onChange={(e) => setSelectedDivision(e.target.value as Division | 'All')}
-                className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500/50 transition-colors"
               >
                 <option value="All">All Divisions</option>
                 {(['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'] as Division[]).map((division) => (
@@ -1830,7 +1830,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
 
           {/* Round Details */}
           {selectedRound && (
-            <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl">
+            <div className="p-4 bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">
                 Round Details
               </h3>
@@ -1874,7 +1874,7 @@ Thank you once again for your involvement with VHKC. We look forward to continui
           <button
             onClick={generatePDF}
             disabled={!selectedRoundId || exporting}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all shadow-lg hover:shadow-xl hover-lift font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {exporting ? (
               <>

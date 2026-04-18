@@ -1488,10 +1488,10 @@ export default function RacesPage() {
                         shouldLoadResultsRef.current = true;
                         // Don't clear types here - let the useEffect populate them from results
                       }}
-                      className={`w-full text-left p-2 rounded-lg transition-colors text-sm ${
+                      className={`w-full text-left p-2 rounded-md transition-colors text-sm border ${
                         selectedEvent?.id === race.id
-                          ? 'bg-primary-500 text-white'
-                          : 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600'
+                          ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                       }`}
                     >
                       <div className="font-medium">{race.name}</div>
@@ -1575,12 +1575,12 @@ export default function RacesPage() {
                             setTypes([]);
                           }
                         }}
-                        className={`w-full text-left p-2 rounded-lg transition-colors text-sm ${
+                        className={`w-full text-left p-2 rounded-md transition-colors text-sm border ${
                           isSelected
-                            ? 'bg-primary-500 text-white'
+                            ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100'
                             : hasResults
-                            ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600'
-                            : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                            : 'border-transparent text-slate-400 dark:text-slate-600'
                         }`}
                       >
                         <div className="font-medium">{division}</div>
@@ -1607,7 +1607,7 @@ export default function RacesPage() {
             actions={
               <button
                 onClick={handleAddType}
-                className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all shadow-md text-xs font-medium"
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors"
               >
                 <Plus className="w-3 h-3" />
                 Add
@@ -1638,10 +1638,10 @@ export default function RacesPage() {
                           // Reset the load flag so results will be loaded for the new type
                           shouldLoadResultsRef.current = true;
                         }}
-                        className={`group flex items-center justify-between p-2 rounded-lg transition-colors text-sm cursor-pointer ${
+                        className={`group flex items-center justify-between p-2 rounded-md transition-colors text-sm cursor-pointer border ${
                           selectedType === type
-                            ? 'bg-primary-500 text-white'
-                            : 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600'
+                            ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100'
+                            : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                         }`}
                       >
                             <span className="flex-1 font-medium px-2 py-1">

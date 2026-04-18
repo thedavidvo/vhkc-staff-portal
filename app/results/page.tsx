@@ -557,13 +557,13 @@ export default function ResultsPage() {
               Search Driver
             </label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search by driver name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500/50 transition-colors"
               />
             </div>
           </div>
@@ -577,7 +577,7 @@ export default function ResultsPage() {
                 <select
                   value={selectedRound}
                   onChange={(e) => setSelectedRound(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                 >
                   {rounds.map(round => (
                     <option key={round.id} value={round.id}>
@@ -595,7 +595,7 @@ export default function ResultsPage() {
                 <select
                   value={selectedRaceType}
                   onChange={(e) => setSelectedRaceType(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                 >
                   {availableRaceTypes.length === 0 ? (
                     <option value="">No race types available</option>
@@ -618,7 +618,7 @@ export default function ResultsPage() {
                   <select
                     value={selectedHeatType}
                     onChange={(e) => setSelectedHeatType(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                   >
                     {availableHeatTypes.length === 0 ? (
                       <option value="">No heat types available</option>
@@ -645,7 +645,7 @@ export default function ResultsPage() {
                   <select
                     value={selectedFinalType}
                     onChange={(e) => setSelectedFinalType(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                   >
                     {availableFinalTypes.length === 0 ? (
                       <option value="">No final types available</option>
@@ -671,7 +671,7 @@ export default function ResultsPage() {
                 <select
                   value={selectedDivision}
                   onChange={(e) => setSelectedDivision(e.target.value as Division)}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                 >
                   <option value="Division 1">Division 1</option>
                   <option value="Division 2">Division 2</option>
@@ -687,7 +687,7 @@ export default function ResultsPage() {
                 <select
                   value={selectedDriverDivision}
                   onChange={(e) => setSelectedDriverDivision(e.target.value as Division | 'All')}
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                 >
                   <option value="All">All Divisions</option>
                   <option value="Division 1">Division 1</option>
@@ -714,7 +714,7 @@ export default function ResultsPage() {
               </p>
               <button
                 onClick={handleResetView}
-                className="px-3 py-1.5 text-sm bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"
+                className="px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >
                 Reset View
               </button>
@@ -841,3 +841,4 @@ export default function ResultsPage() {
     </>
   );
 }
+

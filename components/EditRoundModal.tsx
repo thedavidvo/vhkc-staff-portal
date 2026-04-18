@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { Round } from '@/types';
 import Modal from '@/components/Modal';
-import { Calendar, Save } from 'lucide-react';
 
 interface Location {
   id: string;
@@ -86,32 +85,29 @@ export default function EditRoundModal({
       isOpen={isOpen}
       onClose={onClose}
       title="Edit Round"
-      subtitle="Update round details"
-      icon={Calendar}
-      size="md"
+      size="sm"
       footer={
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium"
+            className="flex-1 px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
             Cancel
           </button>
           <button
             type="submit"
             form="round-form"
-            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift flex items-center justify-center gap-2"
+            className="flex-1 px-3 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md text-sm hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors"
           >
-            <Save className="w-4 h-4" />
             Save Round
           </button>
         </div>
       }
     >
-      <form id="round-form" onSubmit={handleSubmit} className="space-y-4">
+      <form id="round-form" onSubmit={handleSubmit} className="space-y-3">
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
             Round Number
           </label>
           <input
@@ -120,25 +116,25 @@ export default function EditRoundModal({
             min="1"
             value={formData.roundNumber}
             onChange={(e) => setFormData({ ...formData, roundNumber: parseInt(e.target.value) || 1 })}
-            className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 transition-all"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Date <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">(optional)</span>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+            Date <span className="text-slate-400 font-normal">(optional)</span>
           </label>
           <input
             type="date"
             value={formData.date}
             onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-            className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 transition-all"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Location <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">(optional)</span>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+            Location <span className="text-slate-400 font-normal">(optional)</span>
           </label>
           {!showManualLocation ? (
             <div className="space-y-2">
@@ -151,7 +147,7 @@ export default function EditRoundModal({
                     setFormData({ ...formData, locationId: e.target.value || undefined });
                   }
                 }}
-                className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 transition-all"
               >
                 <option value="">Select a location (optional)</option>
                 {locations.length > 0 && locations.map((loc) => (
@@ -165,7 +161,7 @@ export default function EditRoundModal({
                 <button
                   type="button"
                   onClick={() => setShowManualLocation(true)}
-                  className="w-full px-4 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  className="w-full px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
                   + Add Location Manually
                 </button>
@@ -177,34 +173,29 @@ export default function EditRoundModal({
                 type="text"
                 value={manualLocation}
                 onChange={(e) => setManualLocation(e.target.value)}
-                placeholder="Location name (optional)"
-                className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                placeholder="Location name"
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 transition-all"
               />
               <input
                 type="text"
                 value={manualAddress}
                 onChange={(e) => setManualAddress(e.target.value)}
                 placeholder="Address (optional)"
-                className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 transition-all"
               />
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={async () => {
                     let newLocationId: string | undefined;
-                    
-                    // If location is provided, add it to the locations list
                     if (manualLocation.trim() && onLocationAdded) {
                       try {
                         await onLocationAdded(manualLocation.trim(), manualAddress.trim());
-                        // Fetch the newly added location to get its ID
                         const response = await fetch('/api/locations');
                         if (response.ok) {
                           const locationsData = await response.json();
                           const newLocation = locationsData.find((l: Location) => l.name === manualLocation.trim());
-                          if (newLocation) {
-                            newLocationId = newLocation.id;
-                          }
+                          if (newLocation) newLocationId = newLocation.id;
                         }
                       } catch (error) {
                         console.error('Failed to add location:', error);
@@ -212,17 +203,12 @@ export default function EditRoundModal({
                         return;
                       }
                     }
-                    
-                    // Update form data with locationId
-                    setFormData({ 
-                      ...formData, 
-                      locationId: newLocationId || undefined
-                    });
+                    setFormData({ ...formData, locationId: newLocationId || undefined });
                     setShowManualLocation(false);
                     setManualLocation('');
                     setManualAddress('');
                   }}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                  className="flex-1 px-3 py-1.5 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md text-xs hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors"
                 >
                   Save Location
                 </button>
@@ -233,7 +219,7 @@ export default function EditRoundModal({
                     setManualLocation('');
                     setManualAddress('');
                   }}
-                  className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm font-medium"
+                  className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-xs"
                 >
                   Cancel
                 </button>
@@ -243,14 +229,14 @@ export default function EditRoundModal({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
             Status
           </label>
           <select
             required
             value={formData.status}
             onChange={(e) => setFormData({ ...formData, status: e.target.value as Round['status'] })}
-            className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 transition-all"
           >
             <option value="upcoming">Upcoming</option>
             <option value="completed">Completed</option>

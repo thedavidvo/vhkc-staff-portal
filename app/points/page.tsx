@@ -1298,7 +1298,7 @@ export default function PointsPage() {
               <button
                 onClick={handleCancelChanges}
                 disabled={isSaving}
-                className="px-4 py-2.5 bg-slate-500 text-white rounded-xl hover:bg-slate-600 transition-all font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <X className="w-4 h-4" />
                 Cancel Changes
@@ -1307,7 +1307,7 @@ export default function PointsPage() {
             <button
               onClick={handleSaveAllChanges}
               disabled={isSaving || filteredPoints.length === 0}
-              className="px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? (
                 <>
@@ -1338,7 +1338,7 @@ export default function PointsPage() {
                   <select
                     value={selectedRound}
                     onChange={(e) => setSelectedRound(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                   >
                     {rounds.map(round => (
                       <option key={round.id} value={round.id}>
@@ -1355,7 +1355,7 @@ export default function PointsPage() {
                   <select
                     value={selectedRaceType}
                   onChange={(e) => setSelectedRaceType(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                   >
                     {availableRaceTypes.includes('heat') && (
                       <option value="heat">Heat</option>
@@ -1375,7 +1375,7 @@ export default function PointsPage() {
                     <select
                       value={selectedHeatType}
                       onChange={(e) => setSelectedHeatType(e.target.value)}
-                      className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                   >
                     {availableHeatTypes.length === 0 ? (
                       <option value="">No heat types available</option>
@@ -1402,7 +1402,7 @@ export default function PointsPage() {
                   <select
                     value={selectedFinalType}
                     onChange={(e) => setSelectedFinalType(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                   >
                     {availableFinalTypes.length === 0 ? (
                       <option value="">No final types available</option>
@@ -1428,7 +1428,7 @@ export default function PointsPage() {
                   <select
                     value={selectedDivision}
                     onChange={(e) => setSelectedDivision(e.target.value as Division)}
-                    className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                   >
                   <option value="Division 1">Division 1</option>
                   <option value="Division 2">Division 2</option>
@@ -1444,7 +1444,7 @@ export default function PointsPage() {
                   <select
                     value={selectedDriverDivision}
                     onChange={(e) => setSelectedDriverDivision(e.target.value as Division | 'All')}
-                    className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                   >
                   <option value="All">All Divisions</option>
                   <option value="Division 1">Division 1</option>
@@ -1457,36 +1457,27 @@ export default function PointsPage() {
               </div>
             </SectionCard>
             
-            {/* Tab Switcher */}
-            <div className="mb-6 border-b border-slate-200 dark:border-slate-700">
-              <div className="flex gap-4">
+            <div className="mb-6 flex gap-2">
                 <button
                   onClick={() => setActiveTab('points')}
-                  className={`px-6 py-3 font-medium transition-colors relative ${
+                  className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
                     activeTab === 'points'
-                      ? 'text-primary-600 dark:text-primary-400'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                      ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                   }`}
                 >
                   Points Management
-                  {activeTab === 'points' && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-600 dark:bg-primary-400" />
-                  )}
                 </button>
                 <button
                   onClick={() => setActiveTab('saved')}
-                  className={`px-6 py-3 font-medium transition-colors relative ${
+                  className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
                     activeTab === 'saved'
-                      ? 'text-primary-600 dark:text-primary-400'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                      ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                   }`}
                 >
                   Saved Results
-                  {activeTab === 'saved' && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-600 dark:bg-primary-400" />
-                  )}
                 </button>
-              </div>
             </div>
 
             {/* Points Management Tab */}
@@ -1504,7 +1495,7 @@ export default function PointsPage() {
                 </p>
                 <button
                   onClick={handleResetView}
-                  className="px-3 py-1.5 text-sm bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"
+                  className="px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
                   Reset View
                 </button>
@@ -1908,7 +1899,7 @@ export default function PointsPage() {
                         </p>
                         <button
                           onClick={handleResetSavedView}
-                          className="px-3 py-1.5 text-sm bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"
+                          className="px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                         >
                           Reset View
                         </button>
@@ -2227,3 +2218,4 @@ export default function PointsPage() {
     </>
   );
 }
+

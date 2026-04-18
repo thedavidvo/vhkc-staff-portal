@@ -810,7 +810,7 @@ export default function DivisionsPage() {
         icon={ShieldCheck}
       >
         {/* Division Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
           {(['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'] as Division[]).map(
             (division) => {
               const isSelected = divisionFilter === division;
@@ -818,19 +818,19 @@ export default function DivisionsPage() {
                 <button
                   key={division}
                   onClick={() => setDivisionFilter(isSelected ? 'all' : division)}
-                  className={`p-6 rounded-2xl transition-all duration-300 hover:scale-105 ${
+                  className={`p-3.5 rounded-md border transition-colors ${
                     isSelected
-                      ? `bg-gradient-to-br ${getDivisionGradient(division)} text-white shadow-lg ring-4 ring-white dark:ring-slate-800`
-                      : 'glass shadow-modern hover:shadow-modern-lg'
+                      ? 'border-slate-900 dark:border-slate-100 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className={`text-sm font-bold uppercase tracking-wider ${isSelected ? 'text-white/90' : 'text-slate-600 dark:text-slate-400'}`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <h3 className={`text-xs font-semibold uppercase tracking-wide ${isSelected ? 'text-white/90 dark:text-slate-900/80' : 'text-slate-600 dark:text-slate-400'}`}>
                       {division}
                     </h3>
-                    <Users className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-slate-400'}`} />
+                    <Users className={`w-4 h-4 ${isSelected ? 'text-white dark:text-slate-900' : 'text-slate-400'}`} />
                   </div>
-                  <p className={`text-3xl font-black ${isSelected ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
+                  <p className={`text-2xl font-semibold ${isSelected ? 'text-white dark:text-slate-900' : 'text-slate-900 dark:text-white'}`}>
                     {driversByDivision[division]?.length || 0}
                   </p>
                 </button>
@@ -839,27 +839,162 @@ export default function DivisionsPage() {
           )}
         </div>
 
+        {/* Confirm Division Changes */}
+        <SectionCard
+          title="Confirm Division Changes"
+          icon={Sparkles}
+          actions={
+            pendingChanges.length > 0 && (
+              <span className="px-2 py-0.5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold rounded-md">
+                {pendingChanges.length}
+              </span>
+            )
+          }
+          className="mb-6"
+          noPadding
+        >
+          <div className="max-h-[380px] overflow-y-auto p-3">
+              {/* Promotions */}
+              {promotions.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2.5">
+                    Promotions ({promotions.length})
+                  </h3>
+                  <div className="space-y-2.5">
+                    {promotions.map((change) => (
+                      <div
+                        key={change.driverId}
+                        className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                                {change.driverName}
+                              </p>
+                              <span className={`px-2 py-0.5 text-xs font-medium rounded-md ${getDivisionColor(change.currentDivision)}`}>
+                                {change.currentDivision}
+                              </span>
+                              <span className="text-slate-300 dark:text-slate-600 text-sm">{'->'}</span>
+                              <span className={`px-2 py-0.5 text-xs font-medium rounded-md ${getDivisionColor(change.newDivision)}`}>
+                                {change.newDivision}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-1.5 flex-shrink-0">
+                            <button
+                              onClick={() => handleConfirmChange(change)}
+                              className="p-1.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-md transition-colors"
+                              aria-label="Confirm"
+                              title="Confirm"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeclineChange(change.driverId)}
+                              className="p-1.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md transition-colors"
+                              aria-label="Decline"
+                              title="Decline"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Demotions */}
+              {demotions.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2.5">
+                    Demotions ({demotions.length})
+                  </h3>
+                  <div className="space-y-2.5">
+                    {demotions.map((change) => (
+                      <div
+                        key={change.driverId}
+                        className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                                {change.driverName}
+                              </p>
+                              <span className={`px-2 py-0.5 text-xs font-medium rounded-md ${getDivisionColor(change.currentDivision)}`}>
+                                {change.currentDivision}
+                              </span>
+                              <span className="text-slate-300 dark:text-slate-600 text-sm">{'->'}</span>
+                              <span className={`px-2 py-0.5 text-xs font-medium rounded-md ${getDivisionColor(change.newDivision)}`}>
+                                {change.newDivision}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-1.5 flex-shrink-0">
+                            <button
+                              onClick={() => handleConfirmChange(change)}
+                              className="p-1.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-md transition-colors"
+                              aria-label="Confirm"
+                              title="Confirm"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeclineChange(change.driverId)}
+                              className="p-1.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md transition-colors"
+                              aria-label="Decline"
+                              title="Decline"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {pendingChanges.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800/50 flex items-center justify-center mb-3">
+                    <Check className="w-6 h-6 text-slate-400 dark:text-slate-500" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                    No pending changes
+                  </p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                    Select a division change to see it here
+                  </p>
+                </div>
+              )}
+          </div>
+        </SectionCard>
+
         {/* Search and Filter */}
         <SectionCard
           icon={Search}
           title="Search & Filter"
-          className="mb-8"
+          className="mb-6"
         >
-          <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex flex-col md:flex-row gap-2.5">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search driver by name"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                className="w-full h-9 pl-9 pr-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600 focus:border-slate-300 dark:focus:border-slate-600 transition-colors"
               />
             </div>
             <select
               value={divisionFilter}
               onChange={(e) => setDivisionFilter(e.target.value as Division | 'all')}
-              className="px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all min-w-[180px]"
+              className="h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600 focus:border-slate-300 dark:focus:border-slate-600 transition-colors min-w-[180px]"
             >
               <option value="all">All Divisions</option>
               <option value="Division 1">Division 1</option>
@@ -871,26 +1006,24 @@ export default function DivisionsPage() {
           </div>
         </SectionCard>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Drivers Table - Middle */}
-          <div className="lg:col-span-2">
+        {/* Main Content */}
+        <div>
             <SectionCard
-              title={`Search Results (${filteredDrivers.length})`}
+              title={`Results (${filteredDrivers.length})`}
               icon={Users}
               actions={
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   {selectedDriverIds.size > 0 && (
-                    <span className="px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs font-semibold rounded-full">
+                    <span className="px-2 py-0.5 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-xs font-medium rounded-md">
                       {selectedDriverIds.size} selected
                     </span>
                   )}
                   {selectedDriverIds.size > 0 && (
                     <button
                       onClick={handleBulkEdit}
-                      className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                      className="inline-flex items-center gap-1 px-2 py-1.5 text-xs border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                     >
-                      <Edit2 className="w-4 h-4" />
+                      <Edit2 className="w-3.5 h-3.5" />
                       Bulk Edit
                     </button>
                   )}
@@ -898,41 +1031,41 @@ export default function DivisionsPage() {
               }
               noPadding
             >
-              <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-400px)]">
+              <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-430px)]">
                 <table className="w-full">
-                    <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-30 shadow-sm">
+                    <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-30">
                       <tr>
-                        <th className="px-6 py-4 text-center text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider w-12">
+                        <th className="px-3 py-1.5 text-center text-[11px] font-medium text-slate-500 dark:text-slate-400 w-12">
                           <button
                             onClick={handleSelectAll}
                             className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
                             title={selectedDriverIds.size === filteredDrivers.length ? 'Deselect all' : 'Select all'}
                           >
                             {selectedDriverIds.size === filteredDrivers.length && filteredDrivers.length > 0 ? (
-                              <CheckSquare className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                              <CheckSquare className="w-5 h-5 text-slate-600 dark:text-slate-300" />
                             ) : (
                               <Square className="w-5 h-5 text-slate-400" />
                             )}
                           </button>
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider sticky left-12 bg-slate-50 dark:bg-slate-800 z-50 min-w-[200px]">
+                        <th className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 sticky left-12 bg-slate-50 dark:bg-slate-800 z-50 min-w-[200px]">
                           Name
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider sticky left-[248px] bg-slate-50 dark:bg-slate-800 z-50 w-48">
+                        <th className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 sticky left-[248px] bg-slate-50 dark:bg-slate-800 z-50 w-48">
                           Current Division
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                        <th className="px-3 py-1.5 text-center text-[11px] font-medium text-slate-500 dark:text-slate-400">
                           Change To
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider w-40">
+                        <th className="px-3 py-1.5 text-center text-[11px] font-medium text-slate-500 dark:text-slate-400 w-40">
                           History / Actions
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-slate-800">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
                       {filteredDrivers.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-6 py-12 text-center">
+                          <td colSpan={5} className="px-4 py-10 text-center">
                             <p className="text-slate-500 dark:text-slate-400">
                               No drivers found matching your search criteria.
                             </p>
@@ -951,40 +1084,33 @@ export default function DivisionsPage() {
                           const isSelected = selectedDriverIds.has(driver.id);
                           
                           return (
-                            <tr
-                              key={driver.id}
-                              className={`group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${
-                                pendingChange ? 'bg-amber-50 dark:bg-amber-900/10' : ''
-                              } ${isSelected ? 'bg-primary-50 dark:bg-primary-900/10' : ''}`}
-                            >
-                              <td className="px-6 py-4 text-center">
+                            <tr key={driver.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                              <td className="px-3 py-2 text-center">
                                 <button
                                   onClick={() => handleSelectDriver(driver.id)}
                                   className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
                                   title={isSelected ? 'Deselect' : 'Select'}
                                 >
                                   {isSelected ? (
-                                    <CheckSquare className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                                    <CheckSquare className="w-5 h-5 text-slate-600 dark:text-slate-300" />
                                   ) : (
                                     <Square className="w-5 h-5 text-slate-400" />
                                   )}
                                 </button>
                               </td>
-                              <td className={`px-6 py-4 text-sm font-medium text-slate-900 dark:text-white sticky left-12 z-20 ${
-                                pendingChange 
-                                  ? 'bg-amber-50 dark:bg-amber-900/10 border-l-4 border-l-amber-400 group-hover:bg-amber-50 dark:group-hover:bg-amber-900/10' 
+                              <td className={`px-3 py-2 text-sm text-slate-900 dark:text-white sticky left-12 z-20 ${
+                                pendingChange
+                                  ? 'bg-white dark:bg-slate-900 border-l-2 border-l-amber-400 group-hover:bg-slate-50 dark:group-hover:bg-slate-800'
                                   : isSelected
-                                  ? 'bg-primary-50 dark:bg-primary-900/10 group-hover:bg-primary-50 dark:group-hover:bg-primary-900/10'
-                                  : 'bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-800'
+                                  ? 'bg-white dark:bg-slate-900 border-l-2 border-l-slate-400 group-hover:bg-slate-50 dark:group-hover:bg-slate-800'
+                                  : 'bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800'
                               }`}>
                                 {driver.name}
                               </td>
-                              <td className={`px-6 py-4 text-sm sticky left-[248px] z-20 w-48 ${
-                                pendingChange 
-                                  ? 'bg-amber-50 dark:bg-amber-900/10 group-hover:bg-amber-50 dark:group-hover:bg-amber-900/10' 
-                                  : isSelected
-                                  ? 'bg-primary-50 dark:bg-primary-900/10 group-hover:bg-primary-50 dark:group-hover:bg-primary-900/10'
-                                  : 'bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-800'
+                              <td className={`px-3 py-2 text-sm sticky left-[248px] z-20 w-48 ${
+                                pendingChange || isSelected
+                                  ? 'bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800'
+                                  : 'bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800'
                               }`}>
                                 <div className="relative inline-block">
                                   <select
@@ -1002,16 +1128,14 @@ export default function DivisionsPage() {
                                     <option value="Division 4">Division 4</option>
                                     <option value="New">New</option>
                                   </select>
-                                  <div className={`px-3 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap inline-flex items-center gap-1 ${getDivisionColor(driver.division)} ${updatingDriverId === driver.id ? 'opacity-50' : ''}`}>
+                                  <div className={`px-2 py-0.5 text-xs font-medium rounded-md whitespace-nowrap inline-flex items-center gap-1 ${getDivisionColor(driver.division)} ${updatingDriverId === driver.id ? 'opacity-50' : ''}`}>
                                     <span>{driver.division}</span>
                                     {updatingDriverId !== driver.id && <ChevronDown className="w-3 h-3" style={{ color: 'inherit' }} />}
                                     {updatingDriverId === driver.id && <Loader2 className="w-3 h-3 animate-spin" style={{ color: 'inherit' }} />}
                                   </div>
                                 </div>
                               </td>
-                              <td className={`px-6 py-4 text-sm text-center ${
-                                pendingChange ? 'bg-amber-50 dark:bg-amber-900/10' : ''
-                              }`}>
+                              <td className="px-3 py-2 text-sm text-center">
                                 {(() => {
                                   const selectedDivision = pendingChange?.newDivision || driver.division;
                                   return (
@@ -1030,7 +1154,7 @@ export default function DivisionsPage() {
                                         <option value="Division 4">Division 4</option>
                                         <option value="New">New</option>
                                       </select>
-                                      <div className={`px-3 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap inline-flex items-center gap-1 ${getDivisionColor(selectedDivision)} pointer-events-none`}>
+                                      <div className={`px-2 py-0.5 text-xs font-medium rounded-md whitespace-nowrap inline-flex items-center gap-1 ${getDivisionColor(selectedDivision)} pointer-events-none`}>
                                         <span>{selectedDivision}</span>
                                         <ChevronDown className="w-3 h-3" style={{ color: 'inherit' }} />
                                       </div>
@@ -1038,9 +1162,7 @@ export default function DivisionsPage() {
                                   );
                                 })()}
                               </td>
-                              <td className={`px-6 py-4 text-sm text-center ${
-                                pendingChange ? 'bg-amber-50 dark:bg-amber-900/10' : ''
-                              }`}>
+                              <td className="px-3 py-2 text-sm text-center">
                                 <div className="flex flex-col items-center gap-2">
                                 {lastChange ? (
                                   <div className="flex flex-col items-center gap-1" title={`Last change at ${getRoundDisplayName(lastChange.roundId, rounds)}`}>
@@ -1057,10 +1179,10 @@ export default function DivisionsPage() {
                                         setSelectedDriverHistory({ id: driver.id, name: driver.name });
                                         setShowDivisionHistoryModal(true);
                                       }}
-                                      className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                                      className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors"
                                       title="View division history"
                                     >
-                                      <History className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                                      <History className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
                                     </button>
                                     <button
                                       onClick={() => {
@@ -1072,10 +1194,10 @@ export default function DivisionsPage() {
                                         setEditingDivisionChange(null);
                                         setShowDivisionChangeModal(true);
                                       }}
-                                      className="p-1.5 hover:bg-primary-100 dark:hover:bg-primary-900/30 rounded-lg transition-colors"
+                                      className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors"
                                       title="Add division change"
                                     >
-                                      <Plus className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                                      <Plus className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
                                     </button>
                                   </div>
                                 </div>
@@ -1088,144 +1210,6 @@ export default function DivisionsPage() {
                   </table>
                 </div>
             </SectionCard>
-          </div>
-
-          {/* Confirm Division Changes - Right Side */}
-          <div className="lg:col-span-1">
-            <SectionCard
-              title="Confirm Division Changes"
-              icon={Sparkles}
-              actions={
-                pendingChanges.length > 0 && (
-                  <span className="px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs font-semibold rounded-full">
-                    {pendingChanges.length}
-                  </span>
-                )
-              }
-              className="h-[calc(100vh-400px)] flex flex-col"
-              noPadding
-            >
-              <div className="flex-1 overflow-y-auto p-6">
-                  {/* Promotions */}
-                  {promotions.length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
-                        Promotions ({promotions.length})
-                      </h3>
-                      <div className="space-y-3">
-                        {promotions.map((change) => (
-                          <div
-                            key={change.driverId}
-                            className="p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-slate-900 dark:text-white truncate mb-3">
-                                  {change.driverName}
-                                </p>
-                                <div className="flex items-center gap-2">
-                                  <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getDivisionColor(change.currentDivision)}`}>
-                                    {change.currentDivision}
-                                  </span>
-                                  <span className="text-slate-300 dark:text-slate-600 text-sm">→</span>
-                                  <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getDivisionColor(change.newDivision)}`}>
-                                    {change.newDivision}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="flex gap-2 flex-shrink-0">
-                                <button
-                                  onClick={() => handleConfirmChange(change)}
-                                  className="p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
-                                  aria-label="Confirm"
-                                  title="Confirm"
-                                >
-                                  <Check className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeclineChange(change.driverId)}
-                                  className="p-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg transition-colors"
-                                  aria-label="Decline"
-                                  title="Decline"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Demotions */}
-                  {demotions.length > 0 && (
-                    <div>
-                      <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
-                        Demotions ({demotions.length})
-                      </h3>
-                      <div className="space-y-3">
-                        {demotions.map((change) => (
-                          <div
-                            key={change.driverId}
-                            className="p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-slate-900 dark:text-white truncate mb-3">
-                                  {change.driverName}
-                                </p>
-                                <div className="flex items-center gap-2">
-                                  <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getDivisionColor(change.currentDivision)}`}>
-                                    {change.currentDivision}
-                                  </span>
-                                  <span className="text-slate-300 dark:text-slate-600 text-sm">→</span>
-                                  <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getDivisionColor(change.newDivision)}`}>
-                                    {change.newDivision}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="flex gap-2 flex-shrink-0">
-                                <button
-                                  onClick={() => handleConfirmChange(change)}
-                                  className="p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
-                                  aria-label="Confirm"
-                                  title="Confirm"
-                                >
-                                  <Check className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeclineChange(change.driverId)}
-                                  className="p-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg transition-colors"
-                                  aria-label="Decline"
-                                  title="Decline"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {pendingChanges.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                      <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800/50 flex items-center justify-center mb-4">
-                        <Check className="w-8 h-8 text-slate-400 dark:text-slate-500" />
-                      </div>
-                      <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-                        No pending changes
-                      </p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                        Select a division change to see it here
-                      </p>
-                    </div>
-                  )}
-              </div>
-            </SectionCard>
-          </div>
         </div>
       </PageLayout>
 

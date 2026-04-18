@@ -83,8 +83,11 @@ export interface Promotion {
 }
 
 export interface Stats {
+  totalRounds: number;
   totalDrivers: number;
   activeDivisions: number;
+  totalTeams: number;
+  totalLocations: number;
 }
 
 export interface Round {

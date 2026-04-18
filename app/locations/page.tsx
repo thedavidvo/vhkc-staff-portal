@@ -170,9 +170,9 @@ export default function LocationsPage() {
         headerActions={
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift"
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4" />
             Add Location
           </button>
         }
@@ -181,16 +181,16 @@ export default function LocationsPage() {
         <SectionCard
           icon={Search}
           title="Search Locations"
-          className="mb-8"
+          className="mb-6"
         >
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search locations by name or address..."
-              className="w-full px-4 py-2.5 pl-10 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+              className="h-9 w-full px-3 pl-9 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600 transition-colors"
             />
           </div>
         </SectionCard>
@@ -198,15 +198,15 @@ export default function LocationsPage() {
         {/* Locations List */}
         {filteredLocations.length === 0 ? (
           <SectionCard>
-            <div className="text-center py-12">
-              <MapPin className="w-16 h-16 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
-              <p className="text-slate-600 dark:text-slate-400 text-lg">
+            <div className="text-center py-10">
+              <MapPin className="w-12 h-12 text-slate-400 dark:text-slate-500 mx-auto mb-3" />
+              <p className="text-slate-600 dark:text-slate-400 text-sm">
                 {searchQuery ? 'No locations found matching your search.' : 'No locations added yet.'}
               </p>
               {!searchQuery && (
                 <button
                   onClick={() => setIsAddModalOpen(true)}
-                  className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                  className="mt-3 h-8 px-3 text-xs bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors"
                 >
                   Add Your First Location
                 </button>
@@ -223,33 +223,33 @@ export default function LocationsPage() {
                 {filteredLocations.map((location) => (
                   <div
                     key={location.id}
-                    className="p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                    className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-4 flex-1 min-w-0">
-                        <div className="p-2 bg-primary-100 dark:bg-primary-900 rounded-lg flex-shrink-0">
-                          <MapPin className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded-md flex-shrink-0">
+                          <MapPin className="w-4 h-4 text-slate-600 dark:text-slate-300" />
                         </div>
                         <div className="flex-1 min-w-0">
                           {editingLocation?.id === location.id ? (
-                            <div className="space-y-3">
+                            <div className="space-y-2">
                               <input
                                 type="text"
                                 value={editingLocation.name}
                                 onChange={(e) => setEditingLocation({ ...editingLocation, name: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary font-semibold"
+                                className="h-9 w-full px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40"
                                 autoFocus
                               />
                               <textarea
                                 value={editingLocation.address}
                                 onChange={(e) => setEditingLocation({ ...editingLocation, address: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary text-sm min-h-[80px]"
+                                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40 min-h-[76px]"
                                 placeholder="Address (optional)"
                               />
                             </div>
                           ) : (
                             <div>
-                              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                              <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-1">
                                 {location.name}
                               </h3>
                               <p className="text-sm text-slate-600 dark:text-slate-400">
@@ -265,35 +265,35 @@ export default function LocationsPage() {
                             <button
                               onClick={handleUpdateLocation}
                               disabled={saving}
-                              className="p-2 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                              className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                               aria-label="Save"
                             >
-                              <Save className="w-4 h-4 text-green-600 dark:text-green-400" />
+                              <Save className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => setEditingLocation(null)}
                               disabled={saving}
-                              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                               aria-label="Cancel"
                             >
-                              <X className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                              <X className="w-3.5 h-3.5" />
                             </button>
                           </>
                         ) : (
                           <>
                             <button
                               onClick={() => setEditingLocation({ ...location })}
-                              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                               aria-label="Edit location"
                             >
-                              <Edit className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                              <Edit className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleDeleteLocation(location.id)}
-                              className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                              className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                               aria-label="Delete location"
                             >
-                              <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </>
                         )}
@@ -325,7 +325,7 @@ export default function LocationsPage() {
                 setIsAddModalOpen(false);
                 setNewLocation({ name: '', address: '' });
               }}
-              className="flex-1 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium"
+              className="flex-1 h-9 px-3 text-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
               Cancel
             </button>
@@ -333,7 +333,7 @@ export default function LocationsPage() {
               type="submit"
               form="add-location-form"
               disabled={saving}
-              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all font-medium shadow-lg hover:shadow-xl hover-lift disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 h-9 inline-flex items-center justify-center gap-2 px-3 text-sm bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? (
                 <>
@@ -359,7 +359,7 @@ export default function LocationsPage() {
           className="space-y-4"
         >
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
                   Location Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -367,19 +367,19 @@ export default function LocationsPage() {
                   required
                   value={newLocation.name}
                   onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })}
-                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                  className="h-9 w-full px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600 transition-colors"
                   placeholder="e.g., VHKC Main Track"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
                   Address <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">(optional)</span>
                 </label>
                 <textarea
                   value={newLocation.address}
                   onChange={(e) => setNewLocation({ ...newLocation, address: e.target.value })}
-                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all min-h-[100px]"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600 transition-colors min-h-[92px]"
                   placeholder="123 Racing Blvd, City, State 12345"
                 />
               </div>
@@ -388,4 +388,5 @@ export default function LocationsPage() {
     </>
   );
 }
+
 
