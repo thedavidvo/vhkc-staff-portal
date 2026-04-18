@@ -10,6 +10,13 @@ import {
   Payment,
 } from '@/lib/dbService';
 
+function normalizePaymentStatus(status?: string): Payment['status'] {
+  if (status === 'paid' || status === 'pending' || status === 'not_paid') {
+    return status;
+  }
+  return 'pending';
+}
+
 function isMissingPaymentsTableError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error || '');
   return (
@@ -58,6 +65,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const payment: Payment = await request.json();
+  payment.status = normalizePaymentStatus(payment.status);
 
   if (!payment.id) {
     payment.id = `payment-${Date.now()}-${Math.random().toString(36).substring(7)}`;
@@ -91,6 +99,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   const payment: Payment = await request.json();
+  payment.status = normalizePaymentStatus(payment.status);
 
   if (!payment.id) {
     return NextResponse.json({ error: 'Payment ID is required' }, { status: 400 });

@@ -1238,7 +1238,7 @@ export interface Payment {
   roundId: string;
   driverId: string;
   amount: number;
-  status: 'paid' | 'pending' | 'failed' | 'refunded';
+  status: 'paid' | 'pending' | 'not_paid';
   paymentMethod?: string;
   stripePaymentIntentId?: string;
   paymentDate?: string;
@@ -1249,6 +1249,13 @@ export interface Payment {
 }
 
 let paymentsTableEnsured = false;
+
+function normalizePaymentStatus(status?: string): Payment['status'] {
+  if (status === 'paid' || status === 'pending' || status === 'not_paid') {
+    return status;
+  }
+  return 'pending';
+}
 
 async function ensurePaymentsTable(): Promise<void> {
   if (paymentsTableEnsured) return;
@@ -1282,6 +1289,32 @@ async function ensurePaymentsTable(): Promise<void> {
 export async function createPayment(payment: Payment): Promise<void> {
   await ensurePaymentsTable();
 
+  // Keep one payment record per driver per round. If one already exists,
+  // update it instead of inserting a duplicate row.
+  const existing = await sql`
+    SELECT id FROM payments
+    WHERE round_id = ${payment.roundId}
+      AND driver_id = ${payment.driverId}
+    ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+    LIMIT 1
+  ` as any[];
+
+  if (existing.length > 0) {
+    await sql`
+      UPDATE payments SET
+        amount = ${payment.amount},
+        status = ${normalizePaymentStatus(payment.status)},
+        payment_method = ${payment.paymentMethod || null},
+        stripe_payment_intent_id = ${payment.stripePaymentIntentId || null},
+        payment_date = ${payment.paymentDate || null},
+        reference_number = ${payment.referenceNumber || null},
+        notes = ${payment.notes || null},
+        updated_at = ${payment.updatedAt || new Date().toISOString()}
+      WHERE id = ${existing[0].id}
+    `;
+    return;
+  }
+
   await sql`
     INSERT INTO payments (
       id, season_id, round_id, driver_id, amount, status,
@@ -1289,7 +1322,7 @@ export async function createPayment(payment: Payment): Promise<void> {
       reference_number, notes, created_at, updated_at
     ) VALUES (
       ${payment.id}, ${payment.seasonId}, ${payment.roundId}, ${payment.driverId},
-      ${payment.amount}, ${payment.status}, ${payment.paymentMethod || null},
+      ${payment.amount}, ${normalizePaymentStatus(payment.status)}, ${payment.paymentMethod || null},
       ${payment.stripePaymentIntentId || null}, ${payment.paymentDate || null},
       ${payment.referenceNumber || null}, ${payment.notes || null},
       ${payment.createdAt || new Date().toISOString()},
@@ -1312,7 +1345,7 @@ export async function getPaymentsByRound(roundId: string): Promise<Payment[]> {
     roundId: p.round_id,
     driverId: p.driver_id,
     amount: parseFloat(p.amount),
-    status: p.status,
+    status: normalizePaymentStatus(p.status),
     paymentMethod: p.payment_method,
     stripePaymentIntentId: p.stripe_payment_intent_id,
     paymentDate: p.payment_date,
@@ -1337,7 +1370,7 @@ export async function getPaymentsByDriver(driverId: string): Promise<Payment[]> 
     roundId: p.round_id,
     driverId: p.driver_id,
     amount: parseFloat(p.amount),
-    status: p.status,
+    status: normalizePaymentStatus(p.status),
     paymentMethod: p.payment_method,
     stripePaymentIntentId: p.stripe_payment_intent_id,
     paymentDate: p.payment_date,
@@ -1362,7 +1395,7 @@ export async function getPaymentsBySeason(seasonId: string): Promise<Payment[]> 
     roundId: p.round_id,
     driverId: p.driver_id,
     amount: parseFloat(p.amount),
-    status: p.status,
+    status: normalizePaymentStatus(p.status),
     paymentMethod: p.payment_method,
     stripePaymentIntentId: p.stripe_payment_intent_id,
     paymentDate: p.payment_date,
@@ -1379,7 +1412,7 @@ export async function updatePayment(payment: Payment): Promise<void> {
   await sql`
     UPDATE payments SET
       amount = ${payment.amount},
-      status = ${payment.status},
+      status = ${normalizePaymentStatus(payment.status)},
       payment_method = ${payment.paymentMethod || null},
       payment_date = ${payment.paymentDate || null},
       reference_number = ${payment.referenceNumber || null},

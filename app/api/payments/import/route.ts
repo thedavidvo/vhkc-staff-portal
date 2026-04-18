@@ -11,7 +11,7 @@ import { cache } from '@/lib/cache';
 
 export const dynamic = 'force-dynamic';
 
-type ImportPaymentStatus = 'paid' | 'pending';
+type ImportPaymentStatus = 'paid' | 'not_paid';
 
 interface ParsedRow {
   orderNumber: string;
@@ -91,7 +91,7 @@ function normalizePaymentStatus(rawValue: string): ImportPaymentStatus {
   if (['paid', 'succeeded', 'successful', 'completed', 'complete'].includes(value)) {
     return 'paid';
   }
-  return 'pending';
+  return 'not_paid';
 }
 
 function parseCsvWithDelimiter(content: string, delimiter: string): string[][] {
@@ -264,7 +264,7 @@ export async function POST(request: NextRequest) {
       const current = aggregated.get(key);
       if (current) {
         current.totalTicketPrice = Math.max(current.totalTicketPrice, amount);
-        current.paymentStatus = current.paymentStatus === 'paid' || paymentStatus === 'paid' ? 'paid' : 'pending';
+        current.paymentStatus = current.paymentStatus === 'paid' || paymentStatus === 'paid' ? 'paid' : 'not_paid';
         if (!current.phoneNumber) current.phoneNumber = getValue(row, 'phone number');
         if (!current.dateOfBirth) current.dateOfBirth = normalizeDateOfBirth(getValue(row, 'date of birth'));
         if (!current.orderNumber) current.orderNumber = getValue(row, 'order number');
