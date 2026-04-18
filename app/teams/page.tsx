@@ -722,8 +722,8 @@ export default function TeamsPage() {
 
       {/* Create Team Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-700 max-w-md w-full p-5">
+        <div className="fixed inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xl max-w-md w-full p-5">
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
               {isEditMode ? 'Edit Team' : 'Register New Team'}
             </h2>

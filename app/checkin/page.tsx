@@ -10,7 +10,7 @@ import { Loader2, Edit, Save, X, CheckCircle2, Circle, Search, Filter, UserCheck
 import { exportDriverListToCSV, downloadCSV } from '@/lib/csvExport';
 
 type DriverStatusFilter = 'all' | 'checkedIn' | 'notCheckedIn';
-type PaymentStatusFilter = 'all' | 'paid' | 'pending' | 'notPaid';
+type PaymentStatusFilter = 'all' | 'paid' | 'pending' | 'not_paid';
 
 // Helper function to get division color
 const getDivisionColor = (division: Division) => {
@@ -30,7 +30,7 @@ const getDivisionColor = (division: Division) => {
   }
 };
 
-const getPaymentColor = (status: 'paid' | 'pending' | 'notPaid') => {
+const getPaymentColor = (status: 'paid' | 'pending' | 'not_paid') => {
   switch (status) {
     case 'paid':
       return 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/70';
@@ -189,8 +189,11 @@ export default function CheckInPage() {
   // Helper to get payment status for a driver
   const getPaymentStatus = (driverId: string) => {
     const payment = payments.find(p => p.driverId === driverId);
-    if (!payment) return 'notPaid';
-    return payment.status === 'paid' ? 'paid' : 'pending';
+    if (!payment) return 'pending';
+    if (payment.status === 'paid' || payment.status === 'pending' || payment.status === 'not_paid') {
+      return payment.status;
+    }
+    return 'pending';
   };
 
   // Filter drivers based on status filter, search query, division, and payment
@@ -544,8 +547,8 @@ export default function CheckInPage() {
                     >
                       <option value="all">All Payment Status</option>
                       <option value="paid">Paid</option>
-                      <option value="pending">Pending</option>
-                      <option value="notPaid">Not Paid</option>
+                      <option value="pending">No Ticket</option>
+                      <option value="not_paid">Not Paid</option>
                     </select>
                   </div>
                 </div>
@@ -639,10 +642,10 @@ export default function CheckInPage() {
                                 ) : paymentStatus === 'pending' ? (
                                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md ${getPaymentColor('pending')}`}>
                                     <DollarSign className="w-3 h-3" />
-                                    Pending
+                                    No Ticket
                                   </span>
                                 ) : (
-                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md ${getPaymentColor('notPaid')}`}>
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md ${getPaymentColor('not_paid')}`}>
                                     <DollarSign className="w-3 h-3" />
                                     Not Paid
                                   </span>
@@ -704,8 +707,8 @@ export default function CheckInPage() {
 
       {/* Edit Driver Modal */}
       {editingDriver && (
-        <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold text-slate-900 dark:text-white">Edit Driver</h2>

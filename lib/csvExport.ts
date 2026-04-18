@@ -56,7 +56,7 @@ export function exportDriverListToCSV(
     checkedInOnly?: boolean;
     activeOnly?: boolean;
     division?: string;
-    paymentStatus?: 'paid' | 'pending' | 'notPaid';
+    paymentStatus?: 'paid' | 'pending' | 'not_paid' | 'notPaid';
     checkInStatus?: 'checkedIn' | 'notCheckedIn';
   }
 ): string {
@@ -82,16 +82,16 @@ export function exportDriverListToCSV(
     filteredDrivers = filteredDrivers.filter(d => paidDriverIds.includes(d.id));
   }
 
-  if (filters?.paymentStatus === 'paid') {
-    const paidDriverIds = payments
-      .filter(p => p.status === 'paid' && p.roundId === round.id)
-      .map(p => p.driverId);
-    filteredDrivers = filteredDrivers.filter(d => paidDriverIds.includes(d.id));
-  } else if (filters?.paymentStatus === 'pending' || filters?.paymentStatus === 'notPaid') {
-    const paidDriverIds = payments
-      .filter(p => p.status === 'paid' && p.roundId === round.id)
-      .map(p => p.driverId);
-    filteredDrivers = filteredDrivers.filter(d => !paidDriverIds.includes(d.id));
+  if (filters?.paymentStatus) {
+    const selectedStatus = filters.paymentStatus === 'notPaid' ? 'not_paid' : filters.paymentStatus;
+    filteredDrivers = filteredDrivers.filter(d => {
+      const payment = payments.find(p => p.driverId === d.id && p.roundId === round.id);
+      if (!payment) return selectedStatus === 'pending';
+      const normalized = payment.status === 'paid' || payment.status === 'pending' || payment.status === 'not_paid'
+        ? payment.status
+        : 'pending';
+      return normalized === selectedStatus;
+    });
   }
   
   if (filters?.checkedInOnly) {
