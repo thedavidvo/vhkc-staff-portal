@@ -5,29 +5,11 @@ import { createPortal } from 'react-dom';
 import Header from '@/components/Header';
 import PageLayout from '@/components/PageLayout';
 import SectionCard from '@/components/SectionCard';
-import Modal from '@/components/Modal';
 import { useSeason } from '@/components/SeasonContext';
 import { Race, Division, DriverRaceResult } from '@/types';
 import { Plus, Save, Trash2, Loader2, Flag, Calendar, Users, Trophy } from 'lucide-react';
 import { getPointsForPosition } from '@/lib/pointsSystem';
-
-// Helper function to get division color (for table cells with division badges)
-const getDivisionColor = (division: Division) => {
-  switch (division) {
-    case 'Division 1':
-      return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
-    case 'Division 2':
-      return 'bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200';
-    case 'Division 3':
-      return 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200';
-    case 'Division 4':
-      return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
-    case 'New':
-      return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
-    default:
-      return 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200';
-  }
-};
+import { getDivisionColor, getDivisionsForSeason, getSeasonNumber, isNewDivisionStructure } from '@/lib/divisions';
 
 // Helper function to get race type for separation
 const getRaceType = (raceName: string): 'qual' | 'heat' | 'final' | 'other' => {
@@ -278,10 +260,8 @@ export default function RacesPage() {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [types, setTypes] = useState<string[]>([]);
   const [driverResults, setDriverResults] = useState<DriverRaceResult[]>([]);
-  const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
-  const [selectedRaceType, setSelectedRaceType] = useState<'qualification' | 'heat' | 'final'>('final');
-  const [selectedFinalType, setSelectedFinalType] = useState<string>('A');
-  const [selectedGroup, setSelectedGroup] = useState<string>('1');
+  const [quickAddType, setQuickAddType] = useState<'qualification' | 'heat' | 'final'>('final');
+  const [quickAddSuffix, setQuickAddSuffix] = useState<string>('A');
   const shouldLoadResultsRef = useRef(true); // Track if we should load results from saved data
 
   // Fetch race results for a specific round
@@ -316,10 +296,14 @@ export default function RacesPage() {
         setSelectedEvent({ ...firstRace, results });
         setSelectedDivision('Division 1');
         setSelectedUIDivision('Division 1');
+        setTypes([]);
+        setSelectedType(null);
       } else if (races.length === 0) {
         setSelectedEvent(null);
         setSelectedDivision(null);
         setSelectedUIDivision(null);
+        setTypes([]);
+        setSelectedType(null);
       } else if (selectedEvent && !races.find((r) => r.id === selectedEvent.id)) {
         // If current selected event is not in filtered races, select first one
         const firstRace = races[0];
@@ -327,6 +311,8 @@ export default function RacesPage() {
         setSelectedEvent({ ...firstRace, results });
         setSelectedDivision('Division 1');
         setSelectedUIDivision('Division 1');
+        setTypes([]);
+        setSelectedType(null);
       } else if (selectedEvent && !selectedEvent.results) {
         // If selected event doesn't have results, fetch them
         const results = await fetchRaceResults(selectedEvent.id);
@@ -648,9 +634,18 @@ export default function RacesPage() {
     shouldLoadResultsRef.current = true;
   }, [selectedDivision, selectedType]);
 
-  // Available divisions - combining Division 3, 4, and New into "Open" for race management
-  const availableDivisions: (Division | 'Open')[] = ['Division 1', 'Division 2', 'Open'];
-  const openDivisions: Division[] = ['Division 3', 'Division 4', 'New'];
+  // Season-aware divisions
+  const seasonNumber = getSeasonNumber(selectedSeason);
+  const isNewStructure = isNewDivisionStructure(seasonNumber);
+
+  // For S4+, show all divisions directly; for S1-S3, keep 'Open' grouping (D3/D4/New)
+  const availableDivisions: (Division | 'Open')[] = isNewStructure
+    ? (getDivisionsForSeason(seasonNumber) as (Division | 'Open')[])
+    : ['Division 1', 'Division 2', 'Open'];
+
+  const openDivisions: Division[] = isNewStructure
+    ? []
+    : ['Division 3', 'Division 4', 'New'];
 
   // Helper to check if a division is an open division
   const isOpenDivision = (div: Division | null): boolean => {
@@ -665,6 +660,7 @@ export default function RacesPage() {
       'Division 3': 0,
       'Division 4': 0,
       'New': 0,
+      'Rookies': 0,
       'Open': 0,
     };
     const uniqueDrivers: Record<Division, Set<string>> = {
@@ -673,6 +669,7 @@ export default function RacesPage() {
       'Division 3': new Set(),
       'Division 4': new Set(),
       'New': new Set(),
+      'Rookies': new Set(),
       'Open': new Set(),
     };
     
@@ -696,6 +693,7 @@ export default function RacesPage() {
       'Division 3': uniqueDrivers['Division 3'].size,
       'Division 4': uniqueDrivers['Division 4'].size,
       'New': uniqueDrivers['New'].size,
+      'Rookies': uniqueDrivers['Rookies'].size,
       'Open': uniqueDrivers['Open'].size,
     };
     
@@ -704,56 +702,25 @@ export default function RacesPage() {
 
   const handleAddDivision = () => {
     if (!selectedEvent) return;
-    const newDivision: Division = 'New';
+    const newDivision: Division = isNewStructure ? 'Rookies' : 'New';
     setSelectedDivision(newDivision);
-    setSelectedUIDivision('Open'); // New is part of Open
+    setSelectedUIDivision(isNewStructure ? 'Rookies' : 'Open');
     setSelectedType(null);
     setDriverResults([]);
   };
 
-  const handleAddType = () => {
-    setIsTypeModalOpen(true);
-  };
-
-  const handleTypeModalSubmit = () => {
-    if (selectedRaceType) {
-      let raceName = '';
-      const capitalizedRaceType = selectedRaceType.charAt(0).toUpperCase() + selectedRaceType.slice(1);
-      
-      if (selectedRaceType === 'qualification') {
-        // Format: "Qual Group 1"
-        raceName = `${capitalizedRaceType === 'Qualification' ? 'Qual' : capitalizedRaceType} Group ${selectedGroup}`;
-      } else if (selectedRaceType === 'heat') {
-        // Format: "Heat A"
-        raceName = `${capitalizedRaceType} ${selectedFinalType}`;
-      } else if (selectedRaceType === 'final') {
-        // Format: "Final A"
-        raceName = `${capitalizedRaceType} ${selectedFinalType}`;
-      }
-      
-      // Use functional update to ensure we're working with the latest types value
-      setTypes((prevTypes) => {
-        // Check if this race name already exists
-        if (prevTypes.includes(raceName)) {
-          return prevTypes; // Don't add duplicates
-        }
-        return [...prevTypes, raceName];
-      });
-      setSelectedType(raceName);
-      setSelectedRaceType('final');
-      setSelectedFinalType('A');
-      setSelectedGroup('1');
-      setIsTypeModalOpen(false);
-      // Reset the load flag so empty spreadsheet will be shown
-      shouldLoadResultsRef.current = true;
+  const handleQuickAdd = () => {
+    let raceName = '';
+    if (quickAddType === 'qualification') {
+      raceName = `Qual Group ${quickAddSuffix}`;
+    } else if (quickAddType === 'heat') {
+      raceName = `Heat ${quickAddSuffix}`;
+    } else {
+      raceName = `Final ${quickAddSuffix}`;
     }
-  };
-
-  const handleTypeModalCancel = () => {
-    setSelectedRaceType('final');
-    setSelectedFinalType('A');
-    setSelectedGroup('1');
-    setIsTypeModalOpen(false);
+    setTypes((prevTypes) => prevTypes.includes(raceName) ? prevTypes : [...prevTypes, raceName]);
+    setSelectedType(raceName);
+    shouldLoadResultsRef.current = true;
   };
 
   const handleDeleteType = async (typeName: string) => {
@@ -1483,10 +1450,9 @@ export default function RacesPage() {
                         setSelectedDivision('Division 1');
                         setSelectedUIDivision('Division 1');
                         setSelectedType(null);
+                        setTypes([]);
                         setDriverResults([]);
-                        // Reset the load flag so types will be loaded from results
                         shouldLoadResultsRef.current = true;
-                        // Don't clear types here - let the useEffect populate them from results
                       }}
                       className={`w-full text-left p-2 rounded-md transition-colors text-sm border ${
                         selectedEvent?.id === race.id
@@ -1605,13 +1571,40 @@ export default function RacesPage() {
             title="Race Name"
             icon={Trophy}
             actions={
-              <button
-                onClick={handleAddType}
-                className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors"
-              >
-                <Plus className="w-3 h-3" />
-                Add
-              </button>
+              selectedEvent && selectedDivision && (
+                <div className="flex items-center gap-1">
+                  <select
+                    value={quickAddType}
+                    onChange={(e) => {
+                      const t = e.target.value as 'qualification' | 'heat' | 'final';
+                      setQuickAddType(t);
+                      setQuickAddSuffix(t === 'qualification' ? '1' : 'A');
+                    }}
+                    className="text-xs px-1.5 py-1 border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                  >
+                    <option value="qualification">Qual</option>
+                    <option value="heat">Heat</option>
+                    <option value="final">Final</option>
+                  </select>
+                  <select
+                    value={quickAddSuffix}
+                    onChange={(e) => setQuickAddSuffix(e.target.value)}
+                    className="text-xs px-1.5 py-1 border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                  >
+                    {quickAddType === 'qualification'
+                      ? ['1','2','3','4','5','6'].map(n => <option key={n} value={n}>Grp {n}</option>)
+                      : ['A','B','C','D','E','F'].map(l => <option key={l} value={l}>{l}</option>)
+                    }
+                  </select>
+                  <button
+                    onClick={handleQuickAdd}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add
+                  </button>
+                </div>
+              )
             }
             className="lg:col-span-4 max-h-[300px] flex flex-col"
             noPadding
@@ -1707,6 +1700,7 @@ export default function RacesPage() {
                 onBatchUpdate={handleBatchUpdateDriverResult}
                 onDeleteRow={handleDeleteRow}
                 drivers={drivers}
+                divisionsForSeason={getDivisionsForSeason(seasonNumber)}
               />
               </div>
             ) : (
@@ -1722,101 +1716,6 @@ export default function RacesPage() {
         </SectionCard>
       </PageLayout>
 
-      {/* Race Name Modal */}
-      {isTypeModalOpen && (
-      <Modal
-        isOpen={isTypeModalOpen}
-        onClose={handleTypeModalCancel}
-        title="Add Race Name"
-        subtitle="Create a new race type for this division"
-        icon={Plus}
-        size="md"
-        footer={
-          <div className="flex gap-3 justify-end">
-            <button
-              onClick={handleTypeModalCancel}
-              className="px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleTypeModalSubmit}
-              className="px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all shadow-lg hover:shadow-xl hover-lift font-medium"
-            >
-              Add
-            </button>
-          </div>
-        }
-      >
-        <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Race Type
-            </label>
-            <select
-              value={selectedRaceType}
-              onChange={(e) => setSelectedRaceType(e.target.value as 'qualification' | 'heat' | 'final')}
-              className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all mb-3"
-              autoFocus
-            >
-              <option value="qualification">Qual</option>
-              <option value="heat">Heat</option>
-              <option value="final">Final</option>
-            </select>
-            {selectedRaceType === 'qualification' && (
-              <>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Group
-                </label>
-                <select
-                  value={selectedGroup}
-                  onChange={(e) => setSelectedGroup(e.target.value)}
-                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleTypeModalSubmit();
-                    } else if (e.key === 'Escape') {
-                      handleTypeModalCancel();
-                    }
-                  }}
-                >
-                  <option value="1">Group 1</option>
-                  <option value="2">Group 2</option>
-                  <option value="3">Group 3</option>
-                  <option value="4">Group 4</option>
-                  <option value="5">Group 5</option>
-                  <option value="6">Group 6</option>
-                </select>
-              </>
-            )}
-            {(selectedRaceType === 'heat' || selectedRaceType === 'final') && (
-              <>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  {selectedRaceType === 'heat' ? 'Final Type' : 'Final Type'}
-                </label>
-                <select
-                  value={selectedFinalType}
-                  onChange={(e) => setSelectedFinalType(e.target.value)}
-                  className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleTypeModalSubmit();
-                    } else if (e.key === 'Escape') {
-                      handleTypeModalCancel();
-                    }
-                  }}
-                >
-                  <option value="A">A</option>
-                  <option value="B">B</option>
-                  <option value="C">C</option>
-                  <option value="D">D</option>
-                  <option value="E">E</option>
-                  <option value="F">F</option>
-                </select>
-              </>
-            )}
-        </div>
-      </Modal>
-      )}
     </>
   );
 }
@@ -1829,6 +1728,7 @@ function SpreadsheetTable({
   onBatchUpdate,
   onDeleteRow,
   drivers,
+  divisionsForSeason,
 }: {
   division: Division;
   type: string | null;
@@ -1837,6 +1737,7 @@ function SpreadsheetTable({
   onBatchUpdate?: (index: number, updates: Partial<DriverRaceResult>, forceAddRow?: boolean) => void;
   onDeleteRow?: (index: number) => void;
   drivers: any[];
+  divisionsForSeason: Division[];
 }) {
   const [suggestions, setSuggestions] = useState<Record<number, any[]>>({});
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<Record<number, number>>({});
@@ -1897,7 +1798,7 @@ function SpreadsheetTable({
             // Handle different field types
             if (field === 'division') {
               // Validate division value - also handle partial matches
-              const validDivisions = ['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'];
+              const validDivisions = divisionsForSeason;
               let divisionValue = trimmedValue;
               
               // Try to match partial division names
@@ -2014,15 +1915,21 @@ function SpreadsheetTable({
     if (!drivers || drivers.length === 0) return [];
     
     const lowerInput = input.toLowerCase().trim();
-    return drivers.filter((driver) => {
-      const nameMatch = driver.name?.toLowerCase().includes(lowerInput);
-      const firstNameMatch = driver.firstName?.toLowerCase().includes(lowerInput);
-      const lastNameMatch = driver.lastName?.toLowerCase().includes(lowerInput);
-      const fullNameMatch = `${driver.firstName || ''} ${driver.lastName || ''}`.toLowerCase().trim().includes(lowerInput);
-      const aliasesMatch = driver.aliases?.some((a: string) => a.toLowerCase().includes(lowerInput));
-      
-      return nameMatch || firstNameMatch || lastNameMatch || fullNameMatch || aliasesMatch;
-    }).slice(0, 5); // Limit to 5 suggestions
+    return drivers
+      .filter((driver) => {
+        const nameMatch = driver.name?.toLowerCase().includes(lowerInput);
+        const firstNameMatch = driver.firstName?.toLowerCase().includes(lowerInput);
+        const lastNameMatch = driver.lastName?.toLowerCase().includes(lowerInput);
+        const fullNameMatch = `${driver.firstName || ''} ${driver.lastName || ''}`.toLowerCase().trim().includes(lowerInput);
+        const aliasesMatch = driver.aliases?.some((a: string) => a.toLowerCase().includes(lowerInput));
+        return nameMatch || firstNameMatch || lastNameMatch || fullNameMatch || aliasesMatch;
+      })
+      .sort((a, b) => {
+        const aInDiv = a.division === division ? 0 : 1;
+        const bInDiv = b.division === division ? 0 : 1;
+        return aInDiv - bInDiv;
+      })
+      .slice(0, 5);
   };
 
   // Function to get matching drivers based on alias input
@@ -2031,17 +1938,21 @@ function SpreadsheetTable({
     if (!drivers || drivers.length === 0) return [];
     
     const lowerInput = input.toLowerCase().trim();
-    return drivers.filter((driver) => {
-      // Match by aliases
-      const aliasesMatch = driver.aliases?.some((a: string) => a.toLowerCase().includes(lowerInput));
-      // Also match by name in case user types name in alias field
-      const nameMatch = driver.name?.toLowerCase().includes(lowerInput);
-      const firstNameMatch = driver.firstName?.toLowerCase().includes(lowerInput);
-      const lastNameMatch = driver.lastName?.toLowerCase().includes(lowerInput);
-      const fullNameMatch = `${driver.firstName || ''} ${driver.lastName || ''}`.toLowerCase().trim().includes(lowerInput);
-      
-      return aliasesMatch || nameMatch || firstNameMatch || lastNameMatch || fullNameMatch;
-    }).slice(0, 5); // Limit to 5 suggestions
+    return drivers
+      .filter((driver) => {
+        const aliasesMatch = driver.aliases?.some((a: string) => a.toLowerCase().includes(lowerInput));
+        const nameMatch = driver.name?.toLowerCase().includes(lowerInput);
+        const firstNameMatch = driver.firstName?.toLowerCase().includes(lowerInput);
+        const lastNameMatch = driver.lastName?.toLowerCase().includes(lowerInput);
+        const fullNameMatch = `${driver.firstName || ''} ${driver.lastName || ''}`.toLowerCase().trim().includes(lowerInput);
+        return aliasesMatch || nameMatch || firstNameMatch || lastNameMatch || fullNameMatch;
+      })
+      .sort((a, b) => {
+        const aInDiv = a.division === division ? 0 : 1;
+        const bInDiv = b.division === division ? 0 : 1;
+        return aInDiv - bInDiv;
+      })
+      .slice(0, 5);
   };
 
   // Handle driver name input change
@@ -2700,11 +2611,7 @@ function SpreadsheetTable({
                   <div className="relative">
                     {/* Datalist must be rendered before inputs for proper association */}
                     <datalist id={`division-list-${index}`}>
-                      <option value="Division 1" />
-                      <option value="Division 2" />
-                      <option value="Division 3" />
-                      <option value="Division 4" />
-                      <option value="New" />
+                      {divisionsForSeason.map(d => <option key={d} value={d} />)}
                     </datalist>
                     {result.division && result.division.trim() ? (
                       // Show as badge when filled, but make it editable
@@ -2713,7 +2620,7 @@ function SpreadsheetTable({
                         value={result.division || ''}
                         onChange={(e) => {
                           const value = e.target.value;
-                          const validDivisions = ['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'];
+                          const validDivisions = divisionsForSeason;
                           let divisionValue = value;
                           
                           if (value && !validDivisions.includes(value)) {
@@ -2809,7 +2716,7 @@ function SpreadsheetTable({
                         onChange={(e) => {
                           const value = e.target.value;
                           // Validate division value
-                          const validDivisions = ['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'];
+                          const validDivisions = divisionsForSeason;
                           let divisionValue = value;
                           
                           // Try to match partial division names
