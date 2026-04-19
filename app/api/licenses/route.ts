@@ -34,9 +34,6 @@ async function ensureLicensePolicyColumns() {
   await sql`ALTER TABLE license_points_history ADD COLUMN IF NOT EXISTS incident_round_number INTEGER`;
   await sql`ALTER TABLE license_points_history ADD COLUMN IF NOT EXISTS incident_division TEXT`;
 
-  await sql`ALTER TABLE licenses ADD COLUMN IF NOT EXISTS is_race_suspended BOOLEAN DEFAULT FALSE`;
-  await sql`ALTER TABLE licenses ADD COLUMN IF NOT EXISTS race_suspended_round_id TEXT`;
-
   await sql`CREATE INDEX IF NOT EXISTS idx_license_history_incident_season_id ON license_points_history(incident_season_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_license_history_incident_round_id ON license_points_history(incident_round_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_license_history_incident_round_number ON license_points_history(incident_round_number)`;
@@ -57,17 +54,6 @@ function getRoundWindowForDivision(division?: string | null): number | null {
   if (d === 'Division 2') return 6;
   return null;
 }
-
-// Thresholds: each entry triggers -25 championship pts when crossed.
-// raceSuspension: 1-round ban. seasonSuspension: full season suspension.
-const INCIDENT_THRESHOLDS: Array<{ points: number; raceSuspension: boolean; seasonSuspension: boolean }> = [
-  { points: 3,  raceSuspension: false, seasonSuspension: false },
-  { points: 5,  raceSuspension: false, seasonSuspension: false },
-  { points: 7,  raceSuspension: true,  seasonSuspension: false },
-  { points: 10, raceSuspension: false, seasonSuspension: false },
-  { points: 13, raceSuspension: false, seasonSuspension: false },
-  { points: 15, raceSuspension: false, seasonSuspension: true  },
-];
 
 async function getRoundOffsets(): Promise<RoundOffsetMap> {
   const seasonRows = await sql`
@@ -122,8 +108,8 @@ function isHistoryRowActive(
     return new Date(row.expires_at).getTime() > Date.now();
   }
 
-  // Division 3 and Rookies reset each season.
-  if (division === 'Division 3' || division === 'Rookies') {
+  // Division 3 resets each season.
+  if (division === 'Division 3') {
     return incidentSeasonId === currentSeasonId;
   }
 
@@ -184,7 +170,7 @@ function getNextExpiryForActiveRows(
       continue;
     }
 
-    if (division === 'Division 3' || division === 'Rookies') {
+    if (division === 'Division 3') {
       const incidentLabel = row.incident_id || 'incident';
       candidates.push({
         sortKey: Number.MAX_SAFE_INTEGER - 1,
@@ -272,9 +258,8 @@ async function recomputeSeasonLicenses(seasonId: string) {
   const currentRoundNumber = await getCurrentSeasonRoundNumber(seasonId);
 
   const licenses = await sql`
-    SELECT l.id, l.driver_id, l.total_incident_points, l.is_suspended
-    FROM licenses l
-    INNER JOIN season_drivers sd ON sd.driver_id = l.driver_id AND sd.season_id = ${seasonId}
+    SELECT id, driver_id, total_incident_points, is_suspended
+    FROM licenses
   ` as any[];
 
   let updatedCount = 0;
@@ -286,7 +271,7 @@ async function recomputeSeasonLicenses(seasonId: string) {
       currentRoundNumber,
       offsets
     );
-    const shouldSuspend = activePoints >= 15;
+    const shouldSuspend = activePoints >= 8;
     const currentTotal = Number(license.total_incident_points || 0);
     const currentSuspended = Boolean(license.is_suspended);
 
@@ -342,6 +327,19 @@ export async function GET(request: Request) {
         FROM licenses l
         LEFT JOIN drivers d ON l.driver_id = d.id
         WHERE l.driver_id = ${driverId}
+      `;
+    } else if (seasonId) {
+      // Season-aware: only drivers registered in this season, using season-specific division.
+      query = sql`
+        SELECT 
+          l.*,
+          d.name as driver_name,
+          d.email as driver_email,
+          sd.division as driver_division
+        FROM licenses l
+        INNER JOIN drivers d ON l.driver_id = d.id
+        INNER JOIN season_drivers sd ON sd.driver_id = l.driver_id AND sd.season_id = ${seasonId}
+        WHERE 1=1
       `;
     } else if (suspended === 'true') {
       query = sql`
@@ -520,15 +518,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Flaw 5 fix: compute season total BEFORE inserting the new history row.
-    const seasonTotalRows = await sql`
-      SELECT COALESCE(SUM(points_added), 0) AS total
-      FROM license_points_history
-      WHERE driver_id = ${driverId}
-        AND incident_season_id = ${incidentSeasonId}
-    ` as any[];
-    const seasonTotalBefore = Number(seasonTotalRows[0]?.total || 0);
-    const seasonTotalAfter = seasonTotalBefore + Number(incidentPoints);
+    // Keep expires_at for legacy compatibility while using round/season policy.
+    const historyId = `history-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const incident_date = incidentDate ? new Date(incidentDate) : new Date();
+    const expires_at = new Date(incident_date);
+    expires_at.setFullYear(expires_at.getFullYear() + 1);
 
     const offsets = await getRoundOffsets();
     const activeBefore = await calculateActivePoints(
@@ -538,12 +532,6 @@ export async function POST(request: Request) {
       offsets
     );
     const pointsAtTime = activeBefore + Number(incidentPoints);
-
-    // Keep expires_at for legacy compatibility while using round/season policy.
-    const historyId = `history-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const incident_date = incidentDate ? new Date(incidentDate) : new Date();
-    const expires_at = new Date(incident_date);
-    expires_at.setFullYear(expires_at.getFullYear() + 1);
 
     await sql`
       INSERT INTO license_points_history (
@@ -560,53 +548,23 @@ export async function POST(request: Request) {
       )
     `;
 
-    // Check which thresholds are crossed by this confirmation
-    const crossedThresholds = INCIDENT_THRESHOLDS.filter(
-      (t) => seasonTotalBefore < t.points && seasonTotalAfter >= t.points
-    );
-
-    for (const threshold of crossedThresholds) {
-      // Tie deduction ID to the triggering incident so re-accumulation after point
-      // expiry correctly fires a new deduction with a unique ID.
-      const deductionId = `points-threshold-${threshold.points}-${driverId}-${incidentSeasonId}-${incidentId}`;
-      const note = `License threshold (${threshold.points} pts): -25 championship points`
-        + (threshold.raceSuspension ? ' + 1 round race suspension' : '')
-        + (threshold.seasonSuspension ? ' + season suspension' : '');
-      await sql`
-        INSERT INTO points (
-          id, season_id, round_id, driver_id, division, race_type,
-          overall_position, points, note, created_at, updated_at
-        ) VALUES (
-          ${deductionId}, ${incidentSeasonId}, ${incidentRoundId}, ${driverId},
-          ${incidentDivision}, 'incident', 0, -25, ${note}, NOW(), NOW()
-        )
-        ON CONFLICT (id) DO NOTHING
-      `;
-    }
-
-    const isRaceSuspended = crossedThresholds.some((t) => t.raceSuspension);
-    const isSeasonSuspended = Boolean(license.is_suspended) || crossedThresholds.some((t) => t.seasonSuspension);
-    const newRaceSuspended = Boolean(license.is_race_suspended) || isRaceSuspended;
-
+    // Update license with new totals
+    const isSuspended = pointsAtTime >= 8;
     await sql`
       UPDATE licenses
-      SET
-        total_incident_points = ${seasonTotalAfter},
-        is_suspended = ${isSeasonSuspended},
-        suspended_at = ${isSeasonSuspended && !license.is_suspended ? new Date().toISOString() : (license.suspended_at ?? null)},
-        is_race_suspended = ${newRaceSuspended},
-        race_suspended_round_id = ${isRaceSuspended ? incidentRoundId : (license.race_suspended_round_id ?? null)},
+      SET 
+        total_incident_points = ${pointsAtTime},
+        is_suspended = ${isSuspended},
+        suspended_at = ${isSuspended ? new Date().toISOString() : null},
         updated_at = NOW()
       WHERE id = ${license.id}
     `;
 
-    return NextResponse.json({
-      success: true,
+    return NextResponse.json({ 
+      success: true, 
       licenseId: license.id,
-      totalPoints: seasonTotalAfter,
-      isSuspended: isSeasonSuspended,
-      isRaceSuspended,
-      thresholdsCrossed: crossedThresholds.map((t) => t.points),
+      totalPoints: pointsAtTime,
+      isSuspended 
     });
   } catch (error: any) {
     console.error('Error creating/updating license:', error);
@@ -630,18 +588,6 @@ export async function PUT(request: Request) {
 
       const result = await recomputeSeasonLicenses(seasonId);
       return NextResponse.json({ success: true, ...result });
-    }
-
-    if (action === 'clear-race-suspension') {
-      if (!licenseId) {
-        return NextResponse.json({ error: 'licenseId is required' }, { status: 400 });
-      }
-      await sql`
-        UPDATE licenses
-        SET is_race_suspended = false, race_suspended_round_id = NULL, updated_at = NOW()
-        WHERE id = ${licenseId}
-      `;
-      return NextResponse.json({ success: true });
     }
 
     if (!licenseId) {
