@@ -7,7 +7,8 @@ import PageLayout from '@/components/PageLayout';
 import SectionCard from '@/components/SectionCard';
 import { useSeason } from '@/components/SeasonContext';
 import { Race, Division, DriverRaceResult } from '@/types';
-import { Plus, Save, Trash2, Loader2, Flag, Calendar, Users, Trophy } from 'lucide-react';
+import { Plus, Save, Trash2, Loader2, Flag, Calendar, Users, Trophy, Shuffle } from 'lucide-react';
+import Modal from '@/components/Modal';
 import { getPointsForPosition } from '@/lib/pointsSystem';
 import { getDivisionColor, getDivisionsForSeason, getSeasonNumber, isNewDivisionStructure } from '@/lib/divisions';
 
@@ -263,6 +264,10 @@ export default function RacesPage() {
   const [quickAddType, setQuickAddType] = useState<'qualification' | 'heat' | 'final'>('final');
   const [quickAddSuffix, setQuickAddSuffix] = useState<string>('A');
   const shouldLoadResultsRef = useRef(true); // Track if we should load results from saved data
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generateNumGroups, setGenerateNumGroups] = useState(2);
+  const [generateMethod, setGenerateMethod] = useState<'auto' | 'random' | 'championship'>('auto');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Fetch race results for a specific round
   const fetchRaceResults = async (roundId: string, resultsSheetId?: string, raceName?: string) => {
@@ -699,6 +704,153 @@ export default function RacesPage() {
     
     return counts;
   }, [selectedEvent]);
+
+  // Save a set of drivers as qual group entries (pre-filled driver list, no lap times yet)
+  const saveQualGroup = async (groupName: string, groupDrivers: any[]) => {
+    if (!selectedEvent || !selectedDivision || !selectedSeason) return;
+    const groupMatch = groupName.match(/Group\s+(\d+)/i);
+    const finalType = groupMatch ? groupMatch[1] : '';
+    const uiDivision = selectedUIDivision || selectedDivision || 'Division 1';
+    const raceDivision = isOpenDivision(selectedDivision) ? 'Open' : uiDivision;
+    const seasonId = (selectedSeason.id || '').replace(/\s+/g, '');
+    const roundId = selectedEvent.id.replace(/\s+/g, '');
+    const cleanRaceDivision = raceDivision.replace(/\s+/g, '');
+    const resultsSheetId = `${seasonId}${roundId}${cleanRaceDivision}qualification${finalType}`;
+
+    const resultsToSave = groupDrivers.map((driver, i) => ({
+      roundId: selectedEvent.id,
+      driverId: driver.id,
+      driverAlias: driver.aliases?.[0] || '',
+      division: driver.division as Division,
+      kartNumber: '',
+      position: 0,
+      gridPosition: i + 1,
+      overallPosition: 0,
+      fastestLap: '',
+      raceType: 'qualification',
+      raceName: groupName,
+      finalType: finalType,
+      raceDivision: raceDivision,
+      resultsSheetId: resultsSheetId,
+    }));
+
+    await Promise.all(
+      resultsToSave.map((result) =>
+        fetch('/api/race-results', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(result),
+        })
+      )
+    );
+  };
+
+  const handleGenerateQuals = async () => {
+    if (!selectedEvent || !selectedDivision || !selectedSeason) return;
+    setIsGenerating(true);
+    try {
+      // Drivers in the selected division (active only)
+      const divisionDrivers = drivers.filter((d) => {
+        const inDiv =
+          d.division === selectedDivision ||
+          (isOpenDivision(selectedDivision) && openDivisions.includes(d.division as Division));
+        return inDiv && (d.status === 'ACTIVE' || !d.status);
+      });
+
+      if (divisionDrivers.length === 0) {
+        alert('No active drivers found for this division.');
+        return;
+      }
+
+      const currentRoundNumber = selectedEvent.roundNumber || selectedEvent.round || 1;
+      const isFirstRound = currentRoundNumber === 1;
+      const useRandom =
+        generateMethod === 'random' || (generateMethod === 'auto' && isFirstRound);
+
+      let orderedDrivers: any[];
+
+      if (useRandom) {
+        // Fisher-Yates shuffle
+        orderedDrivers = [...divisionDrivers];
+        for (let i = orderedDrivers.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [orderedDrivers[i], orderedDrivers[j]] = [orderedDrivers[j], orderedDrivers[i]];
+        }
+      } else {
+        // Sort by championship points earned in rounds *before* this round
+        let pointsData: any[] = [];
+        try {
+          const pointsResponse = await fetch(`/api/points?seasonId=${selectedSeason.id}`);
+          if (pointsResponse.ok) pointsData = await pointsResponse.json();
+        } catch { /* fall back to original order */ }
+
+        const prevRoundIds = new Set(
+          rounds
+            .filter((r: any) => (r.roundNumber || 0) < currentRoundNumber)
+            .map((r: any) => r.id)
+        );
+
+        const driverPoints: Record<string, number> = {};
+        pointsData.forEach((p: any) => {
+          if (prevRoundIds.has(p.roundId)) {
+            driverPoints[p.driverId] = (driverPoints[p.driverId] || 0) + (p.points || 0);
+          }
+        });
+
+        // Sort descending: championship leader first
+        orderedDrivers = [...divisionDrivers].sort(
+          (a, b) => (driverPoints[b.id] || 0) - (driverPoints[a.id] || 0)
+        );
+      }
+
+      // Round-robin interleave across groups so strength is balanced:
+      // 1st driver → group 1, 2nd → group 2, ..., Nth → group N, (N+1)th → group 1, …
+      const groups: any[][] = Array.from({ length: generateNumGroups }, () => []);
+      orderedDrivers.forEach((driver, i) => {
+        groups[i % generateNumGroups].push(driver);
+      });
+
+      const groupNames = Array.from(
+        { length: generateNumGroups },
+        (_, i) => `Qual Group ${i + 1}`
+      );
+
+      // Warn before overwriting any existing group
+      const existing = groupNames.filter((name) => types.includes(name));
+      if (existing.length > 0) {
+        if (!confirm(`${existing.join(', ')} already have results. Overwrite them?`)) return;
+        for (const name of existing) {
+          const gMatch = name.match(/Group\s+(\d+)/i);
+          const ft = gMatch ? gMatch[1] : '';
+          await fetch(
+            `/api/race-results?roundId=${selectedEvent.id}&raceType=qualification&finalType=${ft}&raceName=${encodeURIComponent(name)}${selectedDivision ? `&raceDivision=${encodeURIComponent(selectedDivision)}` : ''}`,
+            { method: 'DELETE' }
+          );
+        }
+      }
+
+      // Save every group
+      for (let i = 0; i < generateNumGroups; i++) {
+        await saveQualGroup(groupNames[i], groups[i]);
+      }
+
+      // Update type list (keep any non-qual entries) and select first group
+      const nonQualTypes = types.filter((t) => !t.startsWith('Qual Group'));
+      setTypes([...nonQualTypes, ...groupNames]);
+      setSelectedType(groupNames[0]);
+      shouldLoadResultsRef.current = true;
+
+      const refreshedResults = await fetchRaceResults(selectedEvent.id);
+      setSelectedEvent({ ...selectedEvent, results: refreshedResults });
+
+      setShowGenerateModal(false);
+    } catch (error: any) {
+      console.error('Error generating qual groups:', error);
+      alert(error.message || 'Failed to generate qualification groups.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleAddDivision = () => {
     if (!selectedEvent) return;
@@ -1603,6 +1755,14 @@ export default function RacesPage() {
                     <Plus className="w-3 h-3" />
                     Add
                   </button>
+                  <button
+                    onClick={() => setShowGenerateModal(true)}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    title="Auto-generate qualification groups"
+                  >
+                    <Shuffle className="w-3 h-3" />
+                    Quals
+                  </button>
                 </div>
               )
             }
@@ -1715,6 +1875,120 @@ export default function RacesPage() {
           </div>
         </SectionCard>
       </PageLayout>
+
+      {/* Generate Qualification Groups Modal */}
+      <Modal
+        isOpen={showGenerateModal}
+        onClose={() => setShowGenerateModal(false)}
+        title="Generate Qualification Groups"
+        size="sm"
+        footer={
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setShowGenerateModal(false)}
+              className="flex-1 px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleGenerateQuals}
+              disabled={isGenerating}
+              className="flex-1 px-3 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md text-sm hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+            >
+              {isGenerating ? (
+                <><Loader2 className="w-4 h-4 animate-spin" />Generating...</>
+              ) : 'Generate & Save'}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">
+              Number of qualification groups
+            </label>
+            <div className="flex gap-2">
+              {[2, 3, 4, 5, 6].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setGenerateNumGroups(n)}
+                  className={`flex-1 py-2 rounded-md text-sm font-medium border transition-colors ${
+                    generateNumGroups === n
+                      ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">
+              Driver order
+            </label>
+            <div className="space-y-2">
+              {(
+                [
+                  {
+                    value: 'auto' as const,
+                    label: 'Auto-detect',
+                    desc: 'Random for Round 1; championship order for later rounds',
+                  },
+                  {
+                    value: 'random' as const,
+                    label: 'Random',
+                    desc: 'Shuffle drivers randomly',
+                  },
+                  {
+                    value: 'championship' as const,
+                    label: 'Championship order',
+                    desc: 'Interleave by total points (best driver spread across groups)',
+                  },
+                ]
+              ).map(({ value, label, desc }) => (
+                <label
+                  key={value}
+                  className="flex items-start gap-3 p-2 rounded-md border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  <input
+                    type="radio"
+                    name="generateMethod"
+                    value={value}
+                    checked={generateMethod === value}
+                    onChange={() => setGenerateMethod(value)}
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <div className="text-sm font-medium text-slate-800 dark:text-slate-200">{label}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">{desc}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {selectedDivision && (() => {
+            const count = drivers.filter(
+              (d) =>
+                (d.division === selectedDivision ||
+                  (isOpenDivision(selectedDivision) && openDivisions.includes(d.division as Division))) &&
+                (d.status === 'ACTIVE' || !d.status)
+            ).length;
+            return count > 0 ? (
+              <div className="rounded-md bg-slate-50 dark:bg-slate-800/50 p-3 text-xs text-slate-600 dark:text-slate-400">
+                <strong>{count}</strong> active {selectedDivision} drivers → split into{' '}
+                <strong>{generateNumGroups}</strong> groups of ~
+                <strong>{Math.ceil(count / generateNumGroups)}</strong> each
+              </div>
+            ) : null;
+          })()}
+        </div>
+      </Modal>
 
     </>
   );

@@ -510,6 +510,18 @@ export async function addDriver(driver: Driver, seasonId: string): Promise<void>
     // This ensures driver onboarding can still succeed even if division_changes has issues
     console.error('Failed to create division_changes entry for driver:', driver.id, error);
   }
+
+  // Always ensure a license row exists for every driver, regardless of entry point.
+  try {
+    const licenseId = `license-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    await sql`
+      INSERT INTO licenses (id, driver_id, total_incident_points, is_suspended, created_at, updated_at)
+      VALUES (${licenseId}, ${driver.id}, 0, false, NOW(), NOW())
+      ON CONFLICT (driver_id) DO NOTHING
+    `;
+  } catch (error) {
+    console.error('Failed to create license for driver:', driver.id, error);
+  }
 }
 
 export async function updateDriver(driver: Driver, seasonId?: string): Promise<void> {

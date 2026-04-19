@@ -641,12 +641,12 @@ export default function IncidentsPage() {
                   <input
                     type="number"
                     value={formData.incidentPoints}
-                    onChange={(e) => setFormData({ ...formData, incidentPoints: parseInt(e.target.value) || 0 })}
+                    onChange={(e) => setFormData({ ...formData, incidentPoints: Math.max(1, parseInt(e.target.value) || 1) })}
                     className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm"
-                    min="0"
+                    min="1"
                   />
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Points added to driver's license (8+ = suspension). Expires after 1 year.
+                    Points added to driver's license. Suspension threshold varies by division.
                   </p>
                 </div>
 
@@ -659,7 +659,7 @@ export default function IncidentsPage() {
                     value={formData.pointsToDeduct}
                     onChange={(e) => setFormData({ ...formData, pointsToDeduct: parseInt(e.target.value) || 0 })}
                     className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm"
-                    min="1"
+                    min="0"
                   />
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     Championship points deducted for this incident (7 = Minor, {'>'}7 = Major)

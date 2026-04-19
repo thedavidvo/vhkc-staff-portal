@@ -108,8 +108,8 @@ function isHistoryRowActive(
     return new Date(row.expires_at).getTime() > Date.now();
   }
 
-  // Division 3 resets each season.
-  if (division === 'Division 3') {
+  // Division 3 and Rookies reset each season.
+  if (division === 'Division 3' || division === 'Rookies') {
     return incidentSeasonId === currentSeasonId;
   }
 
@@ -170,7 +170,7 @@ function getNextExpiryForActiveRows(
       continue;
     }
 
-    if (division === 'Division 3') {
+    if (division === 'Division 3' || division === 'Rookies') {
       const incidentLabel = row.incident_id || 'incident';
       candidates.push({
         sortKey: Number.MAX_SAFE_INTEGER - 1,

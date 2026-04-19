@@ -349,19 +349,6 @@ export default function DriversPage() {
       if (response.ok) {
         const driverData = await response.json();
         
-        // Create license for the new driver
-        try {
-          await fetch('/api/licenses', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              driverId: newDriver.id,
-            }),
-          });
-        } catch (licenseError) {
-          console.error('Failed to create license for new driver:', licenseError);
-        }
-        
         // Refresh drivers list
         const refreshResponse = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
         if (refreshResponse.ok) {
