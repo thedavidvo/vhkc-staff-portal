@@ -6,6 +6,9 @@ import PageLayout from '@/components/PageLayout';
 import SectionCard from '@/components/SectionCard';
 import { useSeason } from '@/components/SeasonContext';
 import { Driver, Division, DriverStatus } from '@/types';
+
+type DriverStatusFilter = 'checkedIn' | 'notCheckedIn' | 'all';
+type PaymentStatusFilter = 'paid' | 'unpaid' | 'all';
 import { Loader2, Edit, Save, X, CheckCircle2, Circle, Search, Filter, UserCheck, Users, UserRoundCheck, UserRoundX, UsersRound, ClipboardCheck, DollarSign, Download } from 'lucide-react';
 import { exportDriverListToCSV, downloadCSV } from '@/lib/csvExport';
 import { getDivisionColor, getSeasonNumber, getDivisionsForSeason } from '@/lib/divisions';
@@ -323,7 +326,7 @@ export default function CheckInPage() {
     // Apply current filters to export
     const filters = {
       division: divisionFilter !== 'all' ? divisionFilter : undefined,
-      paymentStatus: paymentFilter !== 'all' ? paymentFilter : undefined,
+      paymentStatus: paymentFilter !== 'all' ? (paymentFilter === 'unpaid' ? 'not_paid' : paymentFilter) as 'paid' | 'not_paid' : undefined,
       checkInStatus: statusFilter !== 'all' ? statusFilter : undefined,
     };
 

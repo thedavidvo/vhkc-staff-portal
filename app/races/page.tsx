@@ -1802,7 +1802,7 @@ function SpreadsheetTable({
               let divisionValue = trimmedValue;
               
               // Try to match partial division names
-              if (!validDivisions.includes(trimmedValue)) {
+              if (!validDivisions.includes(trimmedValue as Division)) {
                 const match = validDivisions.find(d => 
                   d.toLowerCase().includes(trimmedValue.toLowerCase()) || 
                   trimmedValue.toLowerCase().includes(d.toLowerCase().replace('division ', ''))
@@ -1810,7 +1810,7 @@ function SpreadsheetTable({
                 if (match) divisionValue = match;
               }
               
-              if (validDivisions.includes(divisionValue)) {
+              if (validDivisions.includes(divisionValue as Division)) {
                 updates.push({ row: targetRow, field, value: divisionValue as Division });
               }
             } else if (field === 'gridPosition' || field === 'overallPosition' || field === 'position') {
@@ -2623,7 +2623,7 @@ function SpreadsheetTable({
                           const validDivisions = divisionsForSeason;
                           let divisionValue = value;
                           
-                          if (value && !validDivisions.includes(value)) {
+                          if (value && !validDivisions.includes(value as Division)) {
                             const match = validDivisions.find(d => 
                               d.toLowerCase().includes(value.toLowerCase()) || 
                               value.toLowerCase().includes(d.toLowerCase().replace('division ', ''))
@@ -2631,7 +2631,7 @@ function SpreadsheetTable({
                             if (match) divisionValue = match;
                           }
                           
-                          if (validDivisions.includes(divisionValue) || !value) {
+                          if (validDivisions.includes(divisionValue as Division) || !value) {
                             onUpdate(index, 'division', divisionValue as Division);
                           }
                         }}
@@ -2720,7 +2720,7 @@ function SpreadsheetTable({
                           let divisionValue = value;
                           
                           // Try to match partial division names
-                          if (value && !validDivisions.includes(value)) {
+                          if (value && !validDivisions.includes(value as Division)) {
                             const match = validDivisions.find(d => 
                               d.toLowerCase().includes(value.toLowerCase()) || 
                               value.toLowerCase().includes(d.toLowerCase().replace('division ', ''))
@@ -2728,7 +2728,7 @@ function SpreadsheetTable({
                             if (match) divisionValue = match;
                           }
                           
-                          if (validDivisions.includes(divisionValue) || !value) {
+                          if (validDivisions.includes(divisionValue as Division) || !value) {
                             onUpdate(index, 'division', divisionValue as Division);
                           }
                         }}

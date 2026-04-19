@@ -490,7 +490,7 @@ export default function DivisionsPage() {
                       {division}
                     </h3>
                     <div className="flex items-center gap-1">
-                      {closed && <Lock className={`w-3 h-3 ${isSelected ? 'text-white/70 dark:text-slate-900/60' : 'text-slate-400'}`} title="Closed division" />}
+                      {closed && <span title="Closed division"><Lock className={`w-3 h-3 ${isSelected ? 'text-white/70 dark:text-slate-900/60' : 'text-slate-400'}`} /></span>}
                       <Users className={`w-4 h-4 ${isSelected ? 'text-white dark:text-slate-900' : 'text-slate-400'}`} />
                     </div>
                   </div>

@@ -50,7 +50,17 @@ export default function AddDriverModal({ isOpen, onClose, onAdd }: AddDriverModa
   const defaultDivision: Division = isNewDivisionStructure(seasonNumber) ? 'Rookies' : 'Division 4';
   const availableDivisions = getDivisionsForSeason(seasonNumber);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    firstName: string;
+    lastName: string;
+    aliases: string[];
+    email: string;
+    mobileNumber: string;
+    division: Division;
+    dateOfBirth: { day: number; month: number; year: number };
+    homeTrack: string;
+    status: DriverStatus;
+  }>({
     firstName: '',
     lastName: '',
     aliases: [''],
