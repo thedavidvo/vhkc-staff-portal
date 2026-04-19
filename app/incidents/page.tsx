@@ -419,73 +419,42 @@ export default function IncidentsPage() {
             </div>
 
             {/* Drivers List */}
-            <ul className="space-y-2">
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800 -mx-4">
               {filteredDrivers.map(driver => (
                 <li
                   key={driver.id}
                   onClick={() => handleOpenHistoryModal(driver)}
-                  className={`p-2.5 rounded-md border cursor-pointer transition-colors ${
-                    driver.license?.isSuspended
-                      ? 'bg-white dark:bg-slate-900 border-red-200 dark:border-red-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                      : (driver.license?.total_incident_points || 0) >= 10
-                      ? 'bg-white dark:bg-slate-900 border-orange-200 dark:border-orange-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                  }`}
+                  className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
                 >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-semibold text-slate-900 dark:text-white">{driver.name}</h4>
-                      {driver.license?.isSuspended && (
-                        <ShieldAlert className="w-4 h-4 text-red-600 dark:text-red-400" />
-                      )}
-                    </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${getDivisionColor(driver.division)}`}>
-                      {driver.division}
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                    driver.license?.isSuspended
+                      ? 'bg-red-500'
+                      : (driver.license?.total_incident_points || 0) >= 10
+                      ? 'bg-orange-400'
+                      : driver.incidentCount > 0
+                      ? 'bg-yellow-400'
+                      : 'bg-slate-300 dark:bg-slate-600'
+                  }`} />
+                  <span className="flex-1 text-sm font-medium text-slate-900 dark:text-white truncate">
+                    {driver.name}
+                  </span>
+                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${getDivisionColor(driver.division)}`}>
+                    {driver.division}
+                  </span>
+                  <span className={`text-xs font-semibold w-12 text-right flex-shrink-0 tabular-nums ${
+                    driver.license?.isSuspended
+                      ? 'text-red-600 dark:text-red-400'
+                      : (driver.license?.total_incident_points || 0) >= 10
+                      ? 'text-orange-500 dark:text-orange-400'
+                      : 'text-slate-400 dark:text-slate-500'
+                  }`}>
+                    {driver.license?.total_incident_points || 0}/15
+                  </span>
+                  {driver.pendingCount > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-medium flex-shrink-0">
+                      {driver.pendingCount} pending
                     </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Season Pts</p>
-                        <p className={`text-lg font-semibold ${
-                          driver.license?.isSuspended
-                            ? 'text-red-600 dark:text-red-400'
-                            : (driver.license?.total_incident_points || 0) >= 10
-                            ? 'text-orange-600 dark:text-orange-400'
-                            : 'text-green-600 dark:text-green-400'
-                        }`}>
-                          {driver.license?.total_incident_points || 0}<span className="text-xs text-slate-500 dark:text-slate-400">/15</span>
-                        </p>
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500">
-                          Active: {driver.license?.activePoints || 0}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Incidents</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
-                            {driver.confirmedCount} ✓
-                          </span>
-                          {driver.pendingCount > 0 && (
-                            <span className="text-xs px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
-                              {driver.pendingCount} ⏳
-                            </span>
-                          )}
-                          {driver.incidentCount === 0 && (
-                            <span className="text-xs px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
-                              0 incidents
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {driver.license?.isSuspended && (
-                      <div className="text-xs font-semibold text-red-600 dark:text-red-400">
-                        SUSPENDED
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </li>
               ))}
             </ul>
