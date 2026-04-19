@@ -63,7 +63,7 @@ export default function LicensePage() {
     return licenses.filter((license) => {
       if (statusFilter === 'suspended' && !license.isSuspended) return false;
       if (statusFilter === 'active' && license.isSuspended) return false;
-      if (statusFilter === 'atRisk' && (license.isSuspended || license.activePoints < 5)) return false;
+      if (statusFilter === 'atRisk' && (license.isSuspended || (license.total_incident_points || 0) < 10)) return false;
 
       if (searchQuery) {
         const searchLower = searchQuery.toLowerCase();
@@ -82,7 +82,7 @@ export default function LicensePage() {
     const total = licenses.length;
     const active = licenses.filter((l) => !l.isSuspended).length;
     const suspended = licenses.filter((l) => l.isSuspended).length;
-    const atRisk = licenses.filter((l) => !l.isSuspended && l.activePoints >= 5).length;
+    const atRisk = licenses.filter((l) => !l.isSuspended && (l.total_incident_points || 0) >= 10).length;
 
     return { total, active, suspended, atRisk };
   }, [licenses]);
@@ -181,9 +181,11 @@ export default function LicensePage() {
             </h3>
             <ul className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
               <li>• Incident points are assigned manually during incident review</li>
-              <li>• Drivers with <strong>8 or more points</strong> will have their license suspended</li>
-              <li>• Division 1 points expire after <strong>12 rounds</strong></li>
-              <li>• Division 2 points expire after <strong>6 rounds</strong></li>
+              <li>• Each threshold (3, 5, 7, 10, 13, 15 pts) triggers <strong>-25 championship points</strong></li>
+              <li>• Reaching <strong>7 points</strong> triggers a <strong>1-round race suspension</strong></li>
+              <li>• Reaching <strong>15 or more points</strong> will have their license suspended for the season</li>
+              <li>• Division 1 active points expire after <strong>12 rounds</strong></li>
+              <li>• Division 2 active points expire after <strong>6 rounds</strong></li>
               <li>• Division 3 points reset each season and do not carry over</li>
               <li>• Rookies points reset each season and do not carry over</li>
             </ul>
@@ -279,7 +281,7 @@ export default function LicensePage() {
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">At Risk (5+)</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">At Risk (10+)</p>
               <p className="text-2xl font-semibold text-slate-900 dark:text-white">{stats.atRisk}</p>
             </div>
             <div className="h-9 w-9 rounded-md border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300">
@@ -310,7 +312,7 @@ export default function LicensePage() {
             <option value="all">All Status</option>
             <option value="active">Active</option>
             <option value="suspended">Suspended</option>
-            <option value="atRisk">At Risk (5+)</option>
+            <option value="atRisk">At Risk (10+)</option>
           </select>
         </div>
       </SectionCard>
@@ -361,17 +363,18 @@ export default function LicensePage() {
                     <div className="flex items-center gap-2">
                       <span
                         className={`text-sm font-semibold ${
-                          license.activePoints >= 8
+                          (license.total_incident_points || 0) >= 15
                             ? 'text-red-600 dark:text-red-400'
-                            : license.activePoints >= 5
+                            : (license.total_incident_points || 0) >= 10
                             ? 'text-orange-600 dark:text-orange-400'
                             : 'text-green-600 dark:text-green-400'
                         }`}
                       >
-                        {license.activePoints}
+                        {license.total_incident_points || 0}
                       </span>
-                      <span className="text-xs text-slate-500 dark:text-slate-400">/ 8</span>
-                      {license.activePoints >= 5 && license.activePoints < 8 && (
+                      <span className="text-xs text-slate-500 dark:text-slate-400">/ 15</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500">({license.activePoints} active)</span>
+                      {(license.total_incident_points || 0) >= 10 && (license.total_incident_points || 0) < 15 && (
                         <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
                         At Risk
                         </span>
@@ -387,19 +390,20 @@ export default function LicensePage() {
                     </span>
                   </td>
                   <td className="px-3 py-2 text-sm">
-                    <select
-                      value={license.isSuspended ? 'suspended' : 'active'}
-                      onChange={(e) => handleStatusChange(license.id, e.target.value as 'active' | 'suspended')}
+                    <button
+                      onClick={() => handleStatusChange(license.id, license.isSuspended ? 'active' : 'suspended')}
                       disabled={updatingLicenseId === license.id}
-                      className={`h-7 px-2 text-[11px] font-medium rounded-md border transition-colors disabled:opacity-60 ${
+                      className={`h-7 px-2.5 inline-flex items-center gap-1.5 text-[11px] font-medium rounded-md border transition-colors disabled:opacity-60 ${
                         license.isSuspended
-                          ? 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300'
-                          : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100'
+                          ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
+                          : 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
                       }`}
                     >
-                      <option value="active">Active</option>
-                      <option value="suspended">Suspended</option>
-                    </select>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        license.isSuspended ? 'bg-red-500' : 'bg-green-500'
+                      }`} />
+                      {license.isSuspended ? 'Suspended' : 'Active'}
+                    </button>
                   </td>
                   <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
                     {license.updated_at

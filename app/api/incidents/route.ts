@@ -72,9 +72,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (incident.pointsToDeduct == null || incident.pointsToDeduct < 0) {
+    if (incident.pointsToDeduct != null && incident.pointsToDeduct < 0) {
       return NextResponse.json(
-        { error: 'pointsToDeduct must be 0 or a positive number' },
+        { error: 'pointsToDeduct cannot be negative' },
         { status: 400 }
       );
     }

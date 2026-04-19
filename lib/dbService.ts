@@ -1724,11 +1724,12 @@ export interface Incident {
   seasonId: string;
   roundId: string;
   driverId: string;
+  division?: string;
   incidentType: string;
   severity?: string;
   incidentPoints: number;
-  pointsToDeduct: number;
-  pointsDeducted: number;
+  pointsToDeduct?: number;
+  pointsDeducted?: number;
   description: string;
   reportedBy?: string;
   confirmed: boolean;
@@ -1741,8 +1742,8 @@ export interface Incident {
 export async function createIncident(incident: Incident): Promise<void> {
   await ensureSeasonDriversTable();
 
-  // Calculate severity based on points
-  const severity = incident.pointsToDeduct === 7 ? 'Minor' : 'Major';
+  // Calculate severity based on incident points
+  const severity = (incident.incidentPoints || 0) >= 3 ? 'Major' : 'Minor';
 
   const seasons = await sql`
     SELECT id FROM seasons WHERE id = ${incident.seasonId}
@@ -1783,8 +1784,8 @@ export async function createIncident(incident: Incident): Promise<void> {
       confirmed, created_at, updated_at
     ) VALUES (
       ${incident.id}, ${incident.seasonId}, ${incident.roundId}, ${incident.driverId},
-      ${incident.incidentType}, ${severity}, ${incident.incidentPoints || 0}, ${incident.pointsToDeduct},
-      ${incident.pointsDeducted || 0}, ${incident.description}, ${incident.reportedBy || null},
+      ${incident.incidentType}, ${severity}, ${incident.incidentPoints || 0}, 0,
+      0, ${incident.description}, ${incident.reportedBy || null},
       ${incident.confirmed || false}, ${incident.createdAt || new Date().toISOString()},
       ${incident.updatedAt || new Date().toISOString()}
     )
@@ -1793,8 +1794,12 @@ export async function createIncident(incident: Incident): Promise<void> {
 
 export async function getIncidentsBySeason(seasonId: string): Promise<Incident[]> {
   const incidents = await sql`
-    SELECT * FROM incidents WHERE season_id = ${seasonId}
-    ORDER BY created_at DESC
+    SELECT i.*, COALESCE(sd.division, d.division, 'New') AS incident_division
+    FROM incidents i
+    LEFT JOIN season_drivers sd ON sd.season_id = i.season_id AND sd.driver_id = i.driver_id
+    LEFT JOIN drivers d ON d.id = i.driver_id
+    WHERE i.season_id = ${seasonId}
+    ORDER BY i.created_at DESC
   ` as any[];
   
   return incidents.map((i: any) => ({
@@ -1802,6 +1807,7 @@ export async function getIncidentsBySeason(seasonId: string): Promise<Incident[]
     seasonId: i.season_id,
     roundId: i.round_id,
     driverId: i.driver_id,
+    division: i.incident_division,
     incidentType: i.incident_type,
     severity: i.severity,
     incidentPoints: i.incident_points || 0,
@@ -1870,15 +1876,13 @@ export async function getIncidentsByRound(roundId: string): Promise<Incident[]> 
 }
 
 export async function updateIncident(incident: Incident): Promise<void> {
-  // Recalculate severity based on points
-  const severity = incident.pointsToDeduct === 7 ? 'Minor' : 'Major';
+  const severity = (incident.incidentPoints || 0) >= 3 ? 'Major' : 'Minor';
   
   await sql`
     UPDATE incidents SET
       incident_type = ${incident.incidentType},
       severity = ${severity},
       incident_points = ${incident.incidentPoints || 0},
-      points_to_deduct = ${incident.pointsToDeduct},
       description = ${incident.description},
       updated_at = ${new Date().toISOString()}
     WHERE id = ${incident.id}
@@ -1896,35 +1900,58 @@ export async function confirmIncidentAndDeductPoints(
   
   const incident = incidents[0];
   
-  // Update incident as confirmed
+  // Mark incident as confirmed — championship point deductions are handled automatically
+  // by the license threshold system when license points are posted.
   await sql`
     UPDATE incidents SET
       confirmed = true,
       confirmed_at = ${new Date().toISOString()},
       confirmed_by = ${confirmedBy},
-      points_deducted = ${incident.points_to_deduct},
       updated_at = ${new Date().toISOString()}
     WHERE id = ${incidentId}
-  `;
-  
-  // Create negative points entry
-  const descriptionTrunc = incident.description.substring(0, 50);
-  const note = `Incident #${incidentId}: ${incident.incident_type} - ${descriptionTrunc}`;
-  
-  const pointsId = `points-incident-${incidentId}`;
-  await sql`
-    INSERT INTO points (
-      id, season_id, round_id, driver_id, division, race_type,
-      overall_position, points, note, created_at, updated_at
-    ) VALUES (
-      ${pointsId}, ${seasonId}, ${incident.round_id}, ${incident.driver_id},
-      'New', 'incident', 0, ${-incident.points_to_deduct}, ${note},
-      ${new Date().toISOString()}, ${new Date().toISOString()}
-    )
   `;
 }
 
 export async function deleteIncident(id: string): Promise<void> {
+  // Fetch incident before deletion to check if it was confirmed.
+  const rows = await sql`SELECT * FROM incidents WHERE id = ${id}` as any[];
+  if (rows.length === 0) return;
+  const incident = rows[0];
+
+  if (incident.confirmed) {
+    const driverId = incident.driver_id;
+    const seasonId = incident.season_id;
+
+    // Remove the license history row for this incident.
+    await sql`DELETE FROM license_points_history WHERE incident_id = ${id}`;
+
+    // Compute new season total after deletion.
+    const totalRows = await sql`
+      SELECT COALESCE(SUM(points_added), 0) AS total
+      FROM license_points_history
+      WHERE driver_id = ${driverId}
+        AND incident_season_id = ${seasonId}
+    ` as any[];
+    const newSeasonTotal = Number(totalRows[0]?.total || 0);
+
+    // Remove the specific threshold deduction tied to this incident.
+    await sql`
+      DELETE FROM points
+      WHERE id LIKE ${'points-threshold-%-' + driverId + '-' + seasonId + '-' + id}
+    `;
+
+    const newIsSeasonSuspended = newSeasonTotal >= 15;
+    await sql`
+      UPDATE licenses
+      SET
+        total_incident_points = ${newSeasonTotal},
+        is_suspended = ${newIsSeasonSuspended},
+        suspended_at = CASE WHEN ${newIsSeasonSuspended} THEN suspended_at ELSE NULL END,
+        updated_at = NOW()
+      WHERE driver_id = ${driverId}
+    `;
+  }
+
   await sql`DELETE FROM incidents WHERE id = ${id}`;
 }
 

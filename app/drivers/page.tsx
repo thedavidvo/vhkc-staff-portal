@@ -685,7 +685,7 @@ export default function DriversPage() {
                                   {incident.description}
                                 </p>
                                 <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
-                                  <span>Points: {incident.pointsToDeduct}</span>
+                                  <span>License Points: {incident.incidentPoints}</span>
                                   <span>Reported by: {incident.reportedBy}</span>
                                   {incident.createdAt && (
                                     <span>{new Date(incident.createdAt).toLocaleDateString()}</span>
