@@ -1,4 +1,4 @@
-export type Division = 'Division 1' | 'Division 2' | 'Division 3' | 'Division 4' | 'New' | 'Open';
+export type Division = 'Division 1' | 'Division 2' | 'Division 3' | 'Division 4' | 'New' | 'Rookies' | 'Open';
 export type DriverStatus = 'ACTIVE' | 'INACTIVE' | 'BANNED';
 
 export interface Driver {

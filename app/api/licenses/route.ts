@@ -328,6 +328,19 @@ export async function GET(request: Request) {
         LEFT JOIN drivers d ON l.driver_id = d.id
         WHERE l.driver_id = ${driverId}
       `;
+    } else if (seasonId) {
+      // Season-aware: only drivers registered in this season, using season-specific division.
+      query = sql`
+        SELECT 
+          l.*,
+          d.name as driver_name,
+          d.email as driver_email,
+          sd.division as driver_division
+        FROM licenses l
+        INNER JOIN drivers d ON l.driver_id = d.id
+        INNER JOIN season_drivers sd ON sd.driver_id = l.driver_id AND sd.season_id = ${seasonId}
+        WHERE 1=1
+      `;
     } else if (suspended === 'true') {
       query = sql`
         SELECT 
@@ -399,18 +412,7 @@ export async function GET(request: Request) {
           currentRoundNumber,
           offsets
         );
-        const computedSuspended = activePoints >= 8;
-
-        if (Boolean(license.is_suspended) !== computedSuspended) {
-          await sql`
-            UPDATE licenses
-            SET
-              is_suspended = ${computedSuspended},
-              suspended_at = ${computedSuspended ? new Date().toISOString() : null},
-              updated_at = NOW()
-            WHERE id = ${license.id}
-          `;
-        }
+        const computedSuspended = activePoints >= 15;
 
         return {
           ...license,
@@ -418,6 +420,7 @@ export async function GET(request: Request) {
           nextExpiry: nextExpiry.label,
           nextExpiryDetail: nextExpiry.detail,
           isSuspended: computedSuspended,
+          isRaceSuspended: Boolean(license.is_race_suspended),
         };
       })
     );

@@ -159,6 +159,23 @@ export default function SeasonPage() {
     setIsRoundEditModalOpen(true);
   };
 
+  const handleAddRound = () => {
+    if (!selectedSeason) return;
+    const nextRoundNumber = (selectedSeason.rounds.length > 0
+      ? Math.max(...selectedSeason.rounds.map(r => r.roundNumber))
+      : 0) + 1;
+    const newRound: Round = {
+      id: `round-${Date.now()}`,
+      roundNumber: nextRoundNumber,
+      name: '',
+      date: '',
+      locationId: undefined,
+      status: 'upcoming',
+    };
+    setRoundToEdit(newRound);
+    setIsRoundEditModalOpen(true);
+  };
+
   const handleSaveRound = async (round: Round) => {
     if (!selectedSeason) return;
     try {
@@ -325,6 +342,15 @@ export default function SeasonPage() {
               <SectionCard
                 title={`${selectedSeason.name} - Rounds`}
                 icon={Calendar}
+                actions={
+                  <button
+                    onClick={handleAddRound}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-md hover:bg-slate-700 dark:hover:bg-slate-200 transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add Round
+                  </button>
+                }
               >
                 {displayedRounds.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

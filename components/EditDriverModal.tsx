@@ -2,7 +2,7 @@
 
 import { Loader2, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { Division, DriverStatus, Driver } from '@/types';
+import { DriverStatus, Driver } from '@/types';
 import Modal from '@/components/Modal';
 
 interface EditDriverModalProps {
@@ -66,24 +66,6 @@ const calculateAge = (dateOfBirth: string | undefined): number | null => {
 // Helper function to format status with normal casing
 const formatStatus = (status: string): string => {
   return status.charAt(0) + status.slice(1).toLowerCase();
-};
-
-// Helper function to get division color
-const getDivisionColor = (division: Division) => {
-  switch (division) {
-    case 'Division 1':
-      return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
-    case 'Division 2':
-      return 'bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200';
-    case 'Division 3':
-      return 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200';
-    case 'Division 4':
-      return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
-    case 'New':
-      return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
-    default:
-      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
-  }
 };
 
 // Helper function to get status color
@@ -277,18 +259,13 @@ export default function EditDriverModal({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>Division</label>
-            <select
-              required
-              value={formData.division || driver.division}
-              onChange={(e) => setFormData({ ...formData, division: e.target.value as Division })}
-              className={inputCls}
-            >
-              <option value="Division 1">Division 1</option>
-              <option value="Division 2">Division 2</option>
-              <option value="Division 3">Division 3</option>
-              <option value="Division 4">Division 4</option>
-              <option value="New">New</option>
-            </select>
+            <input
+              type="text"
+              value={driver.division || ''}
+              className={`${inputCls} bg-slate-50 dark:bg-slate-900/40 text-slate-600 dark:text-slate-300`}
+              readOnly
+              disabled
+            />
           </div>
           <div>
             <label className={labelCls}>Home Track <span className="text-slate-400 font-normal">(optional)</span></label>
@@ -306,10 +283,11 @@ export default function EditDriverModal({
           <label className={labelCls}>Team Name <span className="text-slate-400 font-normal">(optional)</span></label>
           <input
             type="text"
-            value={formData.teamName || driver.teamName || ''}
-            onChange={(e) => setFormData({ ...formData, teamName: e.target.value })}
-            className={inputCls}
+            value={driver.teamName || ''}
+            className={`${inputCls} bg-slate-50 dark:bg-slate-900/40 text-slate-600 dark:text-slate-300`}
             placeholder="Team Name"
+            readOnly
+            disabled
           />
         </div>
 
@@ -368,32 +346,6 @@ export default function EditDriverModal({
               + Add Alias
             </button>
           </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Home Track
-          </label>
-          <input
-            type="text"
-            value={formData.homeTrack || driver.homeTrack || ''}
-            onChange={(e) => setFormData({ ...formData, homeTrack: e.target.value })}
-            className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-            placeholder="Home Track"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Team Name
-          </label>
-          <input
-            type="text"
-            value={formData.teamName || driver.teamName || ''}
-            onChange={(e) => setFormData({ ...formData, teamName: e.target.value })}
-            className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-            placeholder="Team Name"
-          />
         </div>
 
         <div>

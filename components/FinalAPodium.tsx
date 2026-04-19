@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { Division } from '@/types';
+import { useSeason } from '@/components/SeasonContext';
+import { getSeasonNumber, getDivisionsForSeason } from '@/lib/divisions';
 
 interface FinalAPodiumProps {
   seasonId: string;
@@ -17,14 +19,16 @@ interface PodiumResult {
 }
 
 export default function FinalAPodium({ seasonId, rounds }: FinalAPodiumProps) {
-  const [podiumResults, setPodiumResults] = useState<Record<Division, PodiumResult[]>>({
-    'Division 1': [],
-    'Division 2': [],
-    'Division 3': [],
-    'Division 4': [],
-    'New': [],
-    'Open': [],
-  });
+  const { selectedSeason } = useSeason();
+  const seasonNumber = getSeasonNumber(selectedSeason);
+  // Exclude 'New' (legacy placeholder) — all real competing divisions show on the podium
+  const competingDivisions = getDivisionsForSeason(seasonNumber).filter(d => d !== 'New') as Division[];
+
+  const emptyPodium = Object.fromEntries(
+    competingDivisions.map(d => [d, [] as PodiumResult[]])
+  ) as Partial<Record<Division, PodiumResult[]>>;
+
+  const [podiumResults, setPodiumResults] = useState<Partial<Record<Division, PodiumResult[]>>>(emptyPodium);
   const [selectedRound, setSelectedRound] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
@@ -56,16 +60,9 @@ export default function FinalAPodium({ seasonId, rounds }: FinalAPodiumProps) {
         );
 
         // Group by division and get top 3 for each
-        const podiumByDivision: Record<Division, PodiumResult[]> = {
-          'Division 1': [],
-          'Division 2': [],
-          'Division 3': [],
-          'Division 4': [],
-          'New': [],
-          'Open': [],
-        };
+        const podiumByDivision: Partial<Record<Division, PodiumResult[]>> = {};
 
-        (['Division 1', 'Division 2', 'Division 3', 'Division 4'] as Division[]).forEach(division => {
+        competingDivisions.forEach(division => {
           const divisionResults = finalAResults
             .filter(r => r.division === division)
             .sort((a, b) => a.overallPosition - b.overallPosition)
@@ -98,6 +95,8 @@ export default function FinalAPodium({ seasonId, rounds }: FinalAPodiumProps) {
     }
   };
 
+  const gridCols = competingDivisions.length === 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3';
+
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex justify-between items-center mb-6">
@@ -120,15 +119,15 @@ export default function FinalAPodium({ seasonId, rounds }: FinalAPodiumProps) {
       {loading ? (
         <div className="text-center py-8 text-gray-500">Loading results...</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {(['Division 1', 'Division 2', 'Division 3', 'Division 4'] as Division[]).map(division => (
+        <div className={`grid grid-cols-1 md:grid-cols-2 ${gridCols} gap-4`}>
+          {competingDivisions.map(division => (
             <div key={division} className="border border-gray-200 rounded-lg p-4">
               <h3 className="text-lg font-semibold text-gray-800 mb-3 text-center">
                 {division}
               </h3>
-              {podiumResults[division].length > 0 ? (
+              {(podiumResults[division] || []).length > 0 ? (
                 <div className="space-y-2">
-                  {podiumResults[division].map((result) => (
+                  {(podiumResults[division] || []).map((result) => (
                     <div
                       key={result.driverId}
                       className="flex items-center gap-2 p-2 bg-gray-50 rounded"

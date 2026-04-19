@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSeasons, addSeason, updateSeason, deleteSeason, getDriversBySeason, upsertSeasonDriverMembership } from '@/lib/dbService';
 import { cache } from '@/lib/cache';
+import { getSeasonNumber, isNewDivisionStructure } from '@/lib/divisions';
 
 const CACHE_KEY = 'seasons';
 
@@ -54,11 +55,16 @@ export async function POST(request: NextRequest) {
     if (previousSeason) {
       try {
         const previousDrivers = await getDriversBySeason(previousSeason.id);
+        const newSeasonNumber = getSeasonNumber(season.name);
+        const defaultDivision = isNewDivisionStructure(newSeasonNumber) ? 'Rookies' : 'New';
 
         // Reset per-season values while keeping canonical driver identity.
         for (const driver of previousDrivers) {
+          // Carry the driver's existing division if it still exists in the new structure;
+          // otherwise fall back to the default for the new season.
+          const carriedDivision = driver.division || defaultDivision;
           await upsertSeasonDriverMembership(season.id, driver.id, {
-            division: (driver.division || 'New'),
+            division: carriedDivision,
             teamName: '',
             status: 'ACTIVE',
           });

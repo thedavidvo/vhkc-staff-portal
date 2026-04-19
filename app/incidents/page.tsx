@@ -6,35 +6,20 @@ import SectionCard from '@/components/SectionCard';
 import Modal from '@/components/Modal';
 import { useSeason } from '@/components/SeasonContext';
 import { AlertTriangle, CheckCircle, XCircle, Loader2, Search, Plus, Edit, Trash, ShieldAlert, Shield, Users } from 'lucide-react';
-
-const getDivisionColor = (division: string) => {
-  switch (division) {
-    case 'Division 1':
-      return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
-    case 'Division 2':
-      return 'bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200';
-    case 'Division 3':
-      return 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200';
-    case 'Division 4':
-      return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
-    case 'New':
-      return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
-    default:
-      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
-  }
-};
+import { getDivisionColor } from '@/lib/divisions';
 
 interface Incident {
   id: string;
   seasonId: string;
   roundId: string;
   driverId: string;
+  division?: string;
   driverName?: string;
   incidentType: string;
   severity: 'Minor' | 'Major';
   incidentPoints: number;
-  pointsToDeduct: number;
-  pointsDeducted: boolean;
+  pointsToDeduct?: number;
+  pointsDeducted?: boolean;
   description: string;
   reportedBy: string;
   confirmed: boolean;
@@ -48,7 +33,9 @@ interface DriverLicense {
   driver_name: string;
   driver_division: string;
   activePoints: number;
+  total_incident_points?: number;
   isSuspended: boolean;
+  isRaceSuspended?: boolean;
 }
 
 export default function IncidentsPage() {
@@ -71,7 +58,6 @@ export default function IncidentsPage() {
     roundId: '',
     incidentType: 'On-Track Incident',
     incidentPoints: 1,
-    pointsToDeduct: 7,
     description: '',
     reportedBy: '',
   });
@@ -145,7 +131,31 @@ export default function IncidentsPage() {
 
   // Create driver-license map with incidents
   const driversWithLicenses = useMemo(() => {
-    return drivers.map(driver => {
+    const registeredIds = new Set(drivers.map(d => d.id));
+
+    // Synthesize entries for drivers who have incidents but aren't in season_drivers
+    const orphanDrivers: typeof drivers = [];
+    for (const incident of incidents) {
+      if (!registeredIds.has(incident.driverId) && !orphanDrivers.some(d => d.id === incident.driverId)) {
+        orphanDrivers.push({
+          id: incident.driverId,
+          name: incident.driverName || incident.driverId,
+          email: '',
+          mobileNumber: '',
+          division: (incident.division || 'New') as any,
+          teamName: '',
+          status: 'ACTIVE' as any,
+          lastUpdated: '',
+          firstName: '',
+          lastName: '',
+          dateOfBirth: '',
+          homeTrack: '',
+          aliases: [],
+        });
+      }
+    }
+
+    return [...drivers, ...orphanDrivers].map(driver => {
       const license = licenses.find(l => l.driver_id === driver.id);
       const driverIncidents = incidents.filter(i => i.driverId === driver.id);
       const confirmedIncidents = driverIncidents.filter(i => i.confirmed);
@@ -193,7 +203,6 @@ export default function IncidentsPage() {
         driverId: formData.driverId,
         incidentType: formData.incidentType,
         incidentPoints: formData.incidentPoints,
-        pointsToDeduct: formData.pointsToDeduct,
         description: formData.description,
         reportedBy: formData.reportedBy,
       };
@@ -234,7 +243,6 @@ export default function IncidentsPage() {
           roundId: '',
           incidentType: 'On-Track Incident',
           incidentPoints: 1,
-          pointsToDeduct: 7,
           description: '',
           reportedBy: '',
         });
@@ -252,7 +260,7 @@ export default function IncidentsPage() {
     const driver = drivers.find(d => d.id === incident.driverId);
     const round = rounds.find(r => r.id === incident.roundId);
     
-    if (!confirm(`Confirm this incident?\n\nDriver: ${driver?.name}\nRound: ${round?.roundNumber}\nIncident Points: ${incident.incidentPoints}\nRace Points Deducted: ${incident.pointsToDeduct}`)) {
+    if (!confirm(`Confirm this incident?\n\nDriver: ${driver?.name}\nRound: ${round?.roundNumber}\nIncident Points: ${incident.incidentPoints}`)) {
       return;
     }
 
@@ -317,11 +325,11 @@ export default function IncidentsPage() {
       }
 
       const licenseData = await licenseResponse.json();
-      if (licenseData.isSuspended) {
-        alert(`Incident confirmed!\n\n⚠️ WARNING: ${driver?.name}'s license is now SUSPENDED with ${licenseData.totalPoints} points!`);
-      } else {
-        alert(`Incident confirmed! ${driver?.name} now has ${licenseData.totalPoints} license points.`);
-      }
+      let msg = `Incident confirmed! ${driver?.name} now has ${licenseData.totalPoints} season point(s).`;
+      if (licenseData.isRaceSuspended) msg += `\n\n⚠️ RACE SUSPENSION: ${driver?.name} is suspended for 1 round.`;
+      if (licenseData.isSuspended) msg += `\n\n🚫 SEASON SUSPENSION: ${driver?.name}'s license is suspended for the season.`;
+      if (licenseData.thresholdsCrossed?.length) msg += `\n\n-25 championship points applied (threshold: ${licenseData.thresholdsCrossed.join(', ')} pts).`;
+      alert(msg);
     } catch (error) {
       console.error('Failed to confirm incident:', error);
       alert('Failed to confirm incident');
@@ -335,7 +343,6 @@ export default function IncidentsPage() {
       roundId: incident.roundId,
       incidentType: incident.incidentType,
       incidentPoints: incident.incidentPoints || 1,
-      pointsToDeduct: incident.pointsToDeduct,
       description: incident.description,
       reportedBy: incident.reportedBy,
     });
@@ -384,7 +391,6 @@ export default function IncidentsPage() {
               roundId: '',
               incidentType: 'On-Track Incident',
               incidentPoints: 1,
-              pointsToDeduct: 7,
               description: '',
               reportedBy: '',
             });
@@ -413,70 +419,42 @@ export default function IncidentsPage() {
             </div>
 
             {/* Drivers List */}
-            <ul className="space-y-2">
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800 -mx-4">
               {filteredDrivers.map(driver => (
                 <li
                   key={driver.id}
                   onClick={() => handleOpenHistoryModal(driver)}
-                  className={`p-2.5 rounded-md border cursor-pointer transition-colors ${
-                    driver.license?.isSuspended
-                      ? 'bg-white dark:bg-slate-900 border-red-200 dark:border-red-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                      : driver.license?.activePoints >= 5
-                      ? 'bg-white dark:bg-slate-900 border-orange-200 dark:border-orange-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                  }`}
+                  className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
                 >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-semibold text-slate-900 dark:text-white">{driver.name}</h4>
-                      {driver.license?.isSuspended && (
-                        <ShieldAlert className="w-4 h-4 text-red-600 dark:text-red-400" />
-                      )}
-                    </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${getDivisionColor(driver.division)}`}>
-                      {driver.division}
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                    driver.license?.isSuspended
+                      ? 'bg-red-500'
+                      : (driver.license?.total_incident_points || 0) >= 10
+                      ? 'bg-orange-400'
+                      : driver.incidentCount > 0
+                      ? 'bg-yellow-400'
+                      : 'bg-slate-300 dark:bg-slate-600'
+                  }`} />
+                  <span className="flex-1 text-sm font-medium text-slate-900 dark:text-white truncate">
+                    {driver.name}
+                  </span>
+                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${getDivisionColor(driver.division)}`}>
+                    {driver.division}
+                  </span>
+                  <span className={`text-xs font-semibold w-12 text-right flex-shrink-0 tabular-nums ${
+                    driver.license?.isSuspended
+                      ? 'text-red-600 dark:text-red-400'
+                      : (driver.license?.total_incident_points || 0) >= 10
+                      ? 'text-orange-500 dark:text-orange-400'
+                      : 'text-slate-400 dark:text-slate-500'
+                  }`}>
+                    {driver.license?.total_incident_points || 0}/15
+                  </span>
+                  {driver.pendingCount > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-medium flex-shrink-0">
+                      {driver.pendingCount} pending
                     </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">License Points</p>
-                        <p className={`text-lg font-semibold ${
-                          driver.license?.isSuspended
-                            ? 'text-red-600 dark:text-red-400'
-                            : driver.license?.activePoints >= 5
-                            ? 'text-orange-600 dark:text-orange-400'
-                            : 'text-green-600 dark:text-green-400'
-                        }`}>
-                          {driver.license?.activePoints || 0}<span className="text-xs text-slate-500 dark:text-slate-400">/8</span>
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Incidents</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
-                            {driver.confirmedCount} ✓
-                          </span>
-                          {driver.pendingCount > 0 && (
-                            <span className="text-xs px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
-                              {driver.pendingCount} ⏳
-                            </span>
-                          )}
-                          {driver.incidentCount === 0 && (
-                            <span className="text-xs px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
-                              0 incidents
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {driver.license?.isSuspended && (
-                      <div className="text-xs font-semibold text-red-600 dark:text-red-400">
-                        SUSPENDED
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -534,7 +512,6 @@ export default function IncidentsPage() {
                                 <span className="font-semibold text-orange-600 dark:text-orange-400">
                                   +{incident.incidentPoints} License Pts
                                 </span>
-                                <span>-{incident.pointsToDeduct} Race Pts</span>
                                 <span>by {incident.reportedBy}</span>
                               </div>
                             </div>
@@ -657,28 +634,12 @@ export default function IncidentsPage() {
                   <input
                     type="number"
                     value={formData.incidentPoints}
-                    onChange={(e) => setFormData({ ...formData, incidentPoints: parseInt(e.target.value) || 0 })}
-                    className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm"
-                    min="0"
-                  />
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Points added to driver's license (8+ = suspension). Expires after 1 year.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Race Points to Deduct *
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.pointsToDeduct}
-                    onChange={(e) => setFormData({ ...formData, pointsToDeduct: parseInt(e.target.value) || 0 })}
+                    onChange={(e) => setFormData({ ...formData, incidentPoints: Math.max(1, parseInt(e.target.value) || 1) })}
                     className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm"
                     min="1"
                   />
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Championship points deducted for this incident (7 = Minor, {'>'}7 = Major)
+                    Points added to driver's license. At 3, 5, 7, 10, 13, 15 pts -25 championship points are applied. 7 pts = 1 round race suspension. 15 pts = season suspension.
                   </p>
                 </div>
 
@@ -735,121 +696,87 @@ export default function IncidentsPage() {
           setShowHistoryModal(false);
           setHistoryModalDriver(null);
         }}
-        title={`Incident History - ${historyModalDriver?.name}`}
+        title={historyModalDriver?.name}
         size="lg"
       >
         {historyModalDriver && (
           <div className="space-y-4">
             {/* Driver Summary */}
-            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Division</p>
-                  <p className={`text-sm font-semibold px-2 py-1 rounded mt-1 inline-block ${getDivisionColor(historyModalDriver.division)}`}>
-                    {historyModalDriver.division}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">License Points</p>
-                  <p className={`text-lg font-bold mt-1 ${
-                    historyModalDriver.license?.isSuspended
-                      ? 'text-red-600 dark:text-red-400'
-                      : historyModalDriver.license?.activePoints >= 5
-                      ? 'text-orange-600 dark:text-orange-400'
-                      : 'text-green-600 dark:text-green-400'
-                  }`}>
-                    {historyModalDriver.license?.activePoints || 0}/8
-                  </p>
-                </div>
+            <div className="flex items-center justify-between">
+              <span className={`text-xs font-medium px-2 py-0.5 rounded ${getDivisionColor(historyModalDriver.division)}`}>
+                {historyModalDriver.division}
+              </span>
+              <div className="flex items-center gap-2">
+                {historyModalDriver.license?.isSuspended && (
+                  <span className="flex items-center gap-1 text-xs font-semibold text-red-600 dark:text-red-400">
+                    <ShieldAlert className="w-3.5 h-3.5" /> Suspended
+                  </span>
+                )}
+                <span className={`text-sm font-semibold ${
+                  historyModalDriver.license?.isSuspended
+                    ? 'text-red-600 dark:text-red-400'
+                    : (historyModalDriver.license?.total_incident_points || 0) >= 10
+                    ? 'text-orange-500 dark:text-orange-400'
+                    : 'text-slate-700 dark:text-slate-300'
+                }`}>
+                  {historyModalDriver.license?.total_incident_points || 0}<span className="text-xs font-normal text-slate-400"> season pts</span>
+                  {(historyModalDriver.license?.activePoints || 0) !== (historyModalDriver.license?.total_incident_points || 0) && (
+                    <span className="ml-1.5 text-xs font-normal text-slate-400">({historyModalDriver.license?.activePoints || 0} active)</span>
+                  )}
+                </span>
               </div>
-              {historyModalDriver.license?.isSuspended && (
-                <div className="mt-3 p-2 bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-800 dark:text-red-200 font-semibold flex items-center gap-2">
-                  <ShieldAlert className="w-4 h-4" />
-                  License Suspended
-                </div>
-              )}
             </div>
 
             {/* Incidents List */}
-            <div>
-              <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
-                Incidents ({incidents.filter(i => i.driverId === historyModalDriver.id).length})
-              </h4>
-              {incidents.filter(i => i.driverId === historyModalDriver.id).length === 0 ? (
-                <div className="p-6 text-center bg-slate-50 dark:bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-700">
-                  <Shield className="w-8 h-8 mx-auto text-green-500 mb-2" />
-                  <p className="text-slate-600 dark:text-slate-400">No incidents recorded</p>
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {incidents.filter(i => i.driverId === historyModalDriver.id).map(incident => {
-                    const round = rounds.find(r => r.id === incident.roundId);
-                    return (
-                      <div
-                        key={incident.id}
-                        className={`p-3 rounded-lg border ${
-                          incident.confirmed
-                            ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800'
-                            : 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-sm font-semibold text-slate-900 dark:text-white">
-                                {incident.incidentType}
-                              </span>
-                              <span className={`text-xs px-2 py-0.5 rounded font-semibold ${
-                                incident.confirmed
-                                  ? 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-100'
-                                  : 'bg-orange-200 dark:bg-orange-800 text-orange-800 dark:text-orange-100'
-                              }`}>
-                                {incident.confirmed ? 'Confirmed' : 'Pending'}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">
-                              Round {round?.roundNumber || 'N/A'} - {round?.location || 'Unknown Location'}
-                            </p>
-                            <p className="text-sm text-slate-700 dark:text-slate-300">{incident.description}</p>
-                            {incident.reportedBy && (
-                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                Reported by: {incident.reportedBy}
-                              </p>
-                            )}
-                            {/* Action Buttons */}
-                            <div className="flex items-center gap-2 mt-2">
-                              {!incident.confirmed && (
-                                <>
-                                  <button
-                                    onClick={() => handleConfirmIncident(incident)}
-                                    className="text-xs font-semibold text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors underline"
-                                  >
-                                    Approve
-                                  </button>
-                                  <span className="text-slate-300 dark:text-slate-600">•</span>
-                                </>
-                              )}
-                              <button
-                                onClick={() => handleDeleteIncident(incident.id)}
-                                className="text-xs font-semibold text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors underline"
-                              >
-                                Delete
-                              </button>
-                            </div>
+            {incidents.filter(i => i.driverId === historyModalDriver.id).length === 0 ? (
+              <div className="py-8 text-center">
+                <Shield className="w-7 h-7 mx-auto text-slate-300 dark:text-slate-600 mb-2" />
+                <p className="text-sm text-slate-500 dark:text-slate-400">No incidents recorded</p>
+              </div>
+            ) : (
+              <div className="space-y-px max-h-[420px] overflow-y-auto -mx-1 px-1">
+                {incidents.filter(i => i.driverId === historyModalDriver.id).map(incident => {
+                  const round = rounds.find(r => r.id === incident.roundId);
+                  return (
+                    <div
+                      key={incident.id}
+                      className="py-2.5 border-b border-slate-100 dark:border-slate-800 last:border-0"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${incident.confirmed ? 'bg-green-500' : 'bg-orange-400'}`} />
+                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                              Rd {round?.roundNumber || '?'} · {incident.incidentType}{incident.division ? ` · ${incident.division}` : ''}
+                            </span>
                           </div>
-                          <div className="text-right">
-                            <p className="text-lg font-bold text-slate-900 dark:text-white">
-                              {incident.incidentPoints}
-                            </p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">points</p>
+                          <p className="text-sm text-slate-800 dark:text-slate-200 truncate">{incident.description}</p>
+                          <div className="flex items-center gap-2 mt-1.5">
+                            {!incident.confirmed && (
+                              <button
+                                onClick={() => handleConfirmIncident(incident)}
+                                className="text-xs text-green-600 dark:text-green-400 hover:underline"
+                              >
+                                Approve
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteIncident(incident.id)}
+                              className="text-xs text-red-500 dark:text-red-400 hover:underline"
+                            >
+                              Delete
+                            </button>
                           </div>
                         </div>
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex-shrink-0">
+                          +{incident.incidentPoints}
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </Modal>

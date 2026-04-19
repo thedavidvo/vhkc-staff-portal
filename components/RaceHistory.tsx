@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Race, Division } from '@/types';
 import { MapPin, Trophy, Medal, Award } from 'lucide-react';
+import { useSeason } from '@/components/SeasonContext';
+import { getSeasonNumber, getDivisionsForSeason } from '@/lib/divisions';
 
 interface RaceHistoryProps {
   races: Race[];
@@ -12,6 +14,9 @@ interface RaceHistoryProps {
 }
 
 export default function RaceHistory({ races, drivers = [], points = [], rounds = [] }: RaceHistoryProps) {
+  const { selectedSeason } = useSeason();
+  const seasonNumber = getSeasonNumber(selectedSeason);
+  const divisionsForSeason = getDivisionsForSeason(seasonNumber);
   const [selectedRaceId, setSelectedRaceId] = useState<string | null>(null);
   const [selectedDivision, setSelectedDivision] = useState<Division>('Division 1');
   const [raceResults, setRaceResults] = useState<any[]>([]);
@@ -280,7 +285,7 @@ export default function RaceHistory({ races, drivers = [], points = [], rounds =
             </h3>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
-            {(['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'] as Division[]).map((division) => (
+            {divisionsForSeason.map((division) => (
               <button
                 key={division}
                 onClick={() => setSelectedDivision(division)}

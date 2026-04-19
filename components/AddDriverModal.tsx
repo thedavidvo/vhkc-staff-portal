@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { Division, DriverStatus } from '@/types';
 import Modal from '@/components/Modal';
+import { useSeason } from '@/components/SeasonContext';
+import { getSeasonNumber, getDivisionsForSeason, isNewDivisionStructure } from '@/lib/divisions';
 
 interface AddDriverModalProps {
   isOpen: boolean;
@@ -43,13 +45,28 @@ const calculateAge = (dateOfBirth: string | undefined): number | null => {
 };
 
 export default function AddDriverModal({ isOpen, onClose, onAdd }: AddDriverModalProps) {
-  const [formData, setFormData] = useState({
+  const { selectedSeason } = useSeason();
+  const seasonNumber = getSeasonNumber(selectedSeason);
+  const defaultDivision: Division = isNewDivisionStructure(seasonNumber) ? 'Rookies' : 'Division 4';
+  const availableDivisions = getDivisionsForSeason(seasonNumber);
+
+  const [formData, setFormData] = useState<{
+    firstName: string;
+    lastName: string;
+    aliases: string[];
+    email: string;
+    mobileNumber: string;
+    division: Division;
+    dateOfBirth: { day: number; month: number; year: number };
+    homeTrack: string;
+    status: DriverStatus;
+  }>({
     firstName: '',
     lastName: '',
     aliases: [''],
     email: '',
     mobileNumber: '',
-    division: 'Division 4' as Division,
+    division: defaultDivision,
     dateOfBirth: { day: 0, month: 0, year: 0 },
     homeTrack: '',
     status: 'ACTIVE' as DriverStatus,
@@ -84,7 +101,7 @@ export default function AddDriverModal({ isOpen, onClose, onAdd }: AddDriverModa
       aliases: [''],
       email: '',
       mobileNumber: '',
-      division: 'Division 4',
+      division: defaultDivision,
       dateOfBirth: { day: 0, month: 0, year: 0 },
       homeTrack: '',
       status: 'ACTIVE',
@@ -216,11 +233,9 @@ export default function AddDriverModal({ isOpen, onClose, onAdd }: AddDriverModa
               onChange={(e) => setFormData({ ...formData, division: e.target.value as Division })}
               className={inputCls}
             >
-              <option value="Division 1">Division 1</option>
-              <option value="Division 2">Division 2</option>
-              <option value="Division 3">Division 3</option>
-              <option value="Division 4">Division 4</option>
-              <option value="New">New</option>
+              {availableDivisions.map((div) => (
+                <option key={div} value={div}>{div}</option>
+              ))}
             </select>
           </div>
           <div>

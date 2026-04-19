@@ -9,24 +9,7 @@ import EditDriverModal from '@/components/EditDriverModal';
 import { useSeason } from '@/components/SeasonContext';
 import { Driver, Division, DriverStatus } from '@/types';
 import { Edit, Trash2, Plus, Loader2, Users, Search, Filter, ChevronUp, ChevronDown, AlertTriangle, ChevronRight } from 'lucide-react';
-
-// Helper function to get division color
-const getDivisionColor = (division: Division) => {
-  switch (division) {
-    case 'Division 1':
-      return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
-    case 'Division 2':
-      return 'bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200';
-    case 'Division 3':
-      return 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200';
-    case 'Division 4':
-      return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
-    case 'New':
-      return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
-    default:
-      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
-  }
-};
+import { getDivisionColor, getSeasonNumber, getDivisionsForSeason } from '@/lib/divisions';
 
 // Helper function to get status color
 const getStatusColor = (status: DriverStatus) => {
@@ -366,19 +349,6 @@ export default function DriversPage() {
       if (response.ok) {
         const driverData = await response.json();
         
-        // Create license for the new driver
-        try {
-          await fetch('/api/licenses', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              driverId: newDriver.id,
-            }),
-          });
-        } catch (licenseError) {
-          console.error('Failed to create license for new driver:', licenseError);
-        }
-        
         // Refresh drivers list
         const refreshResponse = await fetch(`/api/drivers?seasonId=${selectedSeason.id}`);
         if (refreshResponse.ok) {
@@ -459,11 +429,9 @@ export default function DriversPage() {
               className="h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600 focus:border-slate-300 dark:focus:border-slate-600 transition-colors"
             >
               <option value="all">All Divisions</option>
-              <option value="Division 1">Division 1</option>
-              <option value="Division 2">Division 2</option>
-              <option value="Division 3">Division 3</option>
-              <option value="Division 4">Division 4</option>
-              <option value="New">New</option>
+              {getDivisionsForSeason(getSeasonNumber(selectedSeason)).map((div) => (
+                <option key={div} value={div}>{div}</option>
+              ))}
             </select>
             <select
               value={teamFilter}
@@ -717,7 +685,7 @@ export default function DriversPage() {
                                   {incident.description}
                                 </p>
                                 <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
-                                  <span>Points: {incident.pointsToDeduct}</span>
+                                  <span>License Points: {incident.incidentPoints}</span>
                                   <span>Reported by: {incident.reportedBy}</span>
                                   {incident.createdAt && (
                                     <span>{new Date(incident.createdAt).toLocaleDateString()}</span>
