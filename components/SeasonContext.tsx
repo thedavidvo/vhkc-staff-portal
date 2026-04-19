@@ -37,7 +37,14 @@ export function SeasonProvider({ children }: { children: ReactNode }) {
           setSelectedSeason(updatedSelectedSeason);
         }
       } else if (data.length > 0) {
-        setSelectedSeason(data[0]);
+        // Default to the latest season: sort by start date desc, then by parsed season number desc
+        const latest = [...data].sort((a, b) => {
+          if (a.startDate && b.startDate) return b.startDate.localeCompare(a.startDate);
+          const numA = parseInt(a.name.match(/(\d+)/)?.[1] || '0', 10);
+          const numB = parseInt(b.name.match(/(\d+)/)?.[1] || '0', 10);
+          return numB - numA;
+        })[0];
+        setSelectedSeason(latest);
       }
     } catch (error) {
       console.error('Failed to fetch seasons:', error);

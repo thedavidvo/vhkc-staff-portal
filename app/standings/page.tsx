@@ -6,46 +6,12 @@ import PageLayout from '@/components/PageLayout';
 import SectionCard from '@/components/SectionCard';
 import { useSeason } from '@/components/SeasonContext';
 import { Division } from '@/types';
+import { getSeasonNumber, getDivisionsForSeason, getDivisionColor, getDivisionGradient } from '@/lib/divisions';
 import { Trophy, Medal, Award, Loader2, BarChart3, Users, UsersRound } from 'lucide-react';
-
-// Helper function to get division color
-const getDivisionColor = (division: Division) => {
-  switch (division) {
-    case 'Division 1':
-      return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
-    case 'Division 2':
-      return 'bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200';
-    case 'Division 3':
-      return 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200';
-    case 'Division 4':
-      return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
-    case 'New':
-      return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
-    default:
-      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
-  }
-};
-
-// Helper function to get division gradient
-const getDivisionGradient = (division: Division) => {
-  switch (division) {
-    case 'Division 1':
-      return 'from-blue-500 via-blue-600 to-blue-700';
-    case 'Division 2':
-      return 'from-pink-500 via-pink-600 to-rose-600';
-    case 'Division 3':
-      return 'from-orange-500 via-orange-600 to-amber-600';
-    case 'Division 4':
-      return 'from-yellow-500 via-yellow-600 to-amber-600';
-    case 'New':
-      return 'from-purple-500 via-purple-600 to-indigo-600';
-    default:
-      return 'from-slate-500 to-slate-600';
-  }
-};
 
 export default function StandingsPage() {
   const { selectedSeason } = useSeason();
+  const seasonNumber = getSeasonNumber(selectedSeason);
   const [selectedDivision, setSelectedDivision] = useState<Division>('Division 1');
   const [viewMode, setViewMode] = useState<'drivers' | 'teams'>('drivers');
   const [drivers, setDrivers] = useState<any[]>([]);
@@ -54,7 +20,8 @@ export default function StandingsPage() {
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const allDivisions: Division[] = ['Division 1', 'Division 2', 'Division 3', 'Division 4'];
+  // Rookies has no formal standings; filter it out
+  const allDivisions = getDivisionsForSeason(seasonNumber).filter(d => d !== 'Rookies' && d !== 'New');
   const teamDivisions: Division[] = ['Division 1', 'Division 2'];
   const divisions = viewMode === 'teams' ? teamDivisions : allDivisions;
 

@@ -6,23 +6,7 @@ import SectionCard from '@/components/SectionCard';
 import Modal from '@/components/Modal';
 import { useSeason } from '@/components/SeasonContext';
 import { AlertTriangle, CheckCircle, XCircle, Loader2, Search, Plus, Edit, Trash, ShieldAlert, Shield, Users } from 'lucide-react';
-
-const getDivisionColor = (division: string) => {
-  switch (division) {
-    case 'Division 1':
-      return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
-    case 'Division 2':
-      return 'bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200';
-    case 'Division 3':
-      return 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200';
-    case 'Division 4':
-      return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
-    case 'New':
-      return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
-    default:
-      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
-  }
-};
+import { getDivisionColor } from '@/lib/divisions';
 
 interface Incident {
   id: string;

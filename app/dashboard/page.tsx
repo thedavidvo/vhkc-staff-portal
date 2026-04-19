@@ -10,28 +10,14 @@ import RaceHistory from '@/components/RaceHistory';
 import { useSeason } from '@/components/SeasonContext';
 import { Calendar, MapPin, Flag, Trophy, Medal, Award, Loader2, LayoutDashboard, BarChart3 } from 'lucide-react';
 import { Division } from '@/types';
-
-// Helper function to get division color
-const getDivisionColor = (division: Division) => {
-  switch (division) {
-    case 'Division 1':
-      return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
-    case 'Division 2':
-      return 'bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200';
-    case 'Division 3':
-      return 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200';
-    case 'Division 4':
-      return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
-    case 'New':
-      return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
-    default:
-      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
-  }
-};
+import { getDivisionColor, getSeasonNumber, getDivisionsForSeason, isNewDivisionStructure } from '@/lib/divisions';
 
 export default function Dashboard() {
   const router = useRouter();
   const { selectedSeason, loading: seasonsLoading } = useSeason();
+  const seasonNumber = getSeasonNumber(selectedSeason);
+  const divisionsForSeason = getDivisionsForSeason(seasonNumber);
+  const standingsDivisions = divisionsForSeason.filter(d => d !== 'Rookies' && d !== 'New');
   const [drivers, setDrivers] = useState<any[]>([]);
   const [rounds, setRounds] = useState<any[]>([]);
   const [points, setPoints] = useState<any[]>([]);
@@ -327,15 +313,9 @@ export default function Dashboard() {
   const topDriversByDivision = useMemo(() => {
     if (!isSeasonEnded) return null;
 
-    const divisions: Division[] = ['Division 1', 'Division 2', 'Division 3', 'Division 4'];
-    const result: Record<Division, any[]> = {
-      'Division 1': [],
-      'Division 2': [],
-      'Division 3': [],
-      'Division 4': [],
-      'New': [],
-      'Open': [],
-    };
+    const divisions = divisionsForSeason;
+    const result: Partial<Record<Division, any[]>> = {};
+    divisions.forEach(d => { result[d] = []; });
 
     divisions.forEach((division) => {
       const driversInDivision = drivers
@@ -358,8 +338,7 @@ export default function Dashboard() {
     });
 
     return result;
-  }, [isSeasonEnded, drivers, points]);
-
+  }, [isSeasonEnded, drivers, points, divisionsForSeason]);
   const getRankIcon = (rank: number) => {
     if (rank === 1) return <Trophy className="w-5 h-5 text-amber-500" />;
     if (rank === 2) return <Medal className="w-5 h-5 text-slate-400" />;
@@ -387,9 +366,9 @@ export default function Dashboard() {
       });
     }
 
-    const order: Division[] = ['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New', 'Open'];
+    const order: Division[] = [...getDivisionsForSeason(seasonNumber), 'Open' as Division];
     return order.filter((division) => normalized.has(division));
-  }, [teams, drivers]);
+  }, [teams, drivers, seasonNumber]);
 
   useEffect(() => {
     if (selectedTeamStandingsDivision !== 'All' && !teamDivisionOptions.includes(selectedTeamStandingsDivision)) {
@@ -559,8 +538,8 @@ export default function Dashboard() {
         </SectionCard>
       ) : isSeasonEnded ? (
         <SectionCard title="Season Champions" icon={Trophy} className="mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-            {(['Division 1', 'Division 2', 'Division 3', 'Division 4'] as Division[]).map((division) => {
+          <div className={`grid grid-cols-1 md:grid-cols-2 xl:grid-cols-${Math.min(divisionsForSeason.length, 4)} gap-3`}>
+            {divisionsForSeason.map((division) => {
               const topDrivers = topDriversByDivision?.[division] || [];
               if (topDrivers.length === 0) return null;
               return (
@@ -579,7 +558,7 @@ export default function Dashboard() {
                 </div>
               );
             })}
-            {(!topDriversByDivision || !(['Division 1', 'Division 2', 'Division 3', 'Division 4'] as Division[]).some((division) => (topDriversByDivision?.[division] || []).length > 0)) && (
+            {(!topDriversByDivision || !divisionsForSeason.some((division) => (topDriversByDivision?.[division] || []).length > 0)) && (
               <p className="text-sm text-slate-500 dark:text-slate-400">No champion data available yet.</p>
             )}
           </div>
@@ -614,7 +593,7 @@ export default function Dashboard() {
             actions={
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-[11px] text-slate-500 dark:text-slate-400 mr-1">Drag to resize</span>
-                {(['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'] as Division[]).map((division) => (
+                {standingsDivisions.map((division) => (
                   <button
                     key={division}
                     onClick={() => setSelectedStandingsDivision(division)}

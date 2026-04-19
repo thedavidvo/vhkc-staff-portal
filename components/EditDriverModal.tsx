@@ -4,6 +4,8 @@ import { Loader2, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Division, DriverStatus, Driver } from '@/types';
 import Modal from '@/components/Modal';
+import { useSeason } from '@/components/SeasonContext';
+import { getSeasonNumber, getDivisionsForSeason, isClosedDivision, getDivisionColor } from '@/lib/divisions';
 
 interface EditDriverModalProps {
   isOpen: boolean;
@@ -68,24 +70,6 @@ const formatStatus = (status: string): string => {
   return status.charAt(0) + status.slice(1).toLowerCase();
 };
 
-// Helper function to get division color
-const getDivisionColor = (division: Division) => {
-  switch (division) {
-    case 'Division 1':
-      return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
-    case 'Division 2':
-      return 'bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200';
-    case 'Division 3':
-      return 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200';
-    case 'Division 4':
-      return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
-    case 'New':
-      return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
-    default:
-      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
-  }
-};
-
 // Helper function to get status color
 const getStatusColor = (status: DriverStatus) => {
   switch (status) {
@@ -106,6 +90,9 @@ export default function EditDriverModal({
   driver,
   onSave,
 }: EditDriverModalProps) {
+  const { selectedSeason } = useSeason();
+  const seasonNumber = getSeasonNumber(selectedSeason);
+  const allDivisionsForSeason = getDivisionsForSeason(seasonNumber);
   const [formData, setFormData] = useState<Partial<Driver>>({});
   const [dateOfBirth, setDateOfBirth] = useState<{ day: number; month: number; year: number }>({ day: 0, month: 0, year: 0 });
   const [isSaving, setIsSaving] = useState(false);
@@ -283,11 +270,19 @@ export default function EditDriverModal({
               onChange={(e) => setFormData({ ...formData, division: e.target.value as Division })}
               className={inputCls}
             >
-              <option value="Division 1">Division 1</option>
-              <option value="Division 2">Division 2</option>
-              <option value="Division 3">Division 3</option>
-              <option value="Division 4">Division 4</option>
-              <option value="New">New</option>
+              {/* Always show the driver's current division even if it's no longer available (e.g. legacy Division 4) */}
+              {driver.division && !allDivisionsForSeason.includes(driver.division) && (
+                <option value={driver.division}>{driver.division} (legacy)</option>
+              )}
+              {allDivisionsForSeason.map((div) => (
+                <option
+                  key={div}
+                  value={div}
+                  disabled={isClosedDivision(div, seasonNumber)}
+                >
+                  {div}{isClosedDivision(div, seasonNumber) ? ' (closed)' : ''}
+                </option>
+              ))}
             </select>
           </div>
           <div>

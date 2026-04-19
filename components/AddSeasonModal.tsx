@@ -85,7 +85,7 @@ export default function AddSeasonModal({
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-500 transition-all"
-            placeholder="e.g., 2024 Winter Championship"
+            placeholder="e.g., Season 4 (use Season + number for division rules)"
           />
         </div>
 

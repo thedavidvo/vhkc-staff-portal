@@ -8,27 +8,7 @@ import { useSeason } from '@/components/SeasonContext';
 import { Driver, Division, DriverStatus } from '@/types';
 import { Loader2, Edit, Save, X, CheckCircle2, Circle, Search, Filter, UserCheck, Users, UserRoundCheck, UserRoundX, UsersRound, ClipboardCheck, DollarSign, Download } from 'lucide-react';
 import { exportDriverListToCSV, downloadCSV } from '@/lib/csvExport';
-
-type DriverStatusFilter = 'all' | 'checkedIn' | 'notCheckedIn';
-type PaymentStatusFilter = 'all' | 'paid' | 'pending' | 'not_paid';
-
-// Helper function to get division color
-const getDivisionColor = (division: Division) => {
-  switch (division) {
-    case 'Division 1':
-      return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
-    case 'Division 2':
-      return 'bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200';
-    case 'Division 3':
-      return 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200';
-    case 'Division 4':
-      return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
-    case 'New':
-      return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
-    default:
-      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
-  }
-};
+import { getDivisionColor, getSeasonNumber, getDivisionsForSeason } from '@/lib/divisions';
 
 const getPaymentColor = (status: 'paid' | 'pending' | 'not_paid') => {
   switch (status) {
@@ -515,11 +495,9 @@ export default function CheckInPage() {
                       className="h-9 w-full pl-9 pr-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600 transition-colors"
                     >
                       <option value="all">All Divisions</option>
-                      <option value="Division 1">Division 1</option>
-                      <option value="Division 2">Division 2</option>
-                      <option value="Division 3">Division 3</option>
-                      <option value="Division 4">Division 4</option>
-                      <option value="New">New</option>
+                      {getDivisionsForSeason(getSeasonNumber(selectedSeason)).map((div) => (
+                        <option key={div} value={div}>{div}</option>
+                      ))}
                     </select>
                   </div>
 

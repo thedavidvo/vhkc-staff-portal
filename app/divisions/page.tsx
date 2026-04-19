@@ -6,8 +6,20 @@ import PageLayout from '@/components/PageLayout';
 import SectionCard from '@/components/SectionCard';
 import { useSeason } from '@/components/SeasonContext';
 import { Driver, Division } from '@/types';
-import { Search, Check, X, Loader2, ChevronDown, ShieldCheck, Users, Sparkles, Calendar, History, Plus, Trash2, Edit2, Square, CheckSquare, CheckCircle } from 'lucide-react';
+import { Search, Check, X, Loader2, ChevronDown, ShieldCheck, Users, Sparkles, Calendar, History, Plus, Trash2, Edit2, Square, CheckSquare, CheckCircle, Lock } from 'lucide-react';
 import RoundPointsEditModal from '@/components/RoundPointsEditModal';
+import {
+  getDivisionColor,
+  getDivisionGradient,
+  getDivisionSelectColors,
+  getDivisionsForSeason,
+  getAvailableDivisions,
+  getDivisionOrder,
+  isClosedDivision,
+  canPromote,
+  getSeasonNumber,
+  isNewDivisionStructure,
+} from '@/lib/divisions';
 
 interface PendingDivisionChange {
   driverId: string;
@@ -16,84 +28,6 @@ interface PendingDivisionChange {
   newDivision: Division;
   type: 'promotion' | 'demotion';
 }
-
-// Helper function to get division color
-const getDivisionColor = (division: Division) => {
-  switch (division) {
-    case 'Division 1':
-      return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
-    case 'Division 2':
-      return 'bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200';
-    case 'Division 3':
-      return 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200';
-    case 'Division 4':
-      return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
-    case 'New':
-      return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
-    default:
-      return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
-  }
-};
-
-// Helper function to get division gradient
-const getDivisionGradient = (division: Division) => {
-  switch (division) {
-    case 'Division 1':
-      return 'from-blue-500 via-blue-600 to-blue-700';
-    case 'Division 2':
-      return 'from-pink-500 via-pink-600 to-rose-600';
-    case 'Division 3':
-      return 'from-orange-500 via-orange-600 to-amber-600';
-    case 'Division 4':
-      return 'from-yellow-500 via-yellow-600 to-amber-600';
-    case 'New':
-      return 'from-purple-500 via-purple-600 to-indigo-600';
-    default:
-      return 'from-slate-500 to-slate-600';
-  }
-};
-
-// Helper function to get division colors for select dropdown
-const getDivisionSelectColors = (division: Division) => {
-  switch (division) {
-    case 'Division 1':
-      return {
-        bg: 'bg-blue-100 dark:bg-blue-900',
-        text: 'text-blue-800 dark:text-blue-200',
-        border: 'border-blue-300 dark:border-blue-700'
-      };
-    case 'Division 2':
-      return {
-        bg: 'bg-pink-100 dark:bg-pink-900',
-        text: 'text-pink-800 dark:text-pink-200',
-        border: 'border-pink-300 dark:border-pink-700'
-      };
-    case 'Division 3':
-      return {
-        bg: 'bg-orange-100 dark:bg-orange-900',
-        text: 'text-orange-800 dark:text-orange-200',
-        border: 'border-orange-300 dark:border-orange-700'
-      };
-    case 'Division 4':
-      return {
-        bg: 'bg-yellow-100 dark:bg-yellow-900',
-        text: 'text-yellow-800 dark:text-yellow-200',
-        border: 'border-yellow-300 dark:border-yellow-700'
-      };
-    case 'New':
-      return {
-        bg: 'bg-purple-100 dark:bg-purple-900',
-        text: 'text-purple-800 dark:text-purple-200',
-        border: 'border-purple-300 dark:border-purple-700'
-      };
-    default:
-      return {
-        bg: 'bg-white dark:bg-slate-800',
-        text: 'text-slate-900 dark:text-white',
-        border: 'border-slate-300 dark:border-slate-700'
-      };
-  }
-};
 
 // Helper function to get round display name, handling pre-season
 const getRoundDisplayName = (roundId: string, rounds: any[]): string => {
@@ -109,6 +43,9 @@ const getRoundDisplayName = (roundId: string, rounds: any[]): string => {
 
 export default function DivisionsPage() {
   const { selectedSeason } = useSeason();
+  const seasonNumber = getSeasonNumber(selectedSeason);
+  const divisionsForSeason = getDivisionsForSeason(seasonNumber);
+  const divisionOrderMap = getDivisionOrder(seasonNumber);
   const [drivers, setDrivers] = useState<any[]>([]);
   const [rounds, setRounds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -264,11 +201,10 @@ export default function DivisionsPage() {
     
     // Sort by division when "all" is selected
     if (divisionFilter === 'all') {
-      const divisionOrder: Division[] = ['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'];
       return filtered.sort((a, b) => {
-        const aIndex = divisionOrder.indexOf(a.division);
-        const bIndex = divisionOrder.indexOf(b.division);
-        return aIndex - bIndex;
+        const aOrder = divisionOrderMap[a.division as Division] ?? 99;
+        const bOrder = divisionOrderMap[b.division as Division] ?? 99;
+        return aOrder - bOrder;
       });
     }
     
@@ -296,21 +232,21 @@ export default function DivisionsPage() {
 
   // Bulk selection handlers
   const driversByDivision = useMemo(() => {
-    const grouped: Partial<Record<Division, any[]>> = {
-      'Division 1': [],
-      'Division 2': [],
-      'Division 3': [],
-      'Division 4': [],
-      'New': [],
-    };
+    const grouped: Partial<Record<Division, any[]>> = Object.fromEntries(
+      divisionsForSeason.map(d => [d, []])
+    );
     drivers.forEach((driver: any) => {
       const division = driver.division as Division;
       if (grouped[division]) {
         grouped[division].push(driver);
+      } else {
+        // Driver has a division that doesn't exist in the current season structure
+        // (e.g. a Division 4 driver in Season 4+) — still count them under their division
+        grouped[division] = [driver];
       }
     });
     return grouped;
-  }, [drivers]);
+  }, [drivers, divisionsForSeason]);
   const handleSelectDriver = (driverId: string) => {
     setSelectedDriverIds(prev => {
       const newSet = new Set(prev);
@@ -417,16 +353,14 @@ export default function DivisionsPage() {
           }
           
           // Determine change type based on division order
-          const divisionOrder: Partial<Record<Division, number>> = {
-            'Division 1': 1,
-            'Division 2': 2,
-            'Division 3': 3,
-            'Division 4': 4,
-            'New': 5,
-          };
-          const fromOrder = fromDivision ? (divisionOrder[fromDivision] ?? 5) : 5;
-          const toOrder = toDivision ? (divisionOrder[toDivision] ?? 5) : 5;
+          const fromOrder = fromDivision ? (divisionOrderMap[fromDivision] ?? 99) : 99;
+          const toOrder = toDivision ? (divisionOrderMap[toDivision] ?? 99) : 99;
           changeType = toOrder < fromOrder ? 'promotion' : 'demotion';
+
+          // Validate promotion path (e.g. Rookies cannot promote directly to Division 1)
+          if (fromDivision && toDivision && !canPromote(fromDivision, toDivision, seasonNumber)) {
+            throw new Error(`Cannot promote from ${fromDivision} to ${toDivision}. Rookies must be promoted to Division 3 or Division 2 first.`);
+          }
         } else {
           // For division_start and mid_season_join, use divisionStart
           if (!divisionStart) {
@@ -536,10 +470,11 @@ export default function DivisionsPage() {
         icon={ShieldCheck}
       >
         {/* Division Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
-          {(['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'] as Division[]).map(
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${divisionsForSeason.length <= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-5'} gap-3 mb-6`}>
+          {divisionsForSeason.map(
             (division) => {
               const isSelected = divisionFilter === division;
+              const closed = isClosedDivision(division, seasonNumber);
               return (
                 <button
                   key={division}
@@ -554,7 +489,10 @@ export default function DivisionsPage() {
                     <h3 className={`text-xs font-semibold uppercase tracking-wide ${isSelected ? 'text-white/90 dark:text-slate-900/80' : 'text-slate-600 dark:text-slate-400'}`}>
                       {division}
                     </h3>
-                    <Users className={`w-4 h-4 ${isSelected ? 'text-white dark:text-slate-900' : 'text-slate-400'}`} />
+                    <div className="flex items-center gap-1">
+                      {closed && <Lock className={`w-3 h-3 ${isSelected ? 'text-white/70 dark:text-slate-900/60' : 'text-slate-400'}`} title="Closed division" />}
+                      <Users className={`w-4 h-4 ${isSelected ? 'text-white dark:text-slate-900' : 'text-slate-400'}`} />
+                    </div>
                   </div>
                   <p className={`text-2xl font-semibold ${isSelected ? 'text-white dark:text-slate-900' : 'text-slate-900 dark:text-white'}`}>
                     {driversByDivision[division]?.length || 0}
@@ -588,11 +526,9 @@ export default function DivisionsPage() {
               className="h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600 focus:border-slate-300 dark:focus:border-slate-600 transition-colors min-w-[180px]"
             >
               <option value="all">All Divisions</option>
-              <option value="Division 1">Division 1</option>
-              <option value="Division 2">Division 2</option>
-              <option value="Division 3">Division 3</option>
-              <option value="Division 4">Division 4</option>
-              <option value="New">New</option>
+              {divisionsForSeason.map((div) => (
+                <option key={div} value={div}>{div}{isClosedDivision(div, seasonNumber) ? ' (closed)' : ''}</option>
+              ))}
             </select>
           </div>
         </SectionCard>
@@ -706,13 +642,16 @@ export default function DivisionsPage() {
                                     }}
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
                                   >
-                                    <option value="Division 1">Division 1</option>
-                                    <option value="Division 2">Division 2</option>
-                                    <option value="Division 3">Division 3</option>
-                                    <option value="Division 4">Division 4</option>
-                                    <option value="New">New</option>
+                                    {/* Always include the driver's current division as a selectable option */}
+                                    {!divisionsForSeason.includes(driver.division) && (
+                                      <option value={driver.division}>{driver.division} (legacy)</option>
+                                    )}
+                                    {divisionsForSeason.map((div) => (
+                                      <option key={div} value={div}>{div}{isClosedDivision(div, seasonNumber) ? ' (closed)' : ''}</option>
+                                    ))}
                                   </select>
                                   <div className={`px-2 py-0.5 text-xs font-medium rounded-md whitespace-nowrap inline-flex items-center gap-1 ${getDivisionColor(driver.division)} ${updatingDriverId === driver.id ? 'opacity-50' : ''}`}>
+                                    {isClosedDivision(driver.division, seasonNumber) && <Lock className="w-2.5 h-2.5" />}
                                     <span>{driver.division}</span>
                                     {updatingDriverId !== driver.id && <ChevronDown className="w-3 h-3" style={{ color: 'inherit' }} />}
                                     {updatingDriverId === driver.id && <Loader2 className="w-3 h-3 animate-spin" style={{ color: 'inherit' }} />}
@@ -785,6 +724,7 @@ export default function DivisionsPage() {
           driverName={selectedDriverForChange.name}
           currentDivision={selectedDriverForChange.currentDivision}
           seasonId={selectedSeason.id}
+          seasonNumber={seasonNumber}
           rounds={rounds}
           existingChange={editingDivisionChange}
           onSave={async () => {
@@ -898,11 +838,9 @@ export default function DivisionsPage() {
                       className="h-9 w-full px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600"
                     >
                       <option value="">Use driver's current division</option>
-                      <option value="Division 1">Division 1</option>
-                      <option value="Division 2">Division 2</option>
-                      <option value="Division 3">Division 3</option>
-                      <option value="Division 4">Division 4</option>
-                      <option value="New">New</option>
+                      {divisionsForSeason.map((div) => (
+                        <option key={div} value={div}>{div}</option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -915,11 +853,9 @@ export default function DivisionsPage() {
                       className="h-9 w-full px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600"
                     >
                       <option value="">Select target division</option>
-                      <option value="Division 1">Division 1</option>
-                      <option value="Division 2">Division 2</option>
-                      <option value="Division 3">Division 3</option>
-                      <option value="Division 4">Division 4</option>
-                      <option value="New">New</option>
+                      {divisionsForSeason.map((div) => (
+                        <option key={div} value={div}>{div}</option>
+                      ))}
                     </select>
                   </div>
                 </>
@@ -934,11 +870,9 @@ export default function DivisionsPage() {
                     className="h-9 w-full px-3 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-slate-400/40 focus:border-slate-300 dark:focus:border-slate-600"
                   >
                     <option value="">Select division start</option>
-                    <option value="Division 1">Division 1</option>
-                    <option value="Division 2">Division 2</option>
-                    <option value="Division 3">Division 3</option>
-                    <option value="Division 4">Division 4</option>
-                    <option value="New">New</option>
+                    {divisionsForSeason.map((div) => (
+                      <option key={div} value={div}>{div}</option>
+                    ))}
                   </select>
                 </div>
               )}
@@ -1065,6 +999,7 @@ interface DivisionChangeModalProps {
   driverName: string;
   currentDivision: Division;
   seasonId: string;
+  seasonNumber: number;
   rounds: any[];
   existingChange?: any | null;
   onSave: () => void;
@@ -1077,6 +1012,7 @@ function DivisionChangeModal({
   driverName,
   currentDivision,
   seasonId,
+  seasonNumber,
   rounds,
   existingChange,
   onSave
@@ -1105,18 +1041,19 @@ function DivisionChangeModal({
       setChangeType(existingChange.changeType);
       setUpdateCurrentDivision(false);
     } else {
-      // Default to pre-season for new drivers, otherwise first round
+      // Default to pre-season for new/rookies drivers, otherwise first round
       const preSeasonRoundId = `pre-season-${seasonId}`;
       const sortedRounds = [...rounds].sort((a, b) => (a.roundNumber || 0) - (b.roundNumber || 0));
-      // If driver is "New", default to pre-season; otherwise default to first round
-      const defaultRoundId = currentDivision === 'New' ? preSeasonRoundId : (sortedRounds.length > 0 ? sortedRounds[0].id : preSeasonRoundId);
+      const isNewOrRookies = currentDivision === 'New' || currentDivision === 'Rookies';
+      const defaultRoundId = isNewOrRookies ? preSeasonRoundId : (sortedRounds.length > 0 ? sortedRounds[0].id : preSeasonRoundId);
       setSelectedRoundId(defaultRoundId);
       setFromDivision(currentDivision);
       setToDivision(currentDivision);
-      // If pre-season is selected, default division start to "New"
-      const defaultDivisionStart = defaultRoundId === preSeasonRoundId ? 'New' : currentDivision;
+      // If pre-season is selected, default division start to the season-appropriate default
+      const preSeasonDefault: Division = isNewDivisionStructure(seasonNumber) ? 'Rookies' : 'New';
+      const defaultDivisionStart = defaultRoundId === preSeasonRoundId ? preSeasonDefault : currentDivision;
       setDivisionStart(defaultDivisionStart);
-      setChangeType(currentDivision === 'New' ? 'division_start' : 'promotion');
+      setChangeType(isNewOrRookies ? 'division_start' : 'promotion');
       setUpdateCurrentDivision(false);
     }
   }, [existingChange, rounds, currentDivision, isOpen, seasonId]);
@@ -1162,15 +1099,8 @@ function DivisionChangeModal({
           const currentTotal = allSeasonPoints.reduce((sum: number, p: any) => sum + (p.points || 0), 0);
 
           // Determine multiplier: promotion = 0.75, demotion = 1.25
-          const divisionOrder: Partial<Record<Division, number>> = {
-            'Division 1': 1,
-            'Division 2': 2,
-            'Division 3': 3,
-            'Division 4': 4,
-            'New': 5,
-          };
-          const fromOrder = divisionOrder[fromDivision] ?? 5;
-          const toOrder = divisionOrder[toDivision] ?? 5;
+          const fromOrder = divisionOrderLocal[fromDivision] ?? 99;
+          const toOrder = divisionOrderLocal[toDivision] ?? 99;
           const isPromotion = toOrder < fromOrder;
           const multiplierFactor = isPromotion ? 0.75 : 1.25;
 
@@ -1224,21 +1154,15 @@ function DivisionChangeModal({
     
     if (selectedRoundId.startsWith('pre-season-')) {
       setChangeType('division_start');
-      // Automatically set division start to "New" for pre-season
-      setDivisionStart('New');
+      // Default division start for pre-season: Rookies in S4+, New in S1-3
+      const preSeasonDefault: Division = isNewDivisionStructure(seasonNumber) ? 'Rookies' : 'New';
+      setDivisionStart(preSeasonDefault);
     } else if (selectedRoundId && changeType !== 'mid_season_join') {
       // Default to promotion/demotion for existing rounds
       const selectedRound = rounds.find(r => r.id === selectedRoundId);
       if (selectedRound && fromDivision && toDivision && fromDivision !== toDivision) {
-        const divisionOrder: Partial<Record<Division, number>> = {
-          'Division 1': 1,
-          'Division 2': 2,
-          'Division 3': 3,
-          'Division 4': 4,
-          'New': 5,
-        };
-        const fromOrder = divisionOrder[fromDivision] ?? 5;
-        const toOrder = divisionOrder[toDivision] ?? 5;
+        const fromOrder = divisionOrderLocal[fromDivision] ?? 99;
+        const toOrder = divisionOrderLocal[toDivision] ?? 99;
         setChangeType(toOrder < fromOrder ? 'promotion' : 'demotion');
       }
     }
@@ -1277,16 +1201,16 @@ function DivisionChangeModal({
 
       // Determine change type for regular changes
       if (isRegularChange && fromDivision && toDivision) {
-        const divisionOrder: Partial<Record<Division, number>> = {
-          'Division 1': 1,
-          'Division 2': 2,
-          'Division 3': 3,
-          'Division 4': 4,
-          'New': 5,
-        };
-        const fromOrder = divisionOrder[fromDivision] ?? 5;
-        const toOrder = divisionOrder[toDivision] ?? 5;
+        const fromOrder = divisionOrderLocal[fromDivision] ?? 99;
+        const toOrder = divisionOrderLocal[toDivision] ?? 99;
         finalChangeType = toOrder < fromOrder ? 'promotion' : 'demotion';
+
+        // Validate promotion path for the current season structure
+        if (!canPromote(fromDivision, toDivision, seasonNumber)) {
+          alert(`Cannot move from ${fromDivision} to ${toDivision}. Rookies must be promoted to Division 3 or Division 2 first.`);
+          setSaving(false);
+          return;
+        }
       }
 
       const changeId = existingChange?.id || `division-change-${driverId}-${Date.now()}`;
@@ -1364,7 +1288,8 @@ function DivisionChangeModal({
 
   if (!isOpen) return null;
 
-  const divisionOptions: Division[] = ['Division 1', 'Division 2', 'Division 3', 'Division 4', 'New'];
+  const divisionOptions = getDivisionsForSeason(seasonNumber);
+  const divisionOrderLocal = getDivisionOrder(seasonNumber);
 
   return (
     <div className="fixed inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-50 p-4">

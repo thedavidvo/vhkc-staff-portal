@@ -191,7 +191,7 @@ export async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS division_changes (
         id TEXT PRIMARY KEY,
         season_id TEXT NOT NULL,
-        round_id TEXT NOT NULL,
+        round_id TEXT,
         driver_id TEXT NOT NULL,
         driver_name TEXT NOT NULL,
         from_division TEXT,

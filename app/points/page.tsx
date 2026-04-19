@@ -8,26 +8,8 @@ import { useSeason } from '@/components/SeasonContext';
 import { Division } from '@/types';
 import { Loader2, Save, X, ArrowUp, ArrowDown, ArrowUpDown, Trophy, Edit, Trash2, List, Check, FileText, MessageSquare, Plus } from 'lucide-react';
 import { getPointsForPosition, getAllPointsForPosition } from '@/lib/pointsSystem';
+import { getDivisionColor } from '@/lib/divisions';
 
-// Helper function to get division color
-const getDivisionColor = (division: Division | string) => {
-  switch (division) {
-    case 'Division 1':
-      return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
-    case 'Division 2':
-      return 'bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200';
-    case 'Division 3':
-      return 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200';
-    case 'Division 4':
-      return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
-    case 'New':
-      return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
-    case 'Open':
-      return 'bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-200';
-    default:
-      return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300';
-  }
-};
 
 // Helper function to get race type badge color - matching division badge style
 const getRaceTypeBadgeColor = (raceType: string, finalType?: string) => {
