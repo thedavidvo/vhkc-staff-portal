@@ -96,16 +96,20 @@ export default function LicensePage() {
       let cmp = 0;
       switch (sortKey) {
         case 'driver_name':
-          cmp = (a.driver_name ?? '').localeCompare(b.driver_name ?? '');
+          cmp = (a.driver_name ?? '').localeCompare(b.driver_name ?? '', 'en', { sensitivity: 'base' });
           break;
-        case 'driver_division':
-          cmp = (a.driver_division ?? '').localeCompare(b.driver_division ?? '');
+        case 'driver_division': {
+          cmp = (a.driver_division ?? '').localeCompare(b.driver_division ?? '', 'en', { sensitivity: 'base' });
+          if (cmp === 0) {
+            cmp = (a.driver_name ?? '').localeCompare(b.driver_name ?? '', 'en', { sensitivity: 'base' });
+          }
           break;
+        }
         case 'activePoints':
           cmp = (a.activePoints ?? 0) - (b.activePoints ?? 0);
           break;
         case 'nextExpiry':
-          cmp = (a.nextExpiry ?? '').localeCompare(b.nextExpiry ?? '');
+          cmp = (a.nextExpiry ?? '').localeCompare(b.nextExpiry ?? '', 'en', { sensitivity: 'base' });
           break;
         case 'isSuspended':
           cmp = (a.isSuspended ? 1 : 0) - (b.isSuspended ? 1 : 0);
