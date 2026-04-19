@@ -131,7 +131,31 @@ export default function IncidentsPage() {
 
   // Create driver-license map with incidents
   const driversWithLicenses = useMemo(() => {
-    return drivers.map(driver => {
+    const registeredIds = new Set(drivers.map(d => d.id));
+
+    // Synthesize entries for drivers who have incidents but aren't in season_drivers
+    const orphanDrivers: typeof drivers = [];
+    for (const incident of incidents) {
+      if (!registeredIds.has(incident.driverId) && !orphanDrivers.some(d => d.id === incident.driverId)) {
+        orphanDrivers.push({
+          id: incident.driverId,
+          name: incident.driverName || incident.driverId,
+          email: '',
+          mobileNumber: '',
+          division: (incident.division || 'New') as any,
+          teamName: '',
+          status: 'ACTIVE' as any,
+          lastUpdated: '',
+          firstName: '',
+          lastName: '',
+          dateOfBirth: '',
+          homeTrack: '',
+          aliases: [],
+        });
+      }
+    }
+
+    return [...drivers, ...orphanDrivers].map(driver => {
       const license = licenses.find(l => l.driver_id === driver.id);
       const driverIncidents = incidents.filter(i => i.driverId === driver.id);
       const confirmedIncidents = driverIncidents.filter(i => i.confirmed);

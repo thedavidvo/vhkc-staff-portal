@@ -1794,7 +1794,7 @@ export async function createIncident(incident: Incident): Promise<void> {
 
 export async function getIncidentsBySeason(seasonId: string): Promise<Incident[]> {
   const incidents = await sql`
-    SELECT i.*, COALESCE(sd.division, d.division, 'New') AS incident_division
+    SELECT i.*, d.name AS driver_name, COALESCE(sd.division, d.division, 'New') AS incident_division
     FROM incidents i
     LEFT JOIN season_drivers sd ON sd.season_id = i.season_id AND sd.driver_id = i.driver_id
     LEFT JOIN drivers d ON d.id = i.driver_id
@@ -1808,6 +1808,7 @@ export async function getIncidentsBySeason(seasonId: string): Promise<Incident[]
     roundId: i.round_id,
     driverId: i.driver_id,
     division: i.incident_division,
+    driverName: i.driver_name,
     incidentType: i.incident_type,
     severity: i.severity,
     incidentPoints: i.incident_points || 0,
