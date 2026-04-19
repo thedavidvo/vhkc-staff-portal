@@ -2,10 +2,8 @@
 
 import { Loader2, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { Division, DriverStatus, Driver } from '@/types';
+import { DriverStatus, Driver } from '@/types';
 import Modal from '@/components/Modal';
-import { useSeason } from '@/components/SeasonContext';
-import { getSeasonNumber, getDivisionsForSeason, isClosedDivision, getDivisionColor } from '@/lib/divisions';
 
 interface EditDriverModalProps {
   isOpen: boolean;
@@ -90,9 +88,6 @@ export default function EditDriverModal({
   driver,
   onSave,
 }: EditDriverModalProps) {
-  const { selectedSeason } = useSeason();
-  const seasonNumber = getSeasonNumber(selectedSeason);
-  const allDivisionsForSeason = getDivisionsForSeason(seasonNumber);
   const [formData, setFormData] = useState<Partial<Driver>>({});
   const [dateOfBirth, setDateOfBirth] = useState<{ day: number; month: number; year: number }>({ day: 0, month: 0, year: 0 });
   const [isSaving, setIsSaving] = useState(false);
@@ -264,26 +259,13 @@ export default function EditDriverModal({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>Division</label>
-            <select
-              required
-              value={formData.division || driver.division}
-              onChange={(e) => setFormData({ ...formData, division: e.target.value as Division })}
-              className={inputCls}
-            >
-              {/* Always show the driver's current division even if it's no longer available (e.g. legacy Division 4) */}
-              {driver.division && !allDivisionsForSeason.includes(driver.division) && (
-                <option value={driver.division}>{driver.division} (legacy)</option>
-              )}
-              {allDivisionsForSeason.map((div) => (
-                <option
-                  key={div}
-                  value={div}
-                  disabled={isClosedDivision(div, seasonNumber)}
-                >
-                  {div}{isClosedDivision(div, seasonNumber) ? ' (closed)' : ''}
-                </option>
-              ))}
-            </select>
+            <input
+              type="text"
+              value={driver.division || ''}
+              className={`${inputCls} bg-slate-50 dark:bg-slate-900/40 text-slate-600 dark:text-slate-300`}
+              readOnly
+              disabled
+            />
           </div>
           <div>
             <label className={labelCls}>Home Track <span className="text-slate-400 font-normal">(optional)</span></label>
@@ -301,10 +283,11 @@ export default function EditDriverModal({
           <label className={labelCls}>Team Name <span className="text-slate-400 font-normal">(optional)</span></label>
           <input
             type="text"
-            value={formData.teamName || driver.teamName || ''}
-            onChange={(e) => setFormData({ ...formData, teamName: e.target.value })}
-            className={inputCls}
+            value={driver.teamName || ''}
+            className={`${inputCls} bg-slate-50 dark:bg-slate-900/40 text-slate-600 dark:text-slate-300`}
             placeholder="Team Name"
+            readOnly
+            disabled
           />
         </div>
 
@@ -363,32 +346,6 @@ export default function EditDriverModal({
               + Add Alias
             </button>
           </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Home Track
-          </label>
-          <input
-            type="text"
-            value={formData.homeTrack || driver.homeTrack || ''}
-            onChange={(e) => setFormData({ ...formData, homeTrack: e.target.value })}
-            className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-            placeholder="Home Track"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Team Name
-          </label>
-          <input
-            type="text"
-            value={formData.teamName || driver.teamName || ''}
-            onChange={(e) => setFormData({ ...formData, teamName: e.target.value })}
-            className="w-full px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-            placeholder="Team Name"
-          />
         </div>
 
         <div>

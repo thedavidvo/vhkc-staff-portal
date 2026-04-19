@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import PageLayout from '@/components/PageLayout';
 import SectionCard from '@/components/SectionCard';
 import { useSeason } from '@/components/SeasonContext';
-import { CreditCard, AlertTriangle, CheckCircle, XCircle, Loader2, Search, Shield, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
+import { CreditCard, AlertTriangle, CheckCircle, XCircle, Loader2, Search, Shield, RefreshCw, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { getDivisionColor } from '@/lib/divisions';
 
 interface License {
@@ -25,6 +25,7 @@ interface License {
 }
 
 type LicenseFilter = 'all' | 'active' | 'suspended' | 'atRisk';
+type SortKey = 'driver_name' | 'driver_division' | 'activePoints' | 'nextExpiry' | 'isSuspended' | 'updated_at';
 
 export default function LicensePage() {
   const { selectedSeason } = useSeason();
@@ -34,9 +35,20 @@ export default function LicensePage() {
   const [recomputingSeason, setRecomputingSeason] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<LicenseFilter>('all');
+  const [sortKey, setSortKey] = useState<SortKey>('driver_name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [expandedLicenseId, setExpandedLicenseId] = useState<string | null>(null);
   const [incidentCache, setIncidentCache] = useState<Record<string, any[]>>({});
   const [loadingIncidentsFor, setLoadingIncidentsFor] = useState<string | null>(null);
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
 
   useEffect(() => {
     fetchLicenses();
@@ -63,7 +75,7 @@ export default function LicensePage() {
   };
 
   const filteredLicenses = useMemo(() => {
-    return licenses.filter((license) => {
+    const filtered = licenses.filter((license) => {
       if (statusFilter === 'suspended' && !license.isSuspended) return false;
       if (statusFilter === 'active' && license.isSuspended) return false;
       if (statusFilter === 'atRisk' && (license.isSuspended || (license.total_incident_points || 0) < 10)) return false;
@@ -79,7 +91,32 @@ export default function LicensePage() {
 
       return true;
     });
-  }, [licenses, statusFilter, searchQuery]);
+
+    return [...filtered].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case 'driver_name':
+          cmp = (a.driver_name ?? '').localeCompare(b.driver_name ?? '');
+          break;
+        case 'driver_division':
+          cmp = (a.driver_division ?? '').localeCompare(b.driver_division ?? '');
+          break;
+        case 'activePoints':
+          cmp = (a.activePoints ?? 0) - (b.activePoints ?? 0);
+          break;
+        case 'nextExpiry':
+          cmp = (a.nextExpiry ?? '').localeCompare(b.nextExpiry ?? '');
+          break;
+        case 'isSuspended':
+          cmp = (a.isSuspended ? 1 : 0) - (b.isSuspended ? 1 : 0);
+          break;
+        case 'updated_at':
+          cmp = (a.updated_at ?? '') < (b.updated_at ?? '') ? -1 : (a.updated_at ?? '') > (b.updated_at ?? '') ? 1 : 0;
+          break;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [licenses, statusFilter, searchQuery, sortKey, sortDir]);
 
   const stats = useMemo(() => {
     const total = licenses.length;
@@ -346,23 +383,59 @@ export default function LicensePage() {
           <table className="w-full">
             <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-10">
               <tr>
-                <th className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase">
-                  Driver
+                <th
+                  onClick={() => handleSort('driver_name')}
+                  className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Driver
+                    {sortKey === 'driver_name' ? (sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                  </span>
                 </th>
-                <th className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase">
-                  Division
+                <th
+                  onClick={() => handleSort('driver_division')}
+                  className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Division
+                    {sortKey === 'driver_division' ? (sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                  </span>
                 </th>
-                <th className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase">
-                  Active Points
+                <th
+                  onClick={() => handleSort('activePoints')}
+                  className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Active Points
+                    {sortKey === 'activePoints' ? (sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                  </span>
                 </th>
-                <th className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase">
-                  Next Expiry
+                <th
+                  onClick={() => handleSort('nextExpiry')}
+                  className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Next Expiry
+                    {sortKey === 'nextExpiry' ? (sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                  </span>
                 </th>
-                <th className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase">
-                  Status
+                <th
+                  onClick={() => handleSort('isSuspended')}
+                  className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Status
+                    {sortKey === 'isSuspended' ? (sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                  </span>
                 </th>
-                <th className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase">
-                  Last Updated
+                <th
+                  onClick={() => handleSort('updated_at')}
+                  className="px-3 py-1.5 text-left text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Last Updated
+                    {sortKey === 'updated_at' ? (sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                  </span>
                 </th>
               </tr>
             </thead>
@@ -457,7 +530,7 @@ export default function LicensePage() {
                         {loadingIncidentsFor === license.id ? (
                           <div className="flex items-center gap-2">
                             <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-                            <span className="text-xs text-slate-400">Loading incidents…</span>
+                            <span className="text-xs text-slate-400">Loading incidents...</span>
                           </div>
                         ) : driverIncidents.length === 0 ? (
                           <p className="text-xs text-slate-400 dark:text-slate-500">No incidents on record.</p>

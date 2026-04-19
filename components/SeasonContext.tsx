@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { Season } from '@/types';
 
 interface SeasonContextType {
@@ -15,11 +16,33 @@ interface SeasonContextType {
 }
 
 const SeasonContext = createContext<SeasonContextType | undefined>(undefined);
+const SELECTED_SEASON_STORAGE_KEY = 'selectedSeasonId';
+
+const getLatestSeason = (seasonList: Season[]) => {
+  return [...seasonList].sort((a, b) => {
+    if (a.startDate && b.startDate) return b.startDate.localeCompare(a.startDate);
+    const numA = parseInt(a.name.match(/(\d+)/)?.[1] || '0', 10);
+    const numB = parseInt(b.name.match(/(\d+)/)?.[1] || '0', 10);
+    return numB - numA;
+  })[0] || null;
+};
 
 export function SeasonProvider({ children }: { children: ReactNode }) {
   const [seasons, setSeasons] = useState<Season[]>([]);
-  const [selectedSeason, setSelectedSeason] = useState<Season | null>(null);
+  const [selectedSeason, setSelectedSeasonState] = useState<Season | null>(null);
   const [loading, setLoading] = useState(true);
+  const pathname = usePathname();
+
+  const setSelectedSeason = (season: Season | null) => {
+    setSelectedSeasonState(season);
+    if (typeof window === 'undefined') return;
+
+    if (season?.id) {
+      localStorage.setItem(SELECTED_SEASON_STORAGE_KEY, season.id);
+    } else {
+      localStorage.removeItem(SELECTED_SEASON_STORAGE_KEY);
+    }
+  };
 
   const refreshSeasons = async () => {
     try {
@@ -30,20 +53,28 @@ export function SeasonProvider({ children }: { children: ReactNode }) {
       }
       const data = await response.json();
       setSeasons(data);
-      // If we have a selected season, update it with fresh data
-      if (selectedSeason) {
-        const updatedSelectedSeason = data.find((s: Season) => s.id === selectedSeason.id);
+
+      // Keep currently selected season if possible, otherwise restore from persisted preference.
+      const persistedSeasonId = typeof window !== 'undefined'
+        ? localStorage.getItem(SELECTED_SEASON_STORAGE_KEY)
+        : null;
+      const targetSeasonId = selectedSeason?.id || persistedSeasonId;
+
+      if (targetSeasonId) {
+        const updatedSelectedSeason = data.find((s: Season) => s.id === targetSeasonId);
         if (updatedSelectedSeason) {
           setSelectedSeason(updatedSelectedSeason);
+          return;
         }
-      } else if (data.length > 0) {
-        // Default to the latest season: sort by start date desc, then by parsed season number desc
-        const latest = [...data].sort((a, b) => {
-          if (a.startDate && b.startDate) return b.startDate.localeCompare(a.startDate);
-          const numA = parseInt(a.name.match(/(\d+)/)?.[1] || '0', 10);
-          const numB = parseInt(b.name.match(/(\d+)/)?.[1] || '0', 10);
-          return numB - numA;
-        })[0];
+
+        if (persistedSeasonId && typeof window !== 'undefined') {
+          localStorage.removeItem(SELECTED_SEASON_STORAGE_KEY);
+        }
+      }
+
+      // Only auto-select latest on dashboard startup when nothing is selected/persisted.
+      if (!selectedSeason && !persistedSeasonId && data.length > 0 && pathname === '/dashboard') {
+        const latest = getLatestSeason(data);
         setSelectedSeason(latest);
       }
     } catch (error) {
@@ -111,7 +142,8 @@ export function SeasonProvider({ children }: { children: ReactNode }) {
       await refreshSeasons();
       if (selectedSeason?.id === seasonId) {
         const remainingSeasons = seasons.filter(s => s.id !== seasonId);
-        setSelectedSeason(remainingSeasons[0] || null);
+        const fallback = getLatestSeason(remainingSeasons);
+        setSelectedSeason(fallback);
       }
     } catch (error) {
       console.error('Failed to delete season:', error);
